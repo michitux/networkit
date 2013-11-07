@@ -48,25 +48,24 @@ public:
 	 */
 	Clustering();
 
-	// FIXME: the constructor is outdated and will lead to an error if nodes from the graph have been deleted
 	/**
 	 * Construct new clustering.
 	 *
-	 * @param[in]	n	number of nodes
+	 * @param[in]	z	upper node id bound
 	 */
-	Clustering(count n);
+	Clustering(index z);
 
 	virtual ~Clustering();
 
 
 	/**
-	 * Set a human-readable identifier (vulg. a "name") for the graph instance.
+	 * Set a human-readable identifier for the instance.
 	 */
 	void setName(std::string name);
 
 
 	/**
-	 * Get the human-readable identifier (vulg. the "name") of the graph
+	 * Get the human-readable identifier
 	 */
 	std::string getName() const;
 

@@ -114,6 +114,25 @@ cdef class Graph:
 		return self._this.getName()
 
 
+cdef extern from "../src/graph/BFS.h":
+	cdef cppclass _BFS "NetworKit::BFS":
+		_BFS() except +
+		vector[count] run(_Graph G, node source)
+
+cdef class BFS:
+	""" simple breadth-first search"""
+	cdef _BFS _this
+
+	def run(self, Graph G not None, source):
+		"""
+		Breadth-first search from source.
+		return Vector of unweighted distances from node @a source, i.e. the
+	 		length (number of edges) of the shortest path from source to any other vertex.
+		"""
+		return self._this.run(G._this, source)
+
+
+
 # Module: generators
 	
 cdef extern from "../src/graph/GraphGenerator.h":
@@ -320,19 +339,21 @@ cdef class Modularity:
 
 cdef class Clusterer:
 	""" Abstract base class for static community detection algorithms"""
-	def run(self, Graph G not None):
-		raise NotImplementedError("abstract method")
+	pass
 
-cdef extern from "../src/community/LabelPropagation.h":
-	cdef cppclass _LabelPropagation "NetworKit::LabelPropagation":
-		_LabelPropagation() except +
+cdef extern from "../src/community/PLP.h":
+	cdef cppclass _PLP "NetworKit::PLP":
+		_PLP() except +
 		_Clustering run(_Graph _G)
 		count numberOfIterations()
 		string toString()
 
 
-cdef class LabelPropagation(Clusterer):
-	cdef _LabelPropagation _this
+cdef class PLP(Clusterer):
+	""" Parallel label propagation for community detection: 
+		Moderate solution quality, very short time to solution.
+	 """
+	cdef _PLP _this
 	
 	def run(self, Graph G not None):
 		return Clustering().setThis(self._this.run(G._this))
@@ -359,20 +380,22 @@ cdef class LPDegreeOrdered(Clusterer):
 	def numberOfIterations(self):
 		return self._this.numberOfIterations()
 	
-	
 
-cdef extern from "../src/community/Louvain.h":
-	cdef cppclass _Louvain "NetworKit::Louvain":
-		_Louvain() except +
-		_Louvain(string par, double gamma)
+cdef extern from "../src/community/PLM.h":
+	cdef cppclass _PLM "NetworKit::PLM":
+		_PLM() except +
+		_PLM(string par, double gamma)
 		_Clustering run(_Graph _G)
 		string toString()
 		
-cdef class Louvain(Clusterer):
-	cdef _Louvain _this
+cdef class PLM(Clusterer):
+	""" Parallel Louvain method for community detection: 
+	High solution quality, moderate time to solution. """
+
+	cdef _PLM _this
 	
 	def __cinit__(self, par="balanced", gamma=1.0):
-		self._this = _Louvain(stdstring(par), gamma)
+		self._this = _PLM(stdstring(par), gamma)
 	
 	def run(self, Graph G not None):
 		return Clustering().setThis(self._this.run(G._this))
@@ -380,26 +403,48 @@ cdef class Louvain(Clusterer):
 	def toString(self):
 		return self._this.toString().decode("utf-8")
 
-# PLM2
 
-cdef extern from "../src/community/PLM2.h":
-	cdef cppclass _PLM2 "NetworKit::PLM2":
-		_PLM2() except +
-		_PLM2(string par, double gamma)
-		_Clustering run(_Graph _G)
-		string toString()
+# TODO: EPP - possible solution would be a rewrite with templates
 
-cdef class PLM2:
-	cdef _PLM2 _this
+# FIXME: PLM2 
+# FIXME: CNM
 
-	def __cinit__(self, par="balanced", gamma=1.0):
-		self._this = _PLM2(stdstring(par), gamma)
+# # PLM2
 
-	def run(self, Graph G):
-		return Clustering().setThis(self._this.run(G._this))
+# cdef extern from "../src/community/PLM2.h":
+# 	cdef cppclass _PLM2 "NetworKit::PLM2":
+# 		_PLM2() except +
+# 		_PLM2(string par, double gamma)
+# 		_Clustering run(_Graph _G)
+# 		string toString()
 
-	def toString(self):
-		return self._this.toString().decode("utf-8")
+# cdef class PLM2:
+# 	cdef _PLM2 _this
+
+# 	def __cinit__(self, par="balanced", gamma=1.0):
+# 		self._this = _PLM2(stdstring(par), gamma)
+
+# 	def run(self, Graph G):
+# 		return Clustering().setThis(self._this.run(G._this))
+
+# 	def toString(self):
+# 		return self._this.toString().decode("utf-8")
+
+
+# cdef extern from "../src/community/CNM.h":
+# 	cdef cppclass _CNM "NetworKit::CNM":
+# 		_CNM() except +
+# 		_Clustering run(_Graph _G)
+# 		string toString()
+
+# cdef class CNM:
+# 	cdef _CNM _this
+
+# 	def run(self, Graph G):
+# 		return Clustering().setThis(self._this.run(G._this))
+
+# 	def toString(self):
+# 		return self._this.toString().decode("utf-8")
 
 
 # Module: properties
@@ -438,7 +483,7 @@ cdef class GraphProperties:
 
 cdef extern from "../src/properties/ConnectedComponents.h":
 	cdef cppclass _ConnectedComponents "NetworKit::ConnectedComponents":
-		ConnectedComponents() except +
+		_ConnectedComponents() except +
 		void run(_Graph G)
 		count numberOfComponents()
 		count sizeOfComponent(index component)
@@ -464,5 +509,23 @@ cdef class ConnectedComponents:
 		return self._this.getComponent(componentIndex)
 
 
+# module: independentset
 
-	
+cdef extern from "../src/independentset/Luby.h":
+	cdef cppclass _Luby "NetworKit::Luby":
+		_Luby() except +
+		vector[bool] run(_Graph G)
+		string toString()
+
+cdef class Luby:
+	""" Luby's parallel maximal independent set algorithm"""
+	cdef _Luby _this
+
+	def run(self, Graph G not None):
+		return self._this.run(G._this)
+
+	def toString(self):
+		return self._this.toString().decode("utf-8")
+
+
+
