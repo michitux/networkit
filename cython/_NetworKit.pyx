@@ -283,7 +283,20 @@ cdef class FastMETISGraphReader:
 		pathbytes = path.encode("utf-8") # string needs to be converted to bytes, which are coerced to std::string
 		cdef _Graph _G = self._this.read(pathbytes)
 		return Graph(0).setThis(_G)
+
+cdef extern from "../src/io/METISGraphWriter.h":
+	cdef cppclass _METISGraphWriter "NetworKit::METISGraphWriter":
+		_METISGraphWriter() except +
+		void write(_Graph G, string path) except +
+
+
+cdef class METISGraphWriter:
+	""" Writes graphs in the METIS format"""
+	cdef _METISGraphWriter _this
 	
+	def write(self, Graph G not None, path):
+		 # string needs to be converted to bytes, which are coerced to std::string
+		self._this.write(G._this, stdstring(path)) 
 	
 
 cdef extern from "../src/io/DotGraphWriter.h":
@@ -305,8 +318,8 @@ cdef extern from "../src/io/EdgeListIO.h":
 	cdef cppclass _EdgeListIO "NetworKit::EdgeListIO":
 		_EdgeListIO() except +
 		_EdgeListIO(char separator, node firstNode) except +
-		_Graph read(string path)
-		void write(_Graph G, string path)
+		_Graph read(string path) except +
+		void write(_Graph G, string path) except +
 
 cdef class EdgeListIO:
 	""" Reads and writes graphs in various edge list formats"""
