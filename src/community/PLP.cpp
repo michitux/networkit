@@ -47,6 +47,10 @@ Clustering PLP::run(Graph& G) {
 	}
 
 	count n = G.numberOfNodes();
+	// update threshold heuristic
+	if (updateThreshold == none) {
+		updateThreshold = (count) (n / 1e5);
+	}
 
 	// set unique label for each node
 	Clustering labels(n);
@@ -212,12 +216,7 @@ Clustering PLP::run(Graph& G) {
 
 std::string PLP::toString() const {
 	std::stringstream strm;
-	// FIXME: report current number of threads
-#ifdef _OPENMP_
-	strm << "LabelPropagation(" << "version=" << this->VERSION << ", randOrder=" << RAND_ORDER << ",updateThreshold=" << this->updateThreshold << ",OpenMP)";
-#else
-	strm << "LabelPropagation(" << "version=" << this->VERSION << ", randOrder=" << RAND_ORDER << ",updateThreshold=" << this->updateThreshold << ",threads=1)";
-#endif
+	strm << "PLP(" << "version=" << this->VERSION << ", randOrder=" << RAND_ORDER << ",updateThreshold=" << this->updateThreshold << ")";
 	return strm.str();
 }
 

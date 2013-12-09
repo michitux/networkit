@@ -12,6 +12,7 @@ from libc.stdint cimport int64_t
 from libcpp cimport bool
 from libcpp.vector cimport vector
 from libcpp.utility cimport pair
+from libcpp.map cimport map
 from libcpp.string cimport string
 # FIXME: from libcpp.unordered_map import unordered_map
 
@@ -41,7 +42,8 @@ def pystring(stdstring):
 
 cdef extern from "../src/auxiliary/Log.h" namespace "Aux":
 	void _configureLogging "Aux::configureLogging" (string loglevel)
-	string _currentLogLevel "Aux::currentLogLevel" ()
+	string _currentLogLevel "Aux::currentLogLevel" () except +
+	void _setLoglevel "Aux::setLoglevel" (string loglevel) except +
 	
 def configureLogging(loglevel="ERROR"):
 	""" Set the loglevel of the LOG4CXX module"""
@@ -51,8 +53,39 @@ def currentLogLevel():
 	""" Get the current log level"""
 	return pystring(_currentLogLevel());
 
+def setLoglevel(loglevel):
+	""" Set the current loglevel"""
+	_setLoglevel(stdstring(loglevel))
+
+
+cdef extern from "../src/auxiliary/Parallelism.h" namespace "Aux":
+	void _setNumberOfThreads "Aux::setNumberOfThreads" (int)
+	int _getCurrentNumberOfThreads "Aux::getCurrentNumberOfThreads" ()
+	int _getMaxNumberOfThreads "Aux::getMaxNumberOfThreads" ()
+	void _enableNestedParallelism "Aux::enableNestedParallelism" ()
+
+def setNumberOfThreads(nThreads):
+	""" Set the number of OpenMP threads """
+	_setNumberOfThreads(nThreads)
+
+def getCurrentNumberOfThreads():
+	""" Get the number of currently running threads"""
+	return _getCurrentNumberOfThreads()
+
+def getMaxNumberOfThreads():
+	""" Get the maximum number of available threads"""
+	return _getMaxNumberOfThreads()
+
+def enableNestedParallelism():
+	""" Enable nested parallelism for OpenMP"""
+	_enableNestedParallelism()
+
 # Class definitions
 
+
+## Module: engineering
+
+# TODO: timer
 
 ## Module: graph
 
@@ -60,20 +93,20 @@ cdef extern from "../src/graph/Graph.h":
 	cdef cppclass _Graph "NetworKit::Graph":
 		_Graph() except +
 		_Graph(count) except +
-		count numberOfNodes()
-		count numberOfEdges()
-		node addNode()
-		void removeNode(node u)
-		void addEdge(node u, node v, edgeweight w)
-		void removeEdge(node u, node v)
-		bool hasEdge(node u, node v)
-		edgeweight weight(node u, node v)
-		vector[node] nodes()
-		vector[pair[node, node]] edges()
-		void markAsWeighted()
-		bool isMarkedAsWeighted()
-		string toString()
-		string getName()
+		count numberOfNodes() except +
+		count numberOfEdges() except +
+		node addNode() except +
+		void removeNode(node u) except +
+		void addEdge(node u, node v, edgeweight w) except +
+		void removeEdge(node u, node v) except +
+		bool hasEdge(node u, node v) except +
+		edgeweight weight(node u, node v) except +
+		vector[node] nodes() except +
+		vector[pair[node, node]] edges() except +
+		void markAsWeighted() except +
+		bool isMarkedAsWeighted() except +
+		string toString() except +
+		string getName() except +
 		
 
 cdef class Graph:
@@ -89,6 +122,65 @@ cdef class Graph:
 		#del self._this
 		self._this = other
 		return self
+	
+	def numberOfNodes(self):
+		return self._this.numberOfNodes()
+	
+	def numberOfEdges(self):
+		return self._this.numberOfEdges()
+	
+	def addNode(self):
+		return self._this.addNode()
+	
+	def removeNode(self, u):
+		self._this.removeNode(u)
+		
+	def addEdge(self, u, v, w=1.0):
+		self._this.addEdge(u, v, w)
+		
+	def removeEdge(self, u, v):
+		self._this.removeEdge(u, v)
+		
+	def hasEdge(self, u, v):
+		return self._this.hasEdge(u, v)
+		
+	def weight(self, u, v):
+		return self._this.weight(u, v)
+		
+	def nodes(self):
+		return self._this.nodes()
+	
+	def edges(self):
+		return self._this.edges()
+	
+	def markAsWeighted(self):
+		self._this.markAsWeighted()
+	
+	def isMarkedAsWeighted(self):
+		return self._this.isMarkedAsWeighted()
+
+	def toString(self):
+		return self._this.toString()
+
+	def getName(self):
+		return self._this.getName()
+
+
+cdef class Graph2:
+	"""An undirected, optionally weighted graph"""
+	cdef _Graph* _this
+	
+	def __cinit__(self, n=0):
+		self._this = new _Graph(n)
+		
+	# any _thisect which appears as a return type needs to implement setThis
+	cdef setThis(self, _Graph* other):
+		del self._this
+		self._this = other
+		return self
+
+	def __dealloc__(self):
+		del self._this
 	
 	def numberOfNodes(self):
 		return self._this.numberOfNodes()
@@ -227,7 +319,8 @@ cdef class BarabasiAlbertGenerator:
 cdef extern from "../src/io/METISGraphReader.h":
 	cdef cppclass _METISGraphReader "NetworKit::METISGraphReader":
 		_METISGraphReader() except +
-		_Graph read(string path)
+		_Graph read(string path) except +
+		_Graph* readToHeap(string path) except +
 
 cdef class METISGraphReader:
 	""" Reads the METIS adjacency file format [1]
@@ -237,14 +330,16 @@ cdef class METISGraphReader:
 	
 	def read(self, path):
 		pathbytes = path.encode("utf-8") # string needs to be converted to bytes, which are coerced to std::string
-		cdef _Graph _G = self._this.read(pathbytes)
-		return Graph(0).setThis(_G)
+		return Graph(0).setThis(self._this.read(pathbytes))
+
+	def readToHeap(self, path):
+		return Graph2(0).setThis(self._this.readToHeap(path.encode("utf-8")))
 
 
 cdef extern from "../src/io/FastMETISGraphReader.h":
 	cdef cppclass _FastMETISGraphReader "NetworKit::FastMETISGraphReader":
 		_FastMETISGraphReader() except +
-		_Graph read(string path)
+		_Graph read(string path) except +
 
 cdef class FastMETISGraphReader:
 	""" A faster but currently experimental implementation of a reader for
@@ -256,13 +351,26 @@ cdef class FastMETISGraphReader:
 		pathbytes = path.encode("utf-8") # string needs to be converted to bytes, which are coerced to std::string
 		cdef _Graph _G = self._this.read(pathbytes)
 		return Graph(0).setThis(_G)
+
+cdef extern from "../src/io/METISGraphWriter.h":
+	cdef cppclass _METISGraphWriter "NetworKit::METISGraphWriter":
+		_METISGraphWriter() except +
+		void write(_Graph G, string path) except +
+
+
+cdef class METISGraphWriter:
+	""" Writes graphs in the METIS format"""
+	cdef _METISGraphWriter _this
 	
+	def write(self, Graph G not None, path):
+		 # string needs to be converted to bytes, which are coerced to std::string
+		self._this.write(G._this, stdstring(path)) 
 	
 
 cdef extern from "../src/io/DotGraphWriter.h":
 	cdef cppclass _DotGraphWriter "NetworKit::DotGraphWriter":
 		_DotGraphWriter() except +
-		void write(_Graph G, string path)
+		void write(_Graph G, string path) except +
 
 
 cdef class DotGraphWriter:
@@ -278,8 +386,8 @@ cdef extern from "../src/io/EdgeListIO.h":
 	cdef cppclass _EdgeListIO "NetworKit::EdgeListIO":
 		_EdgeListIO() except +
 		_EdgeListIO(char separator, node firstNode) except +
-		_Graph read(string path)
-		void write(_Graph G, string path)
+		_Graph read(string path) except +
+		void write(_Graph G, string path) except +
 
 cdef class EdgeListIO:
 	""" Reads and writes graphs in various edge list formats"""
@@ -381,11 +489,12 @@ cdef extern from "../src/base/Parameters.h":
 cdef extern from "../src/clustering/Clustering.h":
 	cdef cppclass _Clustering "NetworKit::Clustering":
 		_Clustering() except +
-		count numberOfClusters()
-		cluster clusterOf(node)
-		float getImbalance()
-		vector[count] clusterSizes()
-		vector[node] getMembers(cluster C)
+		count numberOfClusters() except +
+		cluster clusterOf(node) except +
+		float getImbalance() except +
+		vector[count] clusterSizes() except +
+		map[index, count] clusterSizeMap() except +
+		vector[node] getMembers(cluster C) except +
 
 cdef class Clustering:
 	"""
@@ -405,6 +514,9 @@ cdef class Clustering:
 
 	def clusterSizes(self):
 		return self._this.clusterSizes()
+
+	def clusterSizeMap(self):
+		return self._this.clusterSizeMap()
 
 	def getMembers(self, C):
 		return self._this.getMembers(C)
@@ -450,9 +562,10 @@ cdef class Clusterer:
 cdef extern from "../src/community/PLP.h":
 	cdef cppclass _PLP "NetworKit::PLP":
 		_PLP() except +
-		_Clustering run(_Graph _G)
-		count numberOfIterations()
-		string toString()
+		_PLP(count updateThreshold) except +
+		_Clustering run(_Graph _G) except +
+		count numberOfIterations() except +
+		string toString() except +
 
 
 cdef class PLP(Clusterer):
@@ -460,6 +573,13 @@ cdef class PLP(Clusterer):
 		Moderate solution quality, very short time to solution.
 	 """
 	cdef _PLP _this
+
+	def __cinit__(self, updateThreshold=None):
+		if updateThreshold is None:
+			self._this = _PLP()
+		else:
+			self._this = _PLP(updateThreshold)
+
 	
 	def run(self, Graph G not None):
 		return Clustering().setThis(self._this.run(G._this))
@@ -508,9 +628,30 @@ cdef class PLM(Clusterer):
 
 	def toString(self):
 		return self._this.toString().decode("utf-8")
+		
+		
+cdef extern from "../src/community/PLMR.h":
+	cdef cppclass _PLMR "NetworKit::PLMR":
+		_PLMR() except +
+		_PLMR(string par,  bool refine, double gamma) except +
+		string toString() except +
+		_Clustering run(_Graph G) except +
 
 
-# TODO: EPP - possible solution would be a rewrite with templates
+cdef class PLMR(Clusterer):
+	""" MultiLevel Parallel LocalMover - the Louvain method principle extended to
+		a full multi-level algorithm with refinement"""
+		
+	cdef _PLMR _this
+	
+	def __cinit__(self, par="balanced", refine=True, gamma=1.0):
+		self._this = _PLMR(stdstring(par), refine, gamma)
+		
+	def toString(self):
+		return self._this.toString().decode("utf-8")
+		
+	def run(self, Graph G not None):
+		return Clustering().setThis(self._this.run(G._this))
 
 # FIXME: PLM2 
 # FIXME: CNM
@@ -552,6 +693,94 @@ cdef class PLM(Clusterer):
 # 	def toString(self):
 # 		return self._this.toString().decode("utf-8")
 
+cdef class DissimilarityMeasure:
+	""" Abstract base class for partition/community dissimilarity measures"""
+	pass
+
+
+cdef extern from "../src/clustering/NodeStructuralRandMeasure.h":
+	cdef cppclass _NodeStructuralRandMeasure "NetworKit::NodeStructuralRandMeasure":
+		_NodeStructuralRandMeasure() except +
+		double getDissimilarity(_Graph G, _Clustering first, _Clustering second)
+
+cdef class NodeStructuralRandMeasure(DissimilarityMeasure):
+	""" The node-structural Rand measure assigns a similarity value in [0,1]
+		to two partitions of a graph, by considering all pairs of nodes.
+	"""
+	cdef _NodeStructuralRandMeasure _this
+
+	def getDissimilarity(self, Graph G, Clustering first, Clustering second):
+		return self._this.getDissimilarity(G._this, first._this, second._this)
+
+
+cdef extern from "../src/clustering/GraphStructuralRandMeasure.h":
+	cdef cppclass _GraphStructuralRandMeasure "NetworKit::GraphStructuralRandMeasure":
+		_GraphStructuralRandMeasure() except +
+		double getDissimilarity(_Graph G, _Clustering first, _Clustering second)
+
+cdef class GraphStructuralRandMeasure(DissimilarityMeasure):
+	""" The graph-structural Rand measure assigns a similarity value in [0,1]
+		to two partitions of a graph, by considering connected pairs of nodes.
+	"""
+	cdef _GraphStructuralRandMeasure _this
+
+	def getDissimilarity(self, Graph G, Clustering first, Clustering second):
+		return self._this.getDissimilarity(G._this, first._this, second._this)
+
+
+cdef extern from "../src/community/EPP.h":
+	cdef cppclass _EPP "NetworKit::EPP":
+		_Clustering run(_Graph G)
+		string toString()
+
+cdef class EPP(Clusterer):
+	""" EPP - Ensemble Preprocessing """
+	cdef _EPP _this
+
+	def run(self, Graph G):
+		return Clustering().setThis(self._this.run(G._this))
+
+	def toString(self):
+		return self._this.toString()
+
+	cdef setThis(self, _EPP other):
+		self._this = other
+		return self
+
+
+cdef extern from "../src/community/EPPFactory.h":
+	cdef cppclass _EPPFactory "NetworKit::EPPFactory":
+		_EPP make(count ensembleSize, string baseAlgorithm, string finalAlgorithm)
+
+cdef class EPPFactory:
+	""" This class makes instaces of the EPP community detection algorithm"""
+	cdef _EPPFactory _this
+	
+	def make(self, ensembleSize, baseAlgorithm="PLP", finalAlgorithm="PLM"):
+		return EPP().setThis(self._this.make(ensembleSize, stdstring(baseAlgorithm), stdstring(finalAlgorithm)))
+
+cdef extern from "../src/community/CommunityGraph.h":
+	cdef cppclass _CommunityGraph "NetworKit::CommunityGraph":
+		void run(_Graph G, _Clustering zeta) except +
+		_Graph getGraph() except +
+		map[index, node] getCommunityToNodeMap() except +
+		map[node, index] getNodeToCommunityMap() except +
+
+cdef class CommunityGraph:
+	""" Coarsen a graph according to communities """
+	cdef _CommunityGraph _this
+
+	def run(self, Graph G, Clustering zeta):
+		self._this.run(G._this, zeta._this)
+
+	def getGraph(self):
+		return Graph().setThis(self._this.getGraph())
+
+	def getCommunityToNodeMap(self):
+		return self._this.getCommunityToNodeMap()
+
+	def getNodeToCommunityMap(self):
+		return self._this.getNodeToCommunityMap()
 
 # Module: properties
 

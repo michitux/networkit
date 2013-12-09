@@ -17,6 +17,10 @@
 #include "../../io/METISGraphReader.h"
 #include "../EPP.h"
 #include "../../overlap/HashingOverlapper.h"
+#include "../EPPFactory.h"
+#include "../PLMR.h"
+#include "../CommunityGraph.h"
+#include "../PLM2.h"
 
 
 
@@ -370,6 +374,59 @@ TEST_F(ClusteringAlgoGTest, testParallelAgglomerativeAndLouvain) {
 
 // }
 
+TEST_F(ClusteringAlgoGTest, testEPPFactory) {
+
+	EPPFactory factory;
+	EPP epp = factory.make(4, "PLP", "PLM");
+
+	METISGraphReader reader;
+	Graph jazz = reader.read("input/jazz.graph");
+	Clustering zeta = epp.run(jazz);
+
+	INFO("number of clusters: " << zeta.numberOfClusters());
+
+	EXPECT_TRUE(zeta.isProper(jazz));
+}
+
+TEST_F(ClusteringAlgoGTest, testMLPLMP) {
+	METISGraphReader reader;
+	Modularity modularity;
+	Graph G = reader.read("input/PGPgiantcompo.graph");
+
+	PLMR plmr("none", false, 1.0);
+	Clustering zeta = plmr.run(G);
+
+	INFO("number of clusters: " << zeta.numberOfClusters());
+	INFO("modularity: " << modularity.getQuality(zeta, G));
+	EXPECT_TRUE(zeta.isProper(G));
+
+	PLMR plmr2("none", true, 1.0);
+	Clustering zeta2 = plmr2.run(G);
+
+	INFO("number of clusters: " << zeta2.numberOfClusters());
+	INFO("modularity: " << modularity.getQuality(zeta2, G));
+	EXPECT_TRUE(zeta2.isProper(G));
+
+}
+
+TEST_F(ClusteringAlgoGTest, testCommunityGraph) {
+	CommunityGraph com;
+	METISGraphReader reader;
+	Graph G = reader.read("input/jazz.graph");
+	ClusteringGenerator clusteringGen;
+
+	Clustering one = clusteringGen.makeOneClustering(G);
+	com.run(G, one);
+	EXPECT_EQ(1, com.getGraph().numberOfNodes());
+
+	Clustering singleton = clusteringGen.makeSingletonClustering(G);
+	com.run(G, singleton);
+	EXPECT_EQ(G.numberOfNodes(), com.getGraph().numberOfNodes());
+
+	Clustering zeta = (new PLP())->run(G);
+	com.run(G, zeta);
+	EXPECT_EQ(zeta.numberOfClusters(), com.getGraph().numberOfNodes());
+}
 
 
 } /* namespace NetworKit */

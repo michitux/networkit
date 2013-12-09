@@ -91,10 +91,11 @@ If remote changes have happened in multiple branches and you pull them, these br
 
 ### Contributions
 
-Users of NetworKit are welcome to contribute their modifications. For incremental improvements we recommend working on the `Dev` branch.  We recommend the following workflow:
+Users of NetworKit are welcome to contribute their modifications. New features must be added to the `Dev` branch, not the `default` branch.  We recommend the following workflow:
 
 1. create a fork of the main repository
-2. commit your changes to the `Dev` branch
+2. switch to the `Dev` branch
+2. make and commit your changes while being on the `Dev` branch
 3. send a pull request to the main repository
 
 
@@ -184,6 +185,7 @@ Unit tests for NetworKit are based on the `googletest` library. For more informa
 - Use the `count` and `index` integer types for non-negative integer quantities and indices.
 - In most cases, objects are passed by reference. New objects are stack-allocated and returned by value. Avoid pointers and `new` where possible.
 - Use the `override` keyword to indicate that a method overrides a virtual method in the superclass.
+- In Python, indent using tabs, not spaces.
 
 
 ### Exposing C++ Code to Python
