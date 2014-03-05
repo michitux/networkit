@@ -64,8 +64,8 @@ A not necessarily complete list of features:
 	- connected components (`properties.ConnectedComponents`)
 	- local clustering coefficient (e.g. `properties.GraphProperties.averageLocalClusteringCoefficient`)
 - graph generators
-	- Erdös-Renyi (`generators.GraphGenerator.makeRandomGraph`)
-	- Barabasi-Albert (`generators.GraphGenerator.makeRandomGraph`)
+	- Erdös-Renyi (`generators.ErdosRenyiGenerator`)
+	- Barabasi-Albert (`generators.BarabasiAlbertGenerator`)
 - traversal
 	- breadth-first search (`graph.BFS`)
 	- Dijkstra's algorithm (`graph.Dijkstra`)
@@ -148,8 +148,8 @@ Credits
 - Florian Weber
 - Patrick Flick
 - Daniel Hoske
-- J�rg Weisbarth
-- Guido Br�ckner
+- Jörg Weisbarth
+- Guido Brückner
 
 
 ### External Code
@@ -179,7 +179,6 @@ A C++ compiler supporting C++11 (we use GCC 4.8). The compiler and linker flags 
 ### Libraries:
 
 - `OpenMP`		for parallelism
-- `Googletest` 	for unit testing
 
 To avoid possible binary incompatibilities, try to build these libraries with the same compiler that will be used to build NetworKit. 
 
@@ -221,29 +220,14 @@ Alternatively, the project can be built with Eclipse. Our Eclipse and CDT projec
 Test
 ----
 
-Next, verify that the code was built correctly: Run all unit tests with 
-
-		./NetworKit-Tests-D --tests
-
-Performance tests will be selected with
-
-		./NetworKit-Tests-D --benchmarks
-
-while experimental tests are called with
-
-		./NetworKit-Tests-D --trials
-
-To run only specific unit tests, you can also add a filter expression, e. g.:
-
-		./NetworKit-Tests --gtest_filter=*PartitionGTest*
-
-runs only unit tests for the Partition data structure.
+You actually don't need to build and run our unit tests. However if you experience any issues with NetworKit, you might want to check, if NetworKit runs properly. Please refer to the `Unit Tests and Testing` section in our DevGuide.pdf
 
 
 Building NetworKit as a Python Module
 --------------------------------------
 
 As of version 2.0 NetworKit is meant to be used as a Python extension module. To build the module, the following is required:
+
 - Python 3 (>= 3.3 recommended)
 - Cython
 
@@ -251,21 +235,31 @@ Additionally, the module uses the following external Python packages:
 
 - `networkx`
 - `tabulate`
+- `scipy`
+- `matplotlib`
 
+The functionality of NetworKit available to Python is greatly reduced without these packages. 
 These are best installed via `easy_install` or `pip`. (If you have multiple Python installations, be sure you use the commands matching your Python 3 version. In the following examples, `python3` and `pip3` will be used.) 
 
 	pip3 install package_name
 
 
-The next step is to compile NetworKit as a library with
+Then, switch to the top folder and run the script `setup.py` with the following options:
 
-	scons --optimize=O --target=Core
+	python3 setup.py build_ext --inplace [--optimize=V] [-jX]
 
-After everything is compiled, switch to the cython folder and use the build script (`build.sh`) or manually call
+The script will call scons to compile NetworKit as a library and then build the extensions in the folder `src/python`. By default, NetworKit will be build with the amount of available cores in optimized mode. It is possible the add the options `--optimize=V` and `-jN` the same way it can be done to a manual scons call.
+The setup script provides more functionality:
+	
+	python3 setup.py develop [--uninstall] [--optimize=V] [-jX]
+	
+will compile NetworKit, build the extensions and on top of that temporarily install NetworKit so that it is available on the whole system. This can be undone by adding `--uninstall`. 
 
-	python3 setup.py build_ext --inplace
+	python3 setup.py clean [--optimize=V]
+	
+will remove the extensions and its build folder as well as call scons to remove the NetworKit library and its build folder specified by `--optimize=V`.
 
-This will create the extension module `NetworKit`. The resulting module can be imported in python:
+Assuming the extension module `NetworKit` exists, it can be imported in python:
 
 	python3
 	>>> import NetworKit
