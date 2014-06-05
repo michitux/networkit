@@ -11,7 +11,7 @@
 #include "gtest/gtest.h"
 #include "../IncidenceMatrix.h"
 #include "../Vector.h"
-#include "../../graph/graph.h"
+#include "../../graph/Graph.h"
 
 namespace NetworKit {
 
