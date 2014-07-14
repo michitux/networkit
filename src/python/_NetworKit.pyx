@@ -1207,6 +1207,19 @@ cdef class SNAPEdgeListPartitionReader:
 #	def Write(self, Partition zeta, path):
 #		self._this.write(zeta._this, stdstring(path))
 
+cdef extern from "../cpp/io/CoverReader.h":
+	cdef cppclass _CoverReader "NetworKit::CoverReader":
+		_CoverReader() except +
+		_Cover read(string path,_Graph G) except +
+
+cdef class CoverReader:
+	""" Reads a cover from a file
+		File format: each line contains the space-separated node ids of a community
+	 """
+	cdef _CoverReader _this
+
+	def read(self, path, Graph G):
+		return Cover().setThis(self._this.read(stdstring(path), dereference(G._this)))
 
 # Parameters
 
@@ -2076,7 +2089,7 @@ cdef class GraphStructuralRandMeasure(DissimilarityMeasure):
 
 cdef extern from "../cpp/community/JaccardMeasure.h":
 	cdef cppclass _JaccardMeasure "NetworKit::JaccardMeasure":
-		J_accardMeasure() except +
+		_JaccardMeasure() except +
 		double getDissimilarity(_Graph G, _Partition first, _Partition second)
 
 cdef class JaccardMeasure(DissimilarityMeasure):
@@ -2087,7 +2100,19 @@ cdef class JaccardMeasure(DissimilarityMeasure):
 	def getDissimilarity(self, Graph G, Partition first, Partition second):
 		return self._this.getDissimilarity(dereference(G._this), first._this, second._this)
 
+cdef extern from "../cpp/community/NMIDistance.h":
+	cdef cppclass _NMIDistance "NetworKit::NMIDistance":
+		_NMIDistance() except +
+		double getDissimilarity(_Graph G, _Partition first, _Partition second)
 
+cdef class NMIDistance(DissimilarityMeasure):
+	""" The NMI distance assigns a similarity value in [0,1] to two partitions
+		of a graph.
+	"""
+	cdef _NMIDistance _this
+
+	def getDissimilarity(self, Graph G, Partition first, Partition second):
+		return self._this.getDissimilarity(dereference(G._this), first._this, second._this)
 
 cdef extern from "../cpp/community/EPP.h":
 	cdef cppclass _EPP "NetworKit::EPP":
