@@ -1,5 +1,5 @@
 /*
- * Betweenness.cpp
+ * Betweenness2.cpp
  *
  *  Created on: 29.07.2014
  *      Author: cls, ebergamini

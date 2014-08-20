@@ -72,7 +72,7 @@ void Dijkstra::run(node t) {
 			stack.push(current);
 		}
 
-		G.forWeightedEdgesOf(current, relax);
+		G.forEdgesOf(current, relax);
 	}
 
 }

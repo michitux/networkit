@@ -35,8 +35,8 @@ void DynDijkstra2::run(node t) {
 	}
 	// insert all neighbors of each vertex u in its priority queue
 	G.forNodes([&](node u){
-		G.forWeightedNeighborsOf(u, [&](node v, edgeweight w){
-			N[u].insert(-1*(distances[v]-w), v);
+		G.forNeighborsOf(u, [&](node v, edgeweight w){
+			N[u].insert(distances[v]-w, v);
 		});
 	});
 }

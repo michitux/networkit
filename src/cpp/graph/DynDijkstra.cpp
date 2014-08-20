@@ -69,7 +69,7 @@ void DynDijkstra::update(const std::vector<GraphEvent>& batch) {
 			previous[current].clear();
 		}
 		npaths[current] = 0;
-		G.forWeightedNeighborsOf(current, [&](node z, edgeweight w){
+		G.forNeighborsOf(current, [&](node z, edgeweight w){
 			//z is a predecessor of current node
 			if (distances[current] == distances[z]+w) {
 				if (storePreds) {
