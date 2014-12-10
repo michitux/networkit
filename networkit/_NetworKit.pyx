@@ -3626,8 +3626,29 @@ cdef class LFRGenerator(Algorithm):
 # 	def fit(cls, Graph G):
 # 		return cls(G)
 
+cdef extern from "cpp/generators/TreeReachabilityGraphGenerator.h":
+	cdef cppclass _TreeReachabilityGraphGenerator "NetworKit::TreeReachabilityGraphGenerator":
+		_TreeReachabilityGraphGenerator(const _Graph &input) except +
+		void run() except +
+		_Graph getGraph() except +
 
+cdef class TreeReachabilityGraphGenerator:
+	cdef _TreeReachabilityGraphGenerator *_this
+	cdef Graph _input
 
+	def __cinit__(self, Graph input not None):
+		self._input = input
+		self._this = new _TreeReachabilityGraphGenerator(input._this)
+
+	def __dealloc__(self):
+		del self._this
+
+	def run(self):
+		self._this.run()
+		return self
+
+	def getGraph(self):
+		return Graph().setThis(self._this.getGraph())
 
 # Module: graphio
 
