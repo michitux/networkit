@@ -39,6 +39,7 @@
 #include <networkit/generators/ClusteredRandomGraphGenerator.hpp>
 #include <networkit/generators/ErdosRenyiGenerator.hpp>
 #include <networkit/community/CoverF1Similarity.hpp>
+#include <networkit/community/QuasiThresholdEditingLocalMover.h"
 
 #include <tlx/unused.hpp>
 
@@ -720,6 +721,15 @@ TEST_F(CommunityGTest, testCoverF1Similarity) {
     EXPECT_DOUBLE_EQ(0.0, sim.getValue(2));
     EXPECT_DOUBLE_EQ((1.0 + f1) / 3.0, sim.getUnweightedAverage());
     EXPECT_DOUBLE_EQ((1.0 * 10.0 + f1 * 10.0) / 29.0, sim.getWeightedAverage());
+}
+
+TEST_F(CommunityGTest, testQuasiThresholdEditingLocalMover) {
+	Graph karate = METISGraphReader().read("input/karate.graph");
+	std::vector<node> parents = {none, 0, 1, 2, 5, 0, 4, 3, 32, 33, 4, 0, 0, 3, 32, 32, 5, 1, 32, 1, 32, 1, 32, 32, none, 24, 33, 33, 33, 23, 8, 32, 33, none};
+
+	QuasiThresholdEditingLocalMover mover(karate, parents, 1);
+	mover.run();
+	EXPECT_EQ(21, mover.getNumberOfEdits());
 }
 
 } /* namespace NetworKit */

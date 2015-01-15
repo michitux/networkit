@@ -6031,6 +6031,35 @@ cdef class CutClustering(CommunityDetector):
 			pyResult[res.first] = Partition().setThis(res.second)
 		return pyResult
 
+cdef extern from "cpp/community/QuasiThresholdEditingLocalMover.h":
+	cdef cppclass _QuasiThresholdEditingLocalMover "NetworKit::QuasiThresholdEditingLocalMover":
+		_QuasiThresholdEditingLocalMover(_Graph G, vector[node] parents, count maxIterations) except +
+		void run() except +
+		count getNumberOfEdits() const
+		_Graph getQuasiThresholdGraph() except +
+
+cdef class QuasiThresholdEditingLocalMover:
+	cdef _QuasiThresholdEditingLocalMover *_this
+	cdef Graph _G
+
+	def __cinit__(self, Graph G, vector[node] parents, count maxIterations):
+		self._G = G
+		self._this = new _QuasiThresholdEditingLocalMover(G._this, parents, maxIterations)
+
+	def __dealloc__(self):
+		del self._this
+
+	def run(self):
+		self._this.run()
+		return self
+
+	def getNumberOfEdits(self):
+		return self._this.getNumberOfEdits()
+
+	def getQuasiThresholdGraph(self):
+		return Graph().setThis(self._this.getQuasiThresholdGraph())
+
+
 cdef class DissimilarityMeasure:
 	""" Abstract base class for partition/community dissimilarity measures """
 	# TODO: use conventional class design of parametrized constructor, run-method and getters
