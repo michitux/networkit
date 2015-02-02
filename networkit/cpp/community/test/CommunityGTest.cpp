@@ -727,11 +727,38 @@ TEST_F(CommunityGTest, testCoverF1Similarity) {
 
 TEST_F(CommunityGTest, testQuasiThresholdEditingLocalMover) {
 	Graph karate = METISGraphReader().read("input/karate.graph");
-	std::vector<node> parents = {none, 0, 1, 2, 5, 0, 4, 3, 32, 33, 4, 0, 0, 3, 32, 32, 5, 1, 32, 1, 32, 1, 32, 32, none, 24, 33, 33, 33, 23, 8, 32, 33, none};
 
-	QuasiThresholdEditingLocalMover mover(karate, parents, 1);
+	karate.indexEdges();
+	QuasiThresholdEditingLinear editing(karate);
+	editing.run();
+
+	std::vector<node> parents = editing.getParents();
+
+	QuasiThresholdEditingLocalMover mover(karate, parents, 2);
 	mover.run();
 	EXPECT_EQ(21, mover.getNumberOfEdits());
+
+	QuasiThresholdEditingLocalMover tester(karate, mover.getParents(), 0);
+	tester.run();
+	EXPECT_EQ(tester.getNumberOfEdits(), mover.getNumberOfEdits());
+
+	QuasiThresholdEditingLocalMover subtreeMover(karate, parents, 2, true);
+	subtreeMover.run();
+	EXPECT_EQ(21, subtreeMover.getNumberOfEdits());
+
+	QuasiThresholdEditingLocalMover subtreeTester(karate, subtreeMover.getParents(), 0);
+	subtreeTester.run();
+	EXPECT_EQ(subtreeTester.getNumberOfEdits(), subtreeMover.getNumberOfEdits());
+
+	parents.clear();
+	parents.resize(karate.upperNodeIdBound(), none);
+	QuasiThresholdEditingLocalMover noParentsMover(karate, parents, 100, true);
+	noParentsMover.run();
+	INFO("Needed ", noParentsMover.getNumberOfEdits(), " edits without pre-initialized parents");
+
+	QuasiThresholdEditingLocalMover noParentsTester(karate, noParentsMover.getParents(), 0);
+	noParentsTester.run();
+	EXPECT_EQ(noParentsTester.getNumberOfEdits(), noParentsMover.getNumberOfEdits());
 }
 
 TEST_F(CommunityGTest, testQuasiThresholdEditingLinear) {
