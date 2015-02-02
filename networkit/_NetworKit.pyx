@@ -6060,6 +6060,38 @@ cdef class QuasiThresholdEditingLocalMover:
 		return Graph().setThis(self._this.getQuasiThresholdGraph())
 
 
+cdef extern from "cpp/community/QuasiThresholdEditingLinear.h":
+	cdef cppclass _QuasiThresholdEditingLinear "NetworKit::QuasiThresholdEditingLinear":
+		_QuasiThresholdEditingLinear(_Graph G) except +
+		void run() except +
+		vector[node] getParents() except +
+		_Graph getDefiningForest() except +
+		_Graph getQuasiThresholdGraph() except +
+
+cdef class QuasiThresholdEditingLinear:
+	cdef _QuasiThresholdEditingLinear *_this
+	cdef Graph _G
+
+	def __cinit__(self, Graph G):
+		self._G = G
+		self._this = new _QuasiThresholdEditingLinear(G._this)
+
+	def __dealloc__(self):
+		del self._this
+
+	def run(self):
+		self._this.run()
+		return self
+
+	def getParents(self):
+		return self._this.getParents()
+
+	def getDefiningForest(self):
+		return Graph().setThis(self._this.getDefiningForest())
+
+	def getQuasiThresholdGraph(self):
+		return Graph().setThis(self._this.getQuasiThresholdGraph())
+
 cdef class DissimilarityMeasure:
 	""" Abstract base class for partition/community dissimilarity measures """
 	# TODO: use conventional class design of parametrized constructor, run-method and getters

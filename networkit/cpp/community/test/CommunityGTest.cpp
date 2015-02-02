@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+<<<<<<< HEAD
 #include <networkit/community/PLP.hpp>
 #include <networkit/community/PLM.hpp>
 #include <networkit/community/ParallelAgglomerativeClusterer.hpp>
@@ -39,7 +40,8 @@
 #include <networkit/generators/ClusteredRandomGraphGenerator.hpp>
 #include <networkit/generators/ErdosRenyiGenerator.hpp>
 #include <networkit/community/CoverF1Similarity.hpp>
-#include <networkit/community/QuasiThresholdEditingLocalMover.h"
+#include <networkit/community/QuasiThresholdEditingLocalMover.hpp>
+#include <networkit/community/QuasiThresholdEditingLinear.hpp>
 
 #include <tlx/unused.hpp>
 
@@ -730,6 +732,22 @@ TEST_F(CommunityGTest, testQuasiThresholdEditingLocalMover) {
 	QuasiThresholdEditingLocalMover mover(karate, parents, 1);
 	mover.run();
 	EXPECT_EQ(21, mover.getNumberOfEdits());
+}
+
+TEST_F(CommunityGTest, testQuasiThresholdEditingLinear) {
+	Graph karate = METISGraphReader().read("input/karate.graph");
+	karate.indexEdges();
+
+	QuasiThresholdEditingLinear editing(karate);
+	editing.run();
+
+	std::vector<node> parents = editing.getParents();
+	QuasiThresholdEditingLocalMover mover(karate, parents, 0);
+	mover.run();
+	INFO("Linear editing needed ", mover.getNumberOfEdits(), " edits");
+	QuasiThresholdEditingLocalMover mover2(karate, parents, 2);
+	mover2.run();
+	INFO("Moving improved this to ", mover2.getNumberOfEdits(), " edits");
 }
 
 } /* namespace NetworKit */
