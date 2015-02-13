@@ -3,7 +3,8 @@
  */
 
 #include "QuasiThresholdEditingLinear.h"
-#include "../backbones/ChibaNishizekiTriangleCounter.h"
+#include "../edgescores/TriangleEdgeScore.h"
+#include <unordered_map>
 
 NetworKit::QuasiThresholdEditingLinear::QuasiThresholdEditingLinear(const NetworKit::Graph &G) : G(G), hasRun(false) {
 }
@@ -14,8 +15,9 @@ void NetworKit::QuasiThresholdEditingLinear::run() {
 
 	std::vector<count> numConnectedAnchestors(G.upperNodeIdBound(), 0), parentStrength(G.upperNodeIdBound(), 0);
 
-	ChibaNishizekiTriangleCounter triangleCounter;
-	std::vector<int> triangles = triangleCounter.getAttribute(G, std::vector<int>());
+	TriangleEdgeScore triangleCounter(G);
+	triangleCounter.run();
+	std::vector<count> triangles = triangleCounter.scores();
 
 	std::vector<count> pseudoP4C4(G.upperEdgeIdBound(), 0);
 
