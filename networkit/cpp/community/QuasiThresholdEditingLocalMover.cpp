@@ -588,11 +588,11 @@ std::vector< NetworKit::node > NetworKit::QuasiThresholdEditingLocalMover::getPa
 }
 
 
-NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getNumberOfEdits() {
+NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getNumberOfEdits() const {
 	return numEdits;
 }
 
-NetworKit::Graph NetworKit::QuasiThresholdEditingLocalMover::getQuasiThresholdGraph() {
+NetworKit::Graph NetworKit::QuasiThresholdEditingLocalMover::getQuasiThresholdGraph() const {
 	TreeReachabilityGraphGenerator gen(forest);
 	gen.run();
 	return gen.getGraph();

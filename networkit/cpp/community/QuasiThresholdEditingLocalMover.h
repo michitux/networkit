@@ -11,8 +11,8 @@ public:
 
 	void run();
 
-	Graph getQuasiThresholdGraph();
-	count getNumberOfEdits();
+	Graph getQuasiThresholdGraph() const;
+	count getNumberOfEdits() const;
 	count getUsedIterations() const;
 	std::vector<node> getParents() const;
 private:
