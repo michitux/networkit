@@ -95,7 +95,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 				neighborQueue.emplace_back(v);
 			});
 
-			std::sort(neighborQueue.begin(), neighborQueue.end(), [&](node u, node v) {return depth[u] < depth[v];}); // the queue shall be used from the end
+			std::stable_sort(neighborQueue.begin(), neighborQueue.end(), [&](node u, node v) {return depth[u] < depth[v];}); // the queue shall be used from the end
 
 			count level = 0;
 			if (!neighborQueue.empty()) {
