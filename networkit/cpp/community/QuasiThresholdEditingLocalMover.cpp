@@ -41,6 +41,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 	DynamicForest dynamicForest(forest);
 
 	numEdits = countNumberOfEdits();
+	usedIterations = 0;
 
 	bool hasMoved = true;
 	std::vector<bool> marker(G.upperNodeIdBound());
@@ -524,6 +525,10 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 				}
 			}, [](node){});
 		});
+
+		if (hasMoved) {
+			usedIterations = i+1;
+		}
 	}
 
 	forest = dynamicForest.toGraph();
@@ -593,5 +598,6 @@ NetworKit::Graph NetworKit::QuasiThresholdEditingLocalMover::getQuasiThresholdGr
 	return gen.getGraph();
 }
 
-
-
+NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getUsedIterations() const {
+	return usedIterations;
+}

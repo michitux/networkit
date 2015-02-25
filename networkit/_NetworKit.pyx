@@ -6036,6 +6036,7 @@ cdef extern from "cpp/community/QuasiThresholdEditingLocalMover.h":
 		_QuasiThresholdEditingLocalMover(_Graph G, vector[node] parents, count maxIterations, bool moveSubtrees) except +
 		void run() except +
 		count getNumberOfEdits() const
+		count getUsedIterations() const
 		_Graph getQuasiThresholdGraph() except +
 		vector[node] getParents() except +
 
@@ -6056,6 +6057,9 @@ cdef class QuasiThresholdEditingLocalMover:
 
 	def getNumberOfEdits(self):
 		return self._this.getNumberOfEdits()
+
+	def getUsedIterations(self):
+		return self._this.getUsedIterations()
 
 	def getQuasiThresholdGraph(self):
 		return Graph().setThis(self._this.getQuasiThresholdGraph())
