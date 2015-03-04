@@ -135,16 +135,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 					while (c != u) {
 						assert(depth[c] > level);
 
-						if (!nodeTouched[c]) {
-							nodeTouched[c] = true;
-							touchedNodes.push_back(c);
-
-							assert(editDifference[c] == 0);
-
-							editDifference[c] = none;
-						}
-
-						if (editDifference[c] == none) {
+						if (!nodeTouched[c] || editDifference[c] == none) {
 							--editDifference[u];
 
 							if (editDifference[u] == none) {
@@ -198,6 +189,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 						}
 
 						if (editDifference[u] != none) {
+							assert(editDifference[u] <= maxGain[u]);
 							editDifference[p] += editDifference[u];
 						}
 
