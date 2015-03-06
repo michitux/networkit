@@ -60,6 +60,9 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 	}, [](node){});
 
 	std::vector<node> neighborQueue, currentLevel, nextLevel, touchedNodes, lastVisitedDFSNode(G.upperNodeIdBound(), none), bestParentBelow(G.upperNodeIdBound(), none);
+	G.parallelForNodes([&](node u) {
+		lastVisitedDFSNode[u] = u;
+	});
 	std::vector<count> maxGain(G.upperNodeIdBound(), 0), editDifference(G.upperNodeIdBound(), 0);
 	std::vector<bool> nodeTouched(G.upperNodeIdBound(), false);
 
@@ -128,7 +131,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 				assert(!marker[u] || editDifference[u] > 0);
 
 				if (editDifference[u] != none) {
-					assert(lastVisitedDFSNode[u] == none);
+					assert(lastVisitedDFSNode[u] == u);
 
 					node c = dynamicForest.nextDFSNodeOnEnter(u, u);
 
@@ -138,14 +141,12 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 						if (!nodeTouched[c] || editDifference[c] == none) {
 							--editDifference[u];
 
+							// advance to the next starting point for the DFS search.
+							c = lastVisitedDFSNode[c];
+
 							if (editDifference[u] == none) {
 								lastVisitedDFSNode[u] = c;
 								break;
-							}
-
-							// advance to the next starting point for the DFS search.
-							while (lastVisitedDFSNode[c] != none) {
-								c = lastVisitedDFSNode[c];
 							}
 
 							c = dynamicForest.nextDFSNodeOnEnter(c, u);
@@ -379,7 +380,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 
 			// cleanup for linear move
 			for (node u : touchedNodes) {
-				lastVisitedDFSNode[u] = none;
+				lastVisitedDFSNode[u] = u;
 				maxGain[u] = 0;
 				editDifference[u] = 0;
 				nodeTouched[u] = false;
