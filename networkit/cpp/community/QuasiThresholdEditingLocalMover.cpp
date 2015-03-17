@@ -519,9 +519,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 			}, [](node){});
 		});
 
-		if (hasMoved) {
-			usedIterations = i+1;
-		}
+		usedIterations = i+1;
 	}
 
 	forest = dynamicForest.toGraph();
