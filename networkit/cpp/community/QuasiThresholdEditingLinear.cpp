@@ -28,28 +28,30 @@ void NetworKit::QuasiThresholdEditingLinear::run() {
 	// bucket sort
 	count n = G.numberOfNodes();
 	std::vector<node> sortedNodes(n);
-	{
-		std::vector<index> nodePos(n + 1, 0);
+	std::vector<count> degree(G.upperNodeIdBound());
+	std::vector<index> sortedPos(G.upperNodeIdBound());
+	std::vector<index> nodePos(n + 1, 0);
 
-		G.forNodes([&](node u) {
-			++nodePos[n - G.degree(u)];
-		});
+	G.forNodes([&](node u) {
+		degree[u] = G.degree(u);
+		++nodePos[n - degree[u]];
+	});
 
-		// exclusive prefix sum
-		index tmp = nodePos[0];
-		index sum = tmp;
-		nodePos[0] = 0;
+	// exclusive prefix sum
+	index tmp = nodePos[0];
+	index sum = tmp;
+	nodePos[0] = 0;
 
-		for (index i = 1; i < nodePos.size(); ++i) {
-			tmp = nodePos[i];
-			nodePos[i] = sum;
-			sum += tmp;
-		}
-
-		G.forNodes([&](node u) {
-			sortedNodes[nodePos[n - G.degree(u)]++] = u;
-		});
+	for (index i = 1; i < nodePos.size(); ++i) {
+		tmp = nodePos[i];
+		nodePos[i] = sum;
+		sum += tmp;
 	}
+
+	G.forNodes([&](node u) {
+		sortedPos[u] = nodePos[n - degree[u]]++;
+		sortedNodes[sortedPos[u]] = u;
+	});
 
 	std::vector<bool> processed(G.upperNodeIdBound(), false);
 
@@ -90,6 +92,29 @@ void NetworKit::QuasiThresholdEditingLinear::run() {
 				parent[v] = u;
 				parentStrength[v] = pseudoP4C4[eid];
 				numConnectedAnchestors[v] += 1;
+			} else if (degree[v] > 0) { // we have ignored an edge of v - decrease degree of v by 1
+				index newPos = nodePos[n - degree[v]] - 1; // this is the last entry of the bucket where v is
+				index oldPos = sortedPos[v];
+				assert(newPos >= oldPos);
+				node x = sortedNodes[newPos];
+				assert(degree[x] == degree[v]);
+				std::swap(sortedNodes[oldPos], sortedNodes[newPos]);
+				--nodePos[n - degree[v]];
+				--degree[v];
+				if (nodePos[n - degree[v]] < n) {
+					assert(degree[sortedNodes[nodePos[n - degree[v]]]] < degree[v]);
+				}
+				if (nodePos[n - degree[x]] < n) {
+					assert(degree[sortedNodes[nodePos[n - degree[x]]]] < degree[x]);
+				}
+				std::swap(sortedPos[v], sortedPos[x]);
+				#ifndef NDEBUG
+				count oldDeg = std::numeric_limits<count>::max();
+				for (node y : sortedNodes) {
+					assert(oldDeg >= degree[y]);
+					oldDeg = degree[y];
+				}
+				#endif
 			}
 		});
 	}
