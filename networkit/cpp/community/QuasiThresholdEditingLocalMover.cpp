@@ -585,6 +585,42 @@ std::vector< NetworKit::node > NetworKit::QuasiThresholdEditingLocalMover::getPa
 	return parents;
 }
 
+NetworKit::Cover NetworKit::QuasiThresholdEditingLocalMover::getCover(index mergeDepth) const {
+	Cover c(G.upperNodeIdBound());
+
+	DynamicForest dynamicForest(forest);
+
+	std::vector<count> depth(G.upperNodeIdBound());
+
+	index curSubset = none;
+
+	dynamicForest.dfsFrom(none, [&](node u) {
+		if (u != none) {
+			if (dynamicForest.parent(u) == none) {
+				depth[u] = 0;
+			} else {
+				depth[u] = depth[dynamicForest.parent(u)] + 1;
+			}
+
+			if (depth[u] == mergeDepth || (depth[u] < mergeDepth && dynamicForest.nextDFSNodeOnEnter(u, u) == u)) {
+				curSubset = c.toSingleton(u);
+
+				node p = dynamicForest.parent(u);
+				while (p != none) {
+					c.addToSubset(curSubset, p);
+					p = dynamicForest.parent(p);
+				}
+			} else if (depth[u] > mergeDepth) {
+				c.addToSubset(curSubset, u);
+			}
+		}
+	}, [&](node) {
+	});
+
+	return c;
+}
+
+
 
 NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getNumberOfEdits() const {
 	return numEdits;

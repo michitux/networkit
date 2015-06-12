@@ -2,6 +2,7 @@
 #define QUASITHRESHOLDEDITINGLOCALMOVER_H
 
 #include "../graph/Graph.h"
+#include "../structures/Cover.h"
 
 namespace NetworKit {
 
@@ -15,6 +16,7 @@ public:
 	count getNumberOfEdits() const;
 	count getUsedIterations() const;
 	std::vector<node> getParents() const;
+	Cover getCover(NetworKit::index mergeDepth) const;
 private:
 	count countNumberOfEdits() const;
 	const Graph& G;
