@@ -4,12 +4,14 @@
 
 #include "QuasiThresholdEditingLinear.h"
 #include "../edgescores/TriangleEdgeScore.h"
+#include "../auxiliary/SignalHandling.h"
 #include <unordered_map>
 
 NetworKit::QuasiThresholdEditingLinear::QuasiThresholdEditingLinear(const NetworKit::Graph &G) : G(G), hasRun(false) {
 }
 
 void NetworKit::QuasiThresholdEditingLinear::run() {
+	Aux::SignalHandler handler;
 	parent.clear();
 	parent.resize(G.upperNodeIdBound(), none);
 
@@ -18,6 +20,8 @@ void NetworKit::QuasiThresholdEditingLinear::run() {
 	TriangleEdgeScore triangleCounter(G);
 	triangleCounter.run();
 	std::vector<count> triangles = triangleCounter.scores();
+
+	handler.assureRunning();
 
 	std::vector<count> pseudoP4C4(G.upperEdgeIdBound(), 0);
 
@@ -53,9 +57,12 @@ void NetworKit::QuasiThresholdEditingLinear::run() {
 		sortedNodes[sortedPos[u]] = u;
 	});
 
+	handler.assureRunning();
+
 	std::vector<bool> processed(G.upperNodeIdBound(), false);
 
 	for (node u : sortedNodes) {
+		handler.assureRunning();
 		processed[u] = true;
 
 		std::unordered_map<node, count> parents;
