@@ -6,6 +6,7 @@
 #include "../generators/TreeReachabilityGraphGenerator.h"
 #include <unordered_set>
 #include "../graph/DynamicForest.h"
+#include "../auxiliary/SignalHandling.h"
 
 NetworKit::QuasiThresholdEditingLocalMover::QuasiThresholdEditingLocalMover(const NetworKit::Graph &G, const std::vector< NetworKit::node > &parent, NetworKit::count maxIterations, bool moveSubtrees)
 : G(G), maxIterations(maxIterations), moveSubtrees(moveSubtrees), numEdits(none) {
@@ -38,6 +39,8 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 	and which were not by checking for marked nodes.
 	*/
 
+	Aux::SignalHandler handler;
+
 	DynamicForest dynamicForest(forest);
 
 	numEdits = countNumberOfEdits();
@@ -59,6 +62,8 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 		}
 	}, [](node){});
 
+	handler.assureRunning();
+
 	std::vector<node> neighborQueue, currentLevel, nextLevel, touchedNodes, lastVisitedDFSNode(G.upperNodeIdBound(), none), bestParentBelow(G.upperNodeIdBound(), none);
 	G.parallelForNodes([&](node u) {
 		lastVisitedDFSNode[u] = u;
@@ -67,9 +72,11 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 	std::vector<bool> nodeTouched(G.upperNodeIdBound(), false);
 
 	for (count i = 0; hasMoved && i < maxIterations; ++i) {
+		handler.assureRunning();
 		hasMoved = false;
 
 		G.forNodesInRandomOrder([&](node nodeToMove) {
+			handler.assureRunning();
 			G.forEdgesOf(nodeToMove, [&](node v) {
 				marker[v] = true;
 			});
