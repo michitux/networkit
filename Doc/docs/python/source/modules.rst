@@ -22,3 +22,4 @@ python
    structures
    termgraph
    viztasks
+   linkprediction

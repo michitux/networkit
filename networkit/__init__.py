@@ -54,10 +54,10 @@ from . import partitioning
 from . import coloring
 from . import workflows
 from . import flow
-from . import distmeasures
 from . import plot
 from . import scd
 from . import clique
+from . import linkprediction
 from . import profiling
 
 try:
