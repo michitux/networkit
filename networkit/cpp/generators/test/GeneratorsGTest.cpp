@@ -45,6 +45,7 @@ Dy * GeneratorsTest.cpp
 #include "../../community/Modularity.h"
 #include "../../dynamics/GraphUpdater.h"
 #include "../../auxiliary/MissingMath.h"
+#include "../../auxiliary/Parallel.h"
 #include "../../global/ClusteringCoefficient.h"
 #include "../../community/PLM.h"
 #include "../../community/Modularity.h"
@@ -837,8 +838,8 @@ TEST_F(GeneratorsGTest, testConfigurationModelGeneratorOnRealSequence) {
 			G2.forNodes([&](node u){
 				testSequence[u] = G2.degree(u);
 			});
-			std::sort(testSequence.begin(), testSequence.end(), std::greater<count>());
-			std::sort(sequence.begin(), sequence.end(), std::greater<count>());
+			Aux::Parallel::sort(testSequence.begin(), testSequence.end(), std::greater<count>());
+			Aux::Parallel::sort(sequence.begin(), sequence.end(), std::greater<count>());
 
 			for (index i = 0; i < n; ++i) {
 				EXPECT_EQ(sequence[i], testSequence[i]);
@@ -1002,7 +1003,7 @@ TEST_F(GeneratorsGTest, testLFRGeneratorWithRealData) {
 	gen.run();
 }
 
-TEST_F(GeneratorsGTest, testMultiscaleGenerator) {
+TEST_F(GeneratorsGTest, tryMultiscaleGenerator) {
 	METISGraphReader reader;
 	Graph G = reader.read("input/lesmis.graph");
 	MultiscaleGenerator gen(G);
