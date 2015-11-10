@@ -19,11 +19,10 @@
 namespace NetworKit {
 
 /**
- * A reader for the edge list format used by the LFR benchmark generators, defined as:
- * 		list of edges (nodes are labelled from 1 to the number of nodes;
- * 		the edges are ordered and repeated twice, i.e. source-target and target-source).
+ * @ingroup io
+ * A reader for various edge list formats, in which each line contains an edge as
+ * two node ids.
  *
- * 	The starting index is a parameter to enable other edge list formats.
  */
 class EdgeListReader: public NetworKit::GraphReader {
 
@@ -38,7 +37,7 @@ public:
 	 * @param[in]	continuous	boolean to specify, if node ids are continuous
 	 * @param[in]	directed	treat graph as directed
 	 */
-	EdgeListReader(char separator, node firstNode, std::string commentPrefix = "#", bool continuous = true, bool directed = false);
+	EdgeListReader(const char separator, const node firstNode, const std::string commentPrefix = "#", const bool continuous = true, const bool directed = false);
 
 	/**
 	 * Given the path of an input file, read the graph contained.

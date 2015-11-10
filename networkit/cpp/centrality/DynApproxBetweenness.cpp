@@ -7,7 +7,7 @@
 
 #include "DynApproxBetweenness.h"
 #include "../auxiliary/Random.h"
-#include "../properties/Diameter.h"
+#include "../distance/Diameter.h"
 #include "../graph/Sampling.h"
 #include "../graph/DynDijkstra.h"
 #include "../graph/DynBFS.h"
@@ -39,13 +39,13 @@ void DynApproxBetweenness::run() {
     v.clear();
     sampledPaths.clear();
 
-    double c = 0.5; // universal positive constant - see reference in paper
+    const double c = 0.5; // universal positive constant - see reference in paper
 
 
     edgeweight vd = Diameter::estimatedVertexDiameterPedantic(G);
 
     INFO("estimated diameter: ", vd);
-    r = ceil((c / (epsilon * epsilon)) * (floor(log(vd - 2)) + 1 + log(1 / delta)));
+    r = ceil((c / (epsilon * epsilon)) * (floor(log2(vd - 2)) + 1 - log(delta)));
     INFO("taking ", r, " path samples");
     sssp.clear();
     sssp.resize(r);

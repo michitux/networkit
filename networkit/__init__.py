@@ -26,10 +26,10 @@ Usage examples can be found on http://nbviewer.ipython.org/urls/networkit.iti.ki
 __author__ = "Christian Staudt"
 __copyright__ = "Copyright (c) 2014 Christan Staudt"
 __credits__ = ["Lukas Barth", "Miriam Beddig", "Elisabetta Bergamini", "Stefan Bertsch", "Pratistha Bhattarai", "Andreas Bilke", "Simon Bischof", \
-	"Guido Brückner", "Patrick Flick", "Michael Hamann", "Lukas Hartmann", "Daniel Hoske", "Gerd Lindner", "Moritz v. Looz", "Yassine Marrakchi", "Henning Meyerhenke", \
+	"Guido Brückner", "Mark Erb", "Patrick Flick", "Michael Hamann", "Lukas Hartmann", "Daniel Hoske", "Gerd Lindner", "Moritz v. Looz", "Yassine Marrakchi", "Henning Meyerhenke", \
 	"Marcel Radermacher", "Klara Reichard", "Marvin Ritter", "Aleksejs Sazonovs", "Florian Weber", "Michael Wegner", "Jörg Weisbarth"]
 __license__ = "MIT"
-__version__ = "3.6"
+__version__ = "4.0"
 
 
 # standard library modules
@@ -45,9 +45,10 @@ from . import graphio
 from . import community
 from . import centrality
 from . import generators
-from . import properties
 from . import structures
 from . import engineering
+from . import distance
+from . import components
 from . import dynamic
 from . import gephi
 from . import partitioning
@@ -58,8 +59,10 @@ from . import plot
 from . import sparsification
 from . import scd
 from . import clique
+from . import globals
 from . import linkprediction
-from . import profiling
+from . import correlation
+from .profiling import profiling
 
 try:
 	from . import viztasks

@@ -5,11 +5,12 @@
 __author__ = "Gerd Lindner"
 
 from _NetworKit import ChibaNishizekiTriangleEdgeScore, GlobalThresholdFilter, LocalSimilarityScore, MultiscaleScore, SimmelianOverlapScore, RandomEdgeScore, LocalDegreeScore, ForestFireScore, \
-	EdgeScoreAsWeight, EdgeScoreLinearizer, LocalFilterScore, AdamicAdarDistance, ChanceCorrectedTriangleScore, NodeNormalizedTriangleScore, TriangleEdgeScore, RandomNodeEdgeScore, ChungLuScore, ChibaNishizekiQuadrangleEdgeScore, GeometricMeanScore, \
+	EdgeScoreAsWeight, EdgeScoreLinearizer, LocalFilterScore, AdamicAdarDistance, ChanceCorrectedTriangleScore, TriangleEdgeScore, RandomNodeEdgeScore, ChibaNishizekiQuadrangleEdgeScore, GeometricMeanScore, \
 	EdgeScoreNormalizer, EdgeScoreBlender, PrefixJaccardScore, SCANStructuralSimilarityScore
 
 # local imports
 from . import community
+from . import distance
 
 _ABS_ZERO = 1e-7
 
@@ -225,7 +226,7 @@ class SimmelianSparsifierParametric(Sparsifier):
 		Keyword arguments:
 		G -- the input graph
 		"""
-		triangles = ChibaNishizekiTriangleEdgeScore(G).run().scores()
+		triangles = TriangleEdgeScore(G).run().scores()
 
 		simmelianOverlap = SimmelianOverlapScore(G, triangles, self.maxRank)
 		simmelianOverlap.run()
@@ -250,7 +251,7 @@ class SimmelianSparsifierNonParametric(Sparsifier):
 		Keyword arguments:
 		G -- the input graph
 		"""
-		triangles = ChibaNishizekiTriangleEdgeScore(G).run().scores()
+		triangles = TriangleEdgeScore(G).run().scores()
 		a_sj = PrefixJaccardScore(G, triangles).run().scores()
 
 		return a_sj
@@ -295,7 +296,7 @@ class SimmelianMultiscaleSparsifier(Sparsifier):
 		Keyword arguments:
 		G -- the input graph
 		"""
-		triangles = ChibaNishizekiTriangleEdgeScore(G).run().scores()
+		triangles = TriangleEdgeScore(G).run().scores()
 		ms = MultiscaleScore(G, triangles)
 		ms.run()
 		a_ms = ms.scores()
@@ -354,7 +355,7 @@ class LocalSimilaritySparsifier(Sparsifier):
 		Keyword arguments:
 		G -- the input graph
 		"""
-		triangles = ChibaNishizekiTriangleEdgeScore(G).run().scores()
+		triangles = TriangleEdgeScore(G).run().scores()
 		localSimScore = LocalSimilarityScore(G, triangles)
 		localSimScore.run()
 		return localSimScore.scores()
@@ -511,7 +512,7 @@ class SCANSparsifier(Sparsifier):
 		Keyword arguments:
 		G -- the input graph
 		"""
-		a_triangles = ChibaNishizekiTriangleEdgeScore(G).run().scores()
+		a_triangles = TriangleEdgeScore(G).run().scores()
 
 		scanScore = SCANStructuralSimilarityScore(G, a_triangles)
 		scanScore.run()
@@ -540,6 +541,55 @@ class TriangleSparsifier(Sparsifier):
 
 	def _getParameterizationAlgorithm(self):
 		raise NotImplementedError("parameterization method not yet implemented.")
+
+class AlgebraicDistanceSparsifier(Sparsifier):
+	""" Allows for global filtering with respect to (inverted) algebraic distances. """
+
+	def __init__(self, numberSystems=10, numberIterations=30, omega=0.5, norm=0):
+		self.numberSystems = numberSystems
+		self.numberIterations = numberIterations
+		self.omega = omega
+		self.norm = norm
+
+	def scores(self, G):
+		""" Returns the inverted algebraic distance score of the input graph. """
+		algDist = distance.AlgebraicDistance(G, self.numberSystems, self.numberIterations, self.omega, self.norm)
+		algDist.preprocess()
+		return [1.0 - d for d in algDist.getEdgeAttribute()]
+
+	def _getSparsifiedGraph(self, G, parameter, attribute):
+		gf = GlobalThresholdFilter(G, attribute, parameter, True)
+		return gf.calculate()
+
+	def _getParameterizationAlgorithm(self):
+		return BinarySearchParameterization(False, 0.0, 1.0, 20)
+
+class LocalSparsifier(Sparsifier):
+       def __init__(self, sparsifier):
+               self.sparsifier = sparsifier
+
+       def scores(self, G):
+               """ Returns an edge attribute that holds for each edge 1 - the minimum parameter value
+               such that the edge is contained in the sparsified graph.
+
+               Note that - like for all sparsifiers - edges with the highest score are the most important ones.
+
+               Keyword arguments:
+               G -- the input graph
+               """
+               originalScores = self.sparsifier.scores(G)
+               localFilterScore = LocalFilterScore(G, originalScores)
+               localFilterScore.run()
+
+               return localFilterScore.scores()
+
+       def _getSparsifiedGraph(self, G, parameter, attribute):
+               gf = GlobalThresholdFilter(G, attribute, parameter, True)
+               return gf.calculate()
+
+       def _getParameterizationAlgorithm(self):
+               return BinarySearchParameterization(False, 0.0, 1.0, 20)
+
 
 class ModularityPartitionScore():
 

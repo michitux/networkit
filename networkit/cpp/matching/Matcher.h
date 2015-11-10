@@ -18,14 +18,15 @@ namespace NetworKit {
  */
 class Matcher {
 protected:
-	Graph& G;
+	const Graph& G;
+	Matching M;
 
 public:
 	/**
 	 * Constructor.
 	 * @param[in] G Graph for which matching is to be computed.
 	 */
-	Matcher(Graph& G);
+	Matcher(const Graph& G);
 
 	/** Default destructor */
 	virtual ~Matcher() = default;
@@ -34,7 +35,10 @@ public:
 	 * Run the matching algorithm on the stored graph and return a matching.
 	 * @return A matching of the stored graph.
 	 */
-	virtual Matching run() = 0;
+	virtual void run() = 0;
+
+
+	Matching getMatching() const;
 };
 
 } /* namespace NetworKit */
