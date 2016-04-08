@@ -13,6 +13,7 @@
 #include <functional>
 #include <assert.h>
 #include "../../auxiliary/Log.h"
+#include "../../auxiliary/Parallel.h"
 #include "../../geometric/HyperbolicSpace.h"
 
 using std::vector;
@@ -542,7 +543,7 @@ public:
 			const double queryY = center[1];
 			const count cSize = content.size();
 
-			for (int i=0; i < cSize; i++) {
+			for (index i = 0; i < cSize; i++) {
 				const double deltaX = positions[i].getX() - queryX;
 				const double deltaY = positions[i].getY() - queryY;
 				if (deltaX*deltaX + deltaY*deltaY < rsq) {
@@ -807,7 +808,7 @@ public:
 				std::generate(permutation.begin(), permutation.end(), [&p](){return p++;});
 
 				//can probably be parallelized easily, but doesn't bring much benefit
-				std::sort(permutation.begin(), permutation.end(), [this](index i, index j){return angles[i] < angles[j];});
+				Aux::Parallel::sort(permutation.begin(), permutation.end(), [this](index i, index j){return angles[i] < angles[j];});
 
 				//There ought to be a way to do this more elegant with some algorithm header, but I didn't find any
 

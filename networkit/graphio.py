@@ -6,12 +6,19 @@ from _NetworKit import Graph as __Graph
 # local imports
 from .GraphMLIO import GraphMLReader, GraphMLWriter
 from .GEXFIO import GEXFReader, GEXFWriter
+from . import algebraic
 
 # external imports
 import os
 import logging
-import numpy
-import scipy.io
+try:
+	import numpy
+except ImportError:
+	print("module 'numpy' not available - some functionality will be restricted")
+try:
+	import scipy.io
+except ImportError:
+	print("module 'scipy' not available - some functionality will be restricted")
 import fnmatch
 
 try:
@@ -45,6 +52,7 @@ try:
 		LFR = ()
 		KONECT = ()
 		GraphToolBinary = ()
+		MAT = ()
 
 except ImportError:
 	print("Update to Python >=3.4 recommended - support for < 3.4 may be discontinued in the future")
@@ -65,6 +73,7 @@ except ImportError:
 		LFR = "edgelist-t1"
 		KONECT = "konect"
 		GraphToolBinary = "gtbin"
+		MAT = "mat"
 
 
 
@@ -87,7 +96,8 @@ def getReader(fileformat, **kwargs):
 			Format.LFR:			EdgeListReader('\t',1),
 			Format.KONECT:			KONECTGraphReader(' '),
 			Format.GML:			GMLGraphReader(),
-			Format.GraphToolBinary:		GraphToolBinaryReader()
+			Format.GraphToolBinary:		GraphToolBinaryReader(),
+			Format.MAT:			MatReader()
 			}
 
 	try:
@@ -154,7 +164,14 @@ def readGraphs(dirPath, pattern, fileformat, some=None, **kwargs):
 	return graphs
 
 
-def readMat(path, key="A"):
+class MatReader:
+	def __init__(self, key = "G"):
+		self.key = key
+
+	def read(self, path):
+		return readMat(path, self.key)
+
+def readMat(path, key="G"):
 	""" Reads a Graph from a matlab object file containing an adjacency matrix and returns a NetworKit::Graph
 		Parameters:
 		- key: The key of the adjacency matrix in the matlab object file (default: A)"""
@@ -175,6 +192,23 @@ def readMat(path, key="A"):
 		if not G.hasEdge(u, v):
 			G.addEdge(u, v)
 	return G
+
+class MatWriter:
+	def __init__(self):
+		self.key = key
+
+	def write(self, G, path, key="G"):
+		writeMat(path, key)
+
+def writeMat(G, path, key="G"):
+	""" Writes a NetworKit::Graph to a Matlab object file.
+		Parameters:
+		- G: The graph
+		- path: Path of the matlab file
+		- key: Dictionary Key
+	"""
+	matrix = algebraic.adjacencyMatrix(G, matrixType='sparse')
+	scipy.io.savemat(path, {key : matrix})
 
 
 # writing
@@ -275,11 +309,3 @@ def writeStream(stream, path):
 		Write a graph event stream to a file.
 	"""
 	DGSWriter().write(stream, path)
-
-
-def graphFromStreamFile(path, mapped=True, baseIndex=0):
-	stream = readStream(path, mapped, baseIndex)
-	G = __Graph()
-	gu = GraphUpdater(G)
-	gu.update(stream)
-	return G

@@ -20,25 +20,9 @@
 #include "HyperbolicGenerator.h"
 #include "Quadtree/Quadtree.h"
 #include "../auxiliary/Random.h"
+#include "../auxiliary/Parallel.h"
 
 namespace NetworKit {
-
-HyperbolicGenerator::HyperbolicGenerator() {
-	stretch = 1;
-	alpha = 1;
-	factor = 1;
-	nodeCount = 10000;
-	initialize();
-}
-
-HyperbolicGenerator::HyperbolicGenerator(count n) {
-	nodeCount = n;
-	alpha = 1;
-	factor = 1;
-	stretch=1;
-	temperature=0;
-	initialize();
-}
 
 /**
  * Construct a generator for n nodes and m edges
@@ -68,7 +52,7 @@ void HyperbolicGenerator::initialize() {
 	} else {
 		capacity = 10;
 	}
-	theoreticalSplit = true;
+	theoreticalSplit = false;
 	threadtimers.resize(omp_get_max_threads());
 	balance = 0.5;
 }
@@ -94,7 +78,7 @@ Graph HyperbolicGenerator::generate(count n, double distanceFactor, double alpha
 	std::generate(permutation.begin(), permutation.end(), [&p](){return p++;});
 
 	//can probably be parallelized easily, but doesn't bring much benefit
-	std::sort(permutation.begin(), permutation.end(), [&angles,&radii](index i, index j){return angles[i] < angles[j] || (angles[i] == angles[j] && radii[i] < radii[j]);});
+	Aux::Parallel::sort(permutation.begin(), permutation.end(), [&angles,&radii](index i, index j){return angles[i] < angles[j] || (angles[i] == angles[j] && radii[i] < radii[j]);});
 
 	vector<double> anglecopy(n);
 	vector<double> radiicopy(n);
@@ -191,8 +175,6 @@ Graph HyperbolicGenerator::generateCold(const vector<double> &angles, const vect
 			vector<index> near;
 			near.reserve(expectedDegree*1.1);
 			quad.getElementsInHyperbolicCircle(HyperbolicSpace::polarToCartesian(angles[i], radii[i]), thresholdDistance, suppressLeft, near);
-			assert(near.size() <= n);
-			if (near.size() > 20*expectedDegree) DEBUG("Found ", near.size() , " neighbours while expecting ", expectedDegree, ".");
 			//count realDegree = near.size();
 			//std::swap(expectedDegree, realDegree);//dummy statement for debugging
 			if (directSwap) {
@@ -205,7 +187,6 @@ Graph HyperbolicGenerator::generateCold(const vector<double> &angles, const vect
 				result.swapNeighborhood(i, near, empty, false);
 			} else {
 				for (index j : near) {
-					if (j >= n) ERROR("Node ", j, " prospective neighbour of ", i, " does not actually exist. Oops.");
 					if (j > i) result.addHalfEdge(i,j);
 				}
 			}
@@ -216,7 +197,7 @@ Graph HyperbolicGenerator::generateCold(const vector<double> &angles, const vect
 
 	timer.stop();
 	INFO("Generating Edges took ", timer.elapsedMilliseconds(), " milliseconds.");
-	return result.toGraph(!directSwap, true);
+	return result.toGraph(true);
 }
 
 Graph HyperbolicGenerator::generate(const vector<double> &angles, const vector<double> &radii, Quadtree<index> &quad, double thresholdDistance, double T) {
