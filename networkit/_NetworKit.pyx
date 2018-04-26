@@ -4743,6 +4743,33 @@ cdef class Partition:
 				selfToOther[selfSubset] = other[i]
 		return True
 
+	def __hash__(self):
+		"""
+		Hash the partition.
+
+		This hash value does not depend on the actually used
+		partition ids. Instead, it hashes a list of new
+		partition ids that are assigned in a canonical way.
+
+		Returns
+		-------
+		int
+			A hash value.
+		"""
+		cdef list canonicIds = list()
+		cdef dict toCanonicId = dict()
+
+		cdef index i = 0
+		cdef object nextId = 0
+		for i in range(self._this.numberOfElements()):
+			s = self[i]
+			if not s in toCanonicId:
+				toCanonicId[s] = nextId
+				nextId += 1
+
+			canonicIds.append(toCanonicId[s])
+		return hash(tuple(canonicIds))
+
 cdef extern from "<networkit/structures/Cover.hpp>":
 
 	cdef cppclass _Cover "NetworKit::Cover":

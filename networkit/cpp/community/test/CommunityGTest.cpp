@@ -7,7 +7,6 @@
 
 #include <gtest/gtest.h>
 
-<<<<<<< HEAD
 #include <networkit/community/PLP.hpp>
 #include <networkit/community/PLM.hpp>
 #include <networkit/community/ParallelAgglomerativeClusterer.hpp>
