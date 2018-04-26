@@ -9482,6 +9482,12 @@ cdef class GraphEvent:
 	def __eq__(self, GraphEvent other not None):
 		return _GraphEvent_equal(self._this, other._this)
 
+	def __hash__(self):
+		if self._this.type == _GraphEventType.TIME_STEP:
+			return hash(self.type)
+		else:
+			hash((self.type, self.u, self.v, self.w))
+
 
 cdef extern from "<networkit/dynamics/DGSStreamParser.hpp>":
 
