@@ -3,6 +3,7 @@ networkit_add_module(dynamics
     DGSWriter.cpp
     GraphDifference.cpp
     GraphEvent.cpp
+    CommunityEvent.cpp
     GraphEventHandler.cpp
     GraphEventProxy.cpp
     GraphUpdater.cpp
