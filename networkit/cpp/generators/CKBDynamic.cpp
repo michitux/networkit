@@ -108,6 +108,13 @@ namespace NetworKit {
     }
   }
 
+  void CKBDynamic::Community::removeRandomNode() {
+    if (nodes.size() == 0) throw std::runtime_error("Error, no nodes in community!");
+
+    node u = nodes.at(Aux::Random::index(nodes.size()));
+    removeNode(u);
+  }
+
   void CKBDynamic::Community::addNode(node u) {
     if (nodes.contains(u)) throw std::runtime_error("Node already in community!");
 
@@ -125,6 +132,7 @@ namespace NetworKit {
     }
 
     nodes.insert(u);
+    generator.addNodeToCommunity(u, CommunityPtr(this));
   }
 
   count CKBDynamic::Community::drawDesiredNumberOfEdges(double prob) const {
@@ -280,4 +288,94 @@ namespace NetworKit {
       generator.removeNodeFromCommunity(u, CommunityPtr(&other));
     }
   }
+
+  CKBDynamic::CommunityChangeEvent::CommunityChangeEvent(CKBDynamic& generator, count numSteps) : active(true), numSteps(numSteps), currentStep(0), generator(generator) {}
+
+  CKBDynamic::CommunityBirthEvent::CommunityBirthEvent(Community &community, std::vector<node> nodes, count numSteps, CKBDynamic& generator) : CommunityChangeEvent(generator, numSteps), nodes(std::move(nodes)), community(community) {
+    std::shuffle(nodes.begin(), nodes.end(), Aux::Random::getURNG());
+  }
+
+  void CKBDynamic::CommunityBirthEvent::nextStep() {
+    count numNodesToAdd = nodes.size() / (numSteps - currentStep);
+
+    for (index i = 0; i < numNodesToAdd; ++i) {
+      node u = nodes.back();
+      nodes.pop_back();
+
+      // skip nodes that have been removed in the meantime
+      if (generator.hasNode(u)) {
+	community.addNode(u);
+      }
+    }
+
+    ++currentStep;
+
+    if (currentStep == numSteps) active = false;
+    generator.addAvailableCommunity(CommunityPtr(&community));
+  }
+
+  CKBDynamic::CommunityDeathEvent::CommunityDeathEvent(Community& community, count numSteps, CKBDynamic& generator) : CommunityChangeEvent(generator, numSteps), community(community) {}
+
+
+  void CKBDynamic::CommunityDeathEvent::nextStep() {
+    count numNodesToRemove = community.getNumberOfNodes() / (numSteps - currentStep);
+
+    for (index i = 0; i < numNodesToRemove; ++i) {
+      community.removeRandomNode();
+    }
+
+    ++currentStep;
+
+    if (currentStep == numSteps) active = false;
+  }
+
+  CKBDynamic::CommunityMergeEvent::CommunityMergeEvent(Community& communityA, Community& communityB, double targetEdgeProbability, count numSteps, CKBDynamic& generator) : CommunityChangeEvent(generator, numSteps), communityA(communityA), communityB(communityB) {
+    count overlapSize = 0;
+
+    for (node u : communityA.getNodes()) {
+      if (communityB.hasNode(u)) {
+	++overlapSize;
+      } else {
+	nodesToAddToB.push_back(u);
+      }
+    }
+
+    std::shuffle(nodesToAddToB.begin(), nodesToAddToB.end(), Aux::Random::getURNG());
+
+    for (node u : communityB.getNodes()) {
+      if (!communityA.hasNode(u)) {
+	nodesToAddToA.push_back(u);
+      }
+    }
+
+    std::shuffle(nodesToAddToA.begin(), nodesToAddToA.end(), Aux::Random::getURNG());
+  }
+
+  void CKBDynamic::CommunityMergeEvent::nextStep() {
+    ++currentStep;
+
+
+    auto addNodes = [&](Community& com, std::vector<node>& nodes) {
+		      count numNodesToAdd = nodes.size() / (numSteps - currentStep);
+		      for (index i = 0; i < numNodesToAdd; ++i) {
+			node u = nodes.back();
+			nodes.pop_back();
+
+			// skip nodes that have been removed in the meantime
+			if (generator.hasNode(u)) {
+			  com.addNode(u);
+			}
+		      }
+		    };
+
+    addNodes(communityA, nodesToAddToA);
+    addNodes(communityB, nodesToAddToB);
+
+    // TODO: change edge probability - linearly?
+    double probA = targetEdgeProbability / 2;
+
+    ++currentStep;
+    if (currentStep == numSteps) active = false;
+  }
+
 }
