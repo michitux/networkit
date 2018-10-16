@@ -86,9 +86,16 @@ namespace NetworKit {
 			count getNumberOfNodes() const { return nodes.size(); };
 
 			count getNumberOfEdges() const { return edges.size(); };
+
+			count getMaximumNumberOfEdges() const { return (nodes.size() * (nodes.size() - 1) / 2); }
 		private:
 			void removeEdge(node u, node v);
 			void addEdge(node u, node v);
+
+			void removeRandomEdges(count k);
+			void addRandomEdges(count k);
+
+			count drawDesiredNumberOfEdges(double prob) const;
 
 			Aux::SamplingSet<std::pair<node, node>> edges;
 			// only used if edgeProbability > 0.5.
