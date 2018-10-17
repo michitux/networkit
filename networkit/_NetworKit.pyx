@@ -5770,6 +5770,20 @@ cdef class DynWeaklyConnectedComponents(Algorithm):
 			_batch.push_back(_GraphEvent(event.type, event.u, event.v, event.w))
 		(<_DynWeaklyConnectedComponents*>(self._this)).updateBatch(_batch)
 
+# module: geometric
+
+cdef extern from "cpp/geometric/Voronoi.h":
+	cdef cppclass _Voronoi "NetworKit::Voronoi"(_Algorithm):
+		_Voronoi(vector[pair[float, float]], float xmin, float xmax, float ymin, float ymax) except +
+		vector[vector[pair[float, float]]] getFacets() nogil except +
+
+cdef class Voronoi(Algorithm):
+	def __cinit__(self, vector[pair[float, float]] points, float xmin, float xmax, float ymin, float ymax):
+		self._this = new _Voronoi(points, xmin, xmax, ymin, ymax)
+
+	def getFacets(self):
+		return (<_Voronoi*>(self._this)).getFacets()
+
 
 cdef extern from "cpp/global/ClusteringCoefficient.h" namespace "NetworKit::ClusteringCoefficient":
 		double avgLocal(_Graph G, bool turbo) nogil except +

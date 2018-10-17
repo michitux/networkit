@@ -56,6 +56,7 @@ from . import distance
 from . import components
 from . import dynamic
 from . import gephi
+from . import geometric
 from . import partitioning
 from . import coloring
 from . import workflows

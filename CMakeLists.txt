@@ -42,6 +42,11 @@ if (NOT NETWORKIT_LOGGING)
 	set(NETWORKIT_CXX_FLAGS "-DNOLOGGING")
 endif()
 
+find_package( OpenCV )
+if (NOT ${OpenCV_FOUND})
+  set(NETWORKIT_CXX_FLAGS "${NETWORKIT_CXX_FLAGS} -DNOOPENCV")
+endif()
+
 if (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR
 	("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR
 	("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
@@ -149,7 +154,7 @@ if(NETWORKIT_BUILD_CORE AND NETWORKIT_MONOLITH)
 			LIBRARY DESTINATION .
 			ARCHIVE DESTINATION .)
 
-	target_link_libraries(networkit PRIVATE tlx)
+	target_link_libraries(networkit PRIVATE tlx ${OpenCV_LIBS})
 endif()
 
 if(NETWORKIT_PYTHON)
@@ -209,7 +214,7 @@ function(networkit_add_module modname)
 			COMPILE_FLAGS "${NETWORKIT_CXX_FLAGS}"
 			LINK_FLAGS "${NETWORKIT_LINK_FLAGS}")
 
-		target_link_libraries(${MODULE_TARGET} PRIVATE tlx)
+		target_link_libraries(${MODULE_TARGET} PRIVATE tlx ${OpenCV_LIBS})
 
 		# All tests added to this module will will also become a dependency
 		# of networkit_tests_MODNAME. This target hence allows to build all
@@ -296,6 +301,7 @@ if (NETWORKIT_BUILD_TESTS)
 				gtest
 				networkit
 				tlx
+				${OpenCV_LIBS}
 		)
 
 		set_target_properties(networkit_tests PROPERTIES
@@ -351,6 +357,7 @@ function(networkit_add_extra IS_TEST MOD NAME)
 				PRIVATE
 					networkit_${MOD}
 					tlx
+					${OpenCV_LIBS}
 					)
 			set_target_properties(${TARGET_NAME} PROPERTIES
 				CXX_STANDARD ${NETWORKIT_CXX_STANDARD}
