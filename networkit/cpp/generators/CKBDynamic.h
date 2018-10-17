@@ -119,12 +119,15 @@ namespace NetworKit {
 			CKBDynamic& generator;
 		};
 
+		using CommunityPtr = tlx::CountingPtr<Community>;
+
 		class CommunityChangeEvent {
 		public:
 			CommunityChangeEvent(CKBDynamic& generator, count numSteps);
 			virtual void nextStep() = 0;
 			bool isActive() { return active; };
 		protected:
+			void adaptProbability(CommunityPtr com, double targetProb);
 			bool active;
 			count numSteps;
 			count currentStep;
@@ -135,21 +138,23 @@ namespace NetworKit {
 		// Adds further nodes over time.
 		class CommunityBirthEvent : public CommunityChangeEvent {
 		public:
-			CommunityBirthEvent(Community &community, std::vector<node> nodes, count numSteps, CKBDynamic& generator);
+			CommunityBirthEvent(CommunityPtr community, std::vector<node> nodes, count coreSize, count numSteps, CKBDynamic& generator);
 			virtual void nextStep() override;
 		private:
 			std::vector<node> nodes;
-			Community& community;
+			count coreSize;
+			CommunityPtr community;
 		};
 
 		// Remove nodes over time.
 		// Lets community die at the end.
 		class CommunityDeathEvent : public CommunityChangeEvent {
 		public:
-			CommunityDeathEvent(Community &community, count numSteps, CKBDynamic& generator);
+			CommunityDeathEvent(CommunityPtr community, count coreSize, count numSteps, CKBDynamic& generator);
 			virtual void nextStep() override;
 		private:
-			Community& community;
+			CommunityPtr community;
+			count coreSize;
 		};
 
 		// Takes two communities.
@@ -164,13 +169,15 @@ namespace NetworKit {
 		// object).
 		class CommunityMergeEvent : public CommunityChangeEvent {
 		public:
-			CommunityMergeEvent(Community& communityA, Community& communityB, double targetEdgeProbability, count numSteps, CKBDynamic& generator);
+			CommunityMergeEvent(CommunityPtr communityA, CommunityPtr communityB, double targetEdgeProbability, count numSteps, CKBDynamic& generator);
 			virtual void nextStep() override;
 		private:
 			std::vector<node> nodesToAddToA;
 			std::vector<node> nodesToAddToB;
-			Community &communityA;
-			Community &communityB;
+			double targetEdgeProbability;
+			double targetEdgeProbabilityPerCommunity;
+			CommunityPtr communityA;
+			CommunityPtr communityB;
 		};
 
 		// Takes one community.
@@ -178,7 +185,13 @@ namespace NetworKit {
 		// Removes parts of both communities over time.
 		// Increases the density of both communities over time.
 		class CommunitySplitEvent : public CommunityChangeEvent {
+		public:
+			CommunitySplitEvent(CommunityPtr community, count targetSizeA, double targetEdgeProbabilityA, count targetSizeB, double targetEdgeProbabilityB, count numSteps, CKBDynamic& generator);
 			virtual void nextStep() override;
+		private:
+			std::array<std::vector<node>, 2> nodesToRemove;
+			std::array<double, 2> targetEdgeProbability;
+			std::array<CommunityPtr, 2> communities;
 		};
 
 
@@ -388,13 +401,13 @@ namespace NetworKit {
 			}
 		};
 
-		using CommunityPtr = tlx::CountingPtr<Community>;
 
 		void addEdge(node u, node v);
 		void removeEdge(node u, node v);
 		void addNodeToCommunity(node u, CommunityPtr com);
 		void removeNodeFromCommunity(node u, CommunityPtr com);
 		void addAvailableCommunity(CommunityPtr com);
+		void removeCommunity(CommunityPtr com);
 
 		bool hasNode(node u) { return nodeExists[u]; };
 
