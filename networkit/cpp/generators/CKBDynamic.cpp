@@ -514,7 +514,7 @@ namespace NetworKit {
     return result;
   }
 
-  CKBDynamic::CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double eventProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps) : communityNodeSampler(0, minCommunityMembership, maxCommunityMembership, communityMembershipExponent), communitySizeSampler(new PowerlawCommunitySizeDistribution(minCommunitySize, maxCommunitySize, communitySizeExponent, intraCommunityEdgeProbability, intraCommunityEdgeExponent, minSplitRatio)), n(n), eventProbability(eventProbability), epsilon(epsilon), numTimesteps(numTimesteps) {
+  CKBDynamic::CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double eventProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps) : communityNodeSampler(0, minCommunityMembership, maxCommunityMembership, communityMembershipExponent), communitySizeSampler(new PowerlawCommunitySizeDistribution(minCommunitySize, maxCommunitySize, communitySizeExponent, intraCommunityEdgeProbability, intraCommunityEdgeExponent, minSplitRatio)), n(n), eventProbability(eventProbability), epsilon(epsilon), numTimesteps(numTimesteps), currentCommunityMemberships(0) {
   }
 
   std::vector<GraphEvent> CKBDynamic::getGraphEvents() const {
