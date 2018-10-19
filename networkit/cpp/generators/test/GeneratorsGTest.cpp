@@ -33,6 +33,7 @@ Dy * GeneratorsTest.cpp
 #include "../MocnikGeneratorBasic.h"
 #include "../HyperbolicGenerator.h"
 #include "../DynamicHyperbolicGenerator.h"
+#include "../CKBDynamic.h"
 
 #include "../../viz/PostscriptWriter.h"
 #include "../../community/ClusteringGenerator.h"
@@ -1115,6 +1116,11 @@ TEST_F(GeneratorsGTest, testMocnikGeneratorBasic) {
 	EXPECT_FALSE(G.isEmpty());
 	EXPECT_EQ(G.numberOfNodes(), n);
 	EXPECT_NEAR(G.numberOfEdges() * 1. / G.numberOfNodes(), std::pow(k, dim), 10000);
+}
+
+TEST_F(GeneratorsGTest, testCKBDynamic) {
+	CKBDynamic gen(1000, 10, 100, -2, 0.3, 1, 10, -2, 0.8, 2, 0.5, 0.001, 10);
+	gen.run();
 }
 
 } /* namespace NetworKit */
