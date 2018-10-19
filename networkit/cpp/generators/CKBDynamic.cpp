@@ -1,4 +1,5 @@
 #include "CKBDynamic.h"
+#include <tlx/unused.hpp>
 
 
 namespace NetworKit {
@@ -54,7 +55,7 @@ namespace NetworKit {
     };
   }
 
-  CKBDynamic::Community::Community(const Community& o) : edges(o.edges), nonEdges(o.nonEdges), nodes(o.nodes), neighbors(o.neighbors), edgeProbability(o.edgeProbability), isAvailable(o.isAvailable), storeNonEdges(o.storeNonEdges), generator(o.generator) {
+  CKBDynamic::Community::Community(const Community& o) : id(o.generator.nextCommunityId()), edges(o.edges), nonEdges(o.nonEdges), nodes(o.nodes), neighbors(o.neighbors), edgeProbability(o.edgeProbability), isAvailable(o.isAvailable), storeNonEdges(o.storeNonEdges), generator(o.generator) {
     for (auto e : edges) {
       generator.addEdge(e.first, e.second);
     }
@@ -65,7 +66,7 @@ namespace NetworKit {
   }
 
 
-  CKBDynamic::Community::Community(double edgeProbability, CKBDynamic& generator) : edgeProbability(edgeProbability), isAvailable(false), storeNonEdges(edgeProbability > 0.6), generator(generator) {}
+  CKBDynamic::Community::Community(double edgeProbability, CKBDynamic& generator) : id(generator.nextCommunityId()), edgeProbability(edgeProbability), isAvailable(false), storeNonEdges(edgeProbability > 0.6), generator(generator) {}
 
   void CKBDynamic::Community::removeEdge(node u, node v) {
       edges.erase(canonicalEdge(u, v));
@@ -269,7 +270,7 @@ namespace NetworKit {
   }
 
   void CKBDynamic::Community::combineWith(Community& other) {
-    assert(other.nodes == nodes);
+    assert(other.nodes.size() == nodes.size());
 
     for (auto e : other.edges) {
       if (edges.contains(e)) {
@@ -455,5 +456,159 @@ namespace NetworKit {
       generator.addAvailableCommunity(communities[1]);
     }
   }
+
+  void CKBDynamic::addEdge(node u, node v) {
+    auto e = canonicalEdge(u, v);
+    auto it = edgesAlive.find(e);
+
+    if (it == edgesAlive.end()) {
+      edgesAlive.insert2(e, 1);
+      graphEvents.emplace_back(GraphEvent::EDGE_ADDITION, e.first, e.second);
+    } else {
+      edgesAlive[e] += 1;
+    }
+  }
+
+  void CKBDynamic::removeEdge(node u, node v) {
+    auto e = canonicalEdge(u, v);
+    auto it = edgesAlive.find(e);
+    if (it == edgesAlive.end()) {
+      throw std::runtime_error("Error, removing edge that does not exist");
+    }
+
+    if (it->second > 1) {
+      edgesAlive[e] -= 1;
+    } else {
+      edgesAlive.erase(it);
+      graphEvents.emplace_back(GraphEvent::EDGE_REMOVAL, e.first, e.second);
+    }
+  }
+
+  void CKBDynamic::addNodeToCommunity(node u, CommunityPtr com) {
+    if (com != globalCommunity) {
+      nodeCommunities[u].insert(com);
+      communityEvents.emplace_back(CommunityEvent::NODE_JOINS_COMMUNITY, u, com->getId());
+      ++currentCommunityMemberships;
+    }
+  }
+
+  void CKBDynamic::removeNodeFromCommunity(node u, CommunityPtr com) {
+    if (com != globalCommunity) {
+      nodeCommunities[u].erase(com);
+      communityEvents.emplace_back(CommunityEvent::NODE_LEAVES_COMMUNITY, u, com->getId());
+      --currentCommunityMemberships;
+    }
+  }
+
+  void CKBDynamic::addAvailableCommunity(CommunityPtr com) {
+    availableCommunities.insert(com);
+  }
+
+  void CKBDynamic::removeCommunity(CommunityPtr com) {
+    availableCommunities.erase(com);
+  }
+
+  index CKBDynamic::nextCommunityId() {
+    index result = maxCommunityId;
+    ++maxCommunityId;
+    return result;
+  }
+
+  CKBDynamic::CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double eventProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps) : communityNodeSampler(0, minCommunityMembership, maxCommunityMembership, communityMembershipExponent), communitySizeSampler(new PowerlawCommunitySizeDistribution(minCommunitySize, maxCommunitySize, communitySizeExponent, intraCommunityEdgeProbability, intraCommunityEdgeExponent, minSplitRatio)), n(n), eventProbability(eventProbability), epsilon(epsilon), numTimesteps(numTimesteps) {
+  }
+
+  std::vector<GraphEvent> CKBDynamic::getGraphEvents() const {
+    this->assureFinished();
+    return graphEvents;
+  }
+
+  std::vector<CommunityEvent> CKBDynamic::getCommunityEvents() const {
+    this->assureFinished();
+    return communityEvents;
+  }
+
+  void CKBDynamic::generateNode() {
+      node u = communityNodeSampler.addNode();
+      for (node v = u; v < communityNodeSampler.getNumberOfNodes(); ++v) {
+        nodesAlive.insert(v);
+        nodeCommunities.emplace_back();
+        globalCommunity->addNode(v);
+      }
+  }
+
+  void CKBDynamic::run() {
+    if (hasRun) throw std::runtime_error("Error, run has already been called");
+
+    // initialization
+    globalCommunity = CommunityPtr(new Community(epsilon, *this));
+
+    for (node u = 0; u < n; ++u) {
+      generateNode();
+    }
+
+    while (currentCommunityMemberships < communityNodeSampler.getSumOfDesiredMemberships()) {
+      count communitySize;
+      double edgeProbability;
+      std::tie(communitySize, edgeProbability) = communitySizeSampler->drawCommunity();
+      std::vector<node> comNodes(communityNodeSampler.birthCommunityNodes(communitySize));
+      CommunityPtr com(new Community(edgeProbability, *this));
+      for (node u : comNodes) {
+        com->addNode(u);
+      }
+      addAvailableCommunity(com);
+    }
+
+    for (count timestep = 0; timestep < numTimesteps; ++timestep) {
+      graphEvents.emplace_back(GraphEvent::TIME_STEP);
+      communityEvents.emplace_back(CommunityEvent::TIME_STEP);
+    }
+
+    graphEvents.emplace_back(GraphEvent::TIME_STEP);
+    communityEvents.emplace_back(CommunityEvent::TIME_STEP);
+
+    hasRun = true;
+  }
+
+
+  CKBDynamic::PowerlawCommunitySizeDistribution::PowerlawCommunitySizeDistribution(count minSize, count maxSize, double gamma, double alpha, double densityGamma, double minSplitRatio) : sequence(minSize, maxSize, gamma), alpha(alpha), densityGamma(densityGamma), minSplitRatio(minSplitRatio) {
+    sequence.run();
+  }
+
+  double CKBDynamic::PowerlawCommunitySizeDistribution::getProbability(count size) const {
+    double prob = alpha / std::pow(size, densityGamma);
+    if (prob > 1 || size <= 2) prob = 1;
+    return prob;
+  }
+
+  std::pair<count, double> CKBDynamic::PowerlawCommunitySizeDistribution::drawCommunity() {
+		count size = sequence.getDegree();
+		double probability = getProbability(size);
+		return std::make_pair(size, probability);
+	}
+
+  std::pair<count, double> CKBDynamic::PowerlawCommunitySizeDistribution::mergeCommunities(count sizeA, double probabilityA, count sizeB, double probabilityB, count combinedNodes) {
+    tlx::unused(sizeA);
+    tlx::unused(probabilityA);
+    tlx::unused(sizeB);
+    tlx::unused(probabilityB);
+		assert(getProbability(sizeA) == probabilityA);
+		assert(getProbability(sizeB) == probabilityB);
+
+		return std::make_pair(combinedNodes, getProbability(combinedNodes));
+	}
+
+  std::pair<std::pair<count, double>, std::pair<count, double>> CKBDynamic::PowerlawCommunitySizeDistribution::splitCommunity(count size, double) {
+		count minSize = std::max<count>(minSplitRatio * size, sequence.getMinimumDegree());
+		if (minSize * 2 > size) {
+			throw std::runtime_error("Given community too small to split");
+		}
+
+		std::mt19937 gen(rand());
+		std::uniform_int_distribution<> dis(minSize, size - minSize);
+		int sizeA = dis(gen);
+		int sizeB = size-sizeA;
+
+		return std::make_pair(std::make_pair(sizeA, getProbability(sizeA)),std::make_pair(sizeB, getProbability(sizeB)));
+	}
 
 }

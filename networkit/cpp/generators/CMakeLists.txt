@@ -3,6 +3,7 @@ networkit_add_module(generators
     ChungLuGenerator.cpp
     ClusteredRandomGraphGenerator.cpp
     CKBDynamic.cpp
+    CKBDynamic_BucketSampling.cpp
     DorogovtsevMendesGenerator.cpp
     DynamicBarabasiAlbertGenerator.cpp
     DynamicDGSParser.cpp

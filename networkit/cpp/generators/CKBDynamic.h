@@ -14,14 +14,15 @@
 
 namespace NetworKit {
 	class CKBDynamic : public Algorithm {
+	public:
 		CKBDynamic(const Cover& model);
-		CKBDynamic(count n, const Cover& model);
-		CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, count minCommunityMembership, count maxCommunityMembership, double eventProbability, double intraCommunityEdgeProbability, double epsilon);
+		CKBDynamic(const Graph& G, const Cover& model, count numTimesteps);
+		CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double eventProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps);
 
 		virtual void run() override;
 
-		std::vector<GraphEvent> getGraphEvents();
-		std::vector<CommunityEvent> getCommunityEvents();
+		std::vector<GraphEvent> getGraphEvents() const;
+		std::vector<CommunityEvent> getCommunityEvents() const;
 	private:
 		std::vector<GraphEvent> graphEvents;
 		std::vector<CommunityEvent> communityEvents;
@@ -99,6 +100,8 @@ namespace NetworKit {
 			const Aux::SamplingSet<node>& getNodes() const { return nodes; };
 
 			bool hasNode(node u) const { return nodes.contains(u); };
+
+			index getId() const { return id; };
 		private:
 			void removeEdge(node u, node v);
 			void addEdge(node u, node v);
@@ -108,6 +111,7 @@ namespace NetworKit {
 
 			count drawDesiredNumberOfEdges(double prob) const;
 
+			index id;
 			Aux::SamplingSet<std::pair<node, node>> edges;
 			// only used if edgeProbability > 0.5.
 			Aux::SamplingSet<std::pair<node, node>> nonEdges;
@@ -251,7 +255,6 @@ namespace NetworKit {
 			std::vector<bool> node_sampled_in_current_call;
 			std::vector<slot> full_slots;
 			std::array<std::vector<node>, oversample_fraction> fractional_slots;
-			std::mt19937_64 random_engine;
 
 			count sumOfDesiredMemberships;
 
@@ -266,7 +269,7 @@ namespace NetworKit {
 			 * @param exponent The powerlaw exponent of the membership distribution.
 			 * @param seed Seed for the random number generator used for various random decisions.
 			 */
-			BucketSampling(count n, count minSlots, count maxSlots, double exponent, uint64_t seed);
+			BucketSampling(count n, count minSlots, count maxSlots, double exponent);
 
 			/**
 			 * Sample @a communitySize nodes from the available memberships.
@@ -332,7 +335,7 @@ namespace NetworKit {
 			node addNode(count degree);
 
 		private:
-			void removeNode(node nodeId, bool withFraction);
+			node removeNode(node nodeId, bool withFraction);
 		public:
 			/**
 			 * Remove a node from the sampling data structure.
@@ -345,7 +348,7 @@ namespace NetworKit {
 			 *
 			 * @param nodeId The id of the node to remove.
 			 */
-			void removeNode(node nodeId);
+			node removeNode(node nodeId);
 
 			/**
 			 * Get the total number of nodes. Some of these nodes maybe deleted.
@@ -409,13 +412,28 @@ namespace NetworKit {
 		void addAvailableCommunity(CommunityPtr com);
 		void removeCommunity(CommunityPtr com);
 
-		bool hasNode(node u) { return nodeExists[u]; };
+		void generateNode();
+
+		index nextCommunityId();
+
+		bool hasNode(node u) const { return nodesAlive.contains(u); };
 
 		Aux::SamplingSet<CommunityPtr> splittableCommunities;
 		Aux::SamplingSet<CommunityPtr> availableCommunities;
 		std::vector<tlx::btree_set<CommunityPtr>> nodeCommunities;
+		CommunityPtr globalCommunity;
+		count maxCommunityId;
 
-		std::vector<bool> nodeExists;
+		Aux::SamplingSet<node> nodesAlive;
+		tlx::btree_map<std::pair<node, node>, count> edgesAlive;
+
+		BucketSampling communityNodeSampler;
+		std::unique_ptr<CommunitySizeDistribution> communitySizeSampler;
+		count n;
+		double eventProbability;
+		double epsilon;
+		count numTimesteps;
+		count currentCommunityMemberships;
 	};
 
 } // namespace NetworKit
