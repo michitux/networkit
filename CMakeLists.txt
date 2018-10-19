@@ -164,9 +164,9 @@ if(NETWORKIT_PYTHON)
 		if(NOT EXTERNAL_NETWORKIT_CORE)
 			message(FATAL_ERROR "Core build is disabled but no external core library was found.")
 		endif()
-		target_link_libraries(_NetworKit PRIVATE ${EXTERNAL_NETWORKIT_CORE})
+		target_link_libraries(_NetworKit PRIVATE ${EXTERNAL_NETWORKIT_CORE} tlx)
 	else()
-		target_link_libraries(_NetworKit PRIVATE networkit)
+		target_link_libraries(_NetworKit PRIVATE networkit tlx)
 	endif()
 
 	set_target_properties(_NetworKit PROPERTIES
