@@ -2990,6 +2990,23 @@ cdef class LFRGenerator(Algorithm):
 
 
 
+cdef extern from "cpp/generators/CKBDynamic.h":
+	cdef cppclass _CKBDynamic "NetworKit::CKBDynamic"(_Algorithm):
+		_CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double eventProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps) except +
+		vector[_GraphEvent] getGraphEvents() nogil except +
+		vector[_CommunityEvent] getCommunityEvents() nogil except +
+
+cdef class CKBDynamic(Algorithm):
+	def __cinit__(self, count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double eventProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps):
+		self._this = new _CKBDynamic(n, minCommunitySize, maxCommunitySize, communitySizeExponent, minSplitRatio, minCommunityMembership, maxCommunityMembership, communityMembershipExponent, eventProbability, intraCommunityEdgeProbability, intraCommunityEdgeExponent, epsilon, numTimesteps)
+
+	def getGraphEvents(self):
+		cdef _GraphEvent ev
+		return [GraphEvent(ev.type, ev.u, ev.v, ev.w) for ev in (<_CKBDynamic*>(self._this)).getGraphEvents()]
+
+	def getCommunityEvents(self):
+		cdef _CommunityEvent ev
+		return [CommunityEvent(ev.type, ev.u, ev.community) for ev in (<_CKBDynamic*>(self._this)).getCommunityEvents()]
 
 # Module: graphio
 
