@@ -1,5 +1,5 @@
 # extension imports
-from _NetworKit import Graph, GraphEvent, DGSStreamParser, GraphUpdater, APSP, GraphDifference
+from _NetworKit import Graph, GraphEvent, DGSStreamParser, GraphUpdater, APSP, GraphDifference, CommunityEvent
 
 
 def graphFromStream(stream, weighted, directed):

@@ -7960,6 +7960,54 @@ cdef class GraphEvent:
 	def __eq__(self, GraphEvent other not None):
 		return _GraphEvent_equal(self._this, other._this)
 
+cdef extern from "cpp/dynamics/CommunityEvent.h" namespace "NetworKit::CommunityEvent::Type":
+	enum _CommunityEventType "NetworKit::CommunityEvent::Type":
+		NODE_JOINS_COMMUNITY,
+		NODE_LEAVES_COMMUNITY,
+		TIME_STEP
+
+cdef extern from "cpp/dynamics/CommunityEvent.h":
+	cdef cppclass _CommunityEvent "NetworKit::CommunityEvent":
+		_CommunityEventType type
+		node u
+		index community
+		_CommunityEvent()
+		_CommunityEvent(_CommunityEventType type, node u, index community) nogil
+		string toString() nogil except +
+
+cdef class CommunityEvent:
+	cdef _CommunityEvent _this
+
+	NODE_JOINS_COMMUNITY = _CommunityEventType.NODE_JOINS_COMMUNITY
+	NODE_LEAVES_COMMUNITY = _CommunityEventType.NODE_LEAVES_COMMUNITY
+	TIME_STEP = _CommunityEventType.TIME_STEP
+
+	property type:
+		def __get__(self):
+			return self._this.type
+		def __set__(self, _CommunityEventType type):
+			self._this.type = type
+
+	property u:
+		def __get__(self):
+			return self._this.u
+		def __set__(self, node u):
+			self._this.u = u
+
+	property community:
+		def __get__(self):
+			return self._this.community
+		def __set__(self, index community):
+			self._this.community = community
+
+	def __cinit__(self, _CommunityEventType type, node u = none, index community = none):
+		self._this = _CommunityEvent(type, u, community)
+
+	def toString(self):
+		return self._this.toString().decode("utf-8")
+
+	def __repr__(self):
+		return self.toString()
 
 cdef extern from "cpp/dynamics/DGSStreamParser.h":
 	cdef cppclass _DGSStreamParser "NetworKit::DGSStreamParser":

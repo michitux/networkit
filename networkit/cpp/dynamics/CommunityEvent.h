@@ -20,7 +20,7 @@ namespace NetworKit {
 		node u; //!< node that joins or leaves a community
 		index community; //!< the community that is joined or left
 
-		CommunityEvent(Type type, node u = none, index community = none);
+		CommunityEvent(Type type = TIME_STEP, node u = none, index community = none);
 
 		std::string toString() const;
 
