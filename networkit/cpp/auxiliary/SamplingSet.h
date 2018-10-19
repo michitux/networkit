@@ -22,7 +22,7 @@ namespace Aux {
 
 			elements.push_back(e);
 			try {
-				positions[e] = elements.size();
+				positions[e] = elements.size() - 1;
 			} catch (...) {
 				elements.pop_back();
 				throw;
