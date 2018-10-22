@@ -1119,7 +1119,7 @@ TEST_F(GeneratorsGTest, testMocnikGeneratorBasic) {
 }
 
 TEST_F(GeneratorsGTest, testCKBDynamic) {
-	CKBDynamic gen(1000, 10, 100, -2, 0.3, 1, 10, -2, 0.8, 2, 0.5, 0.001, 10);
+	CKBDynamic gen(1000, 10, 100, -2, 0.3, 1, 10, -2, 0.05, 0.01, 2, 0.5, 0.001, 100);
 	gen.run();
 }
 

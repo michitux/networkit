@@ -91,7 +91,7 @@ namespace NetworKit {
 		}
 	}
 
-	std::vector<node> CKBDynamic::BucketSampling::birthCommunityNodes(count communitySize) {
+	std::vector<node> CKBDynamic::BucketSampling::birthCommunityNodes(count communitySize, const Aux::SamplingSet<node>& existingNodes) {
 		std::vector<node> result;
 
 		std::array<double, oversample_fraction> slot_boundaries;
@@ -124,7 +124,7 @@ namespace NetworKit {
 				}
 			}
 
-			if (!node_sampled_in_current_call[u]) {
+			if (!node_sampled_in_current_call[u] && !existingNodes.contains(u)) {
 				result.push_back(u);
 				node_sampled_in_current_call[u] = true;
 			}

@@ -17,7 +17,7 @@ namespace NetworKit {
 	public:
 		CKBDynamic(const Cover& model);
 		CKBDynamic(const Graph& G, const Cover& model, count numTimesteps);
-		CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double eventProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps);
+		CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps);
 
 		virtual void run() override;
 
@@ -102,6 +102,10 @@ namespace NetworKit {
 			bool hasNode(node u) const { return nodes.contains(u); };
 
 			index getId() const { return id; };
+
+			bool isAvailable() const { return available; }
+
+			void setAvailable(bool available);
 		private:
 			void removeEdge(node u, node v);
 			void addEdge(node u, node v);
@@ -118,7 +122,7 @@ namespace NetworKit {
 			Aux::SamplingSet<node> nodes;
 			tlx::btree_map<node, Aux::SamplingSet<node>> neighbors;
 			double edgeProbability;
-			bool isAvailable;
+			bool available;
 			bool storeNonEdges;
 			CKBDynamic& generator;
 		};
@@ -142,11 +146,11 @@ namespace NetworKit {
 		// Adds further nodes over time.
 		class CommunityBirthEvent : public CommunityChangeEvent {
 		public:
-			CommunityBirthEvent(CommunityPtr community, std::vector<node> nodes, count coreSize, count numSteps, CKBDynamic& generator);
+			CommunityBirthEvent(count coreSize, count targetSize, double edgeProbability, count numSteps, CKBDynamic& generator);
 			virtual void nextStep() override;
 		private:
-			std::vector<node> nodes;
 			count coreSize;
+			count targetSize;
 			CommunityPtr community;
 		};
 
@@ -173,7 +177,7 @@ namespace NetworKit {
 		// object).
 		class CommunityMergeEvent : public CommunityChangeEvent {
 		public:
-			CommunityMergeEvent(CommunityPtr communityA, CommunityPtr communityB, double targetEdgeProbability, count numSteps, CKBDynamic& generator);
+			CommunityMergeEvent(CommunityPtr communityA, CommunityPtr communityB, count numSteps, CKBDynamic& generator);
 			virtual void nextStep() override;
 		private:
 			std::vector<node> nodesToAddToA;
@@ -201,9 +205,15 @@ namespace NetworKit {
 
 		class CommunitySizeDistribution {
 		public:
+			CommunitySizeDistribution(count minSize, count maxSize) : minSize(minSize), maxSize(maxSize) {};
 			virtual std::pair<count, double> drawCommunity() = 0;
 			virtual std::pair<count, double> mergeCommunities(count sizeA, double probabilityA, count sizeB, double probabilityB, count combinedNodes) = 0;
 			virtual std::pair<std::pair<count, double>, std::pair<count, double>> splitCommunity(count size, double probability) = 0;
+			count getMinSize() const { return minSize; };
+			count getMaxSize() const { return maxSize; };
+		protected:
+			count minSize;
+			count maxSize;
 		};
 
 		class PowerlawCommunitySizeDistribution : public CommunitySizeDistribution {
@@ -233,7 +243,7 @@ namespace NetworKit {
 				std::vector<index> full_slot_positions;
 				// fractional part of the number of slots times oversample_fraction
 				// this is negative if the node is in too many communities
-				index current_fractional_slot;
+				int64_t current_fractional_slot;
 				// position in the fractional slot vector of current_fractional_slot > 0
 				index fractional_slot_position;
 				// desired degree of the node. 0 if the node has been removed.
@@ -279,7 +289,7 @@ namespace NetworKit {
 			 * @param communitySize The number of nodes to sample.
 			 * @return The sampled nodes.
 			 */
-			std::vector<node> birthCommunityNodes(count communitySize);
+			std::vector<node> birthCommunityNodes(count communitySize, const Aux::SamplingSet<node>& existingNodes = Aux::SamplingSet<node>());
 
 			/**
 			 * Assign the node @a nodeId to a community, i.e., take a slot from it.
@@ -409,17 +419,20 @@ namespace NetworKit {
 		void removeEdge(node u, node v);
 		void addNodeToCommunity(node u, CommunityPtr com);
 		void removeNodeFromCommunity(node u, CommunityPtr com);
-		void addAvailableCommunity(CommunityPtr com);
+		void addCommunity(CommunityPtr com);
 		void removeCommunity(CommunityPtr com);
 
 		void generateNode();
+		void eraseNode();
 
 		index nextCommunityId();
 
 		bool hasNode(node u) const { return nodesAlive.contains(u); };
 
 		Aux::SamplingSet<CommunityPtr> splittableCommunities;
+		Aux::SamplingSet<CommunityPtr> mergeableCommunities;
 		Aux::SamplingSet<CommunityPtr> availableCommunities;
+		Aux::SamplingSet<CommunityPtr> communities;
 		std::vector<tlx::btree_set<CommunityPtr>> nodeCommunities;
 		CommunityPtr globalCommunity;
 		count maxCommunityId;
@@ -430,10 +443,12 @@ namespace NetworKit {
 		BucketSampling communityNodeSampler;
 		std::unique_ptr<CommunitySizeDistribution> communitySizeSampler;
 		count n;
-		double eventProbability;
+		double communityEventProbability;
+		double nodeEventProbability;
 		double epsilon;
 		count numTimesteps;
 		count currentCommunityMemberships;
+		std::vector<std::unique_ptr<CommunityChangeEvent>> currentEvents;
 	};
 
 } // namespace NetworKit
