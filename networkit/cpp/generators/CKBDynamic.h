@@ -17,7 +17,7 @@ namespace NetworKit {
 	public:
 		CKBDynamic(const Cover& model);
 		CKBDynamic(const Graph& G, const Cover& model, count numTimesteps);
-		CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps);
+		CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps);
 
 		virtual void run() override;
 
@@ -115,6 +115,10 @@ namespace NetworKit {
 
 			count drawDesiredNumberOfEdges(double prob) const;
 
+			void verifyInvariants() const;
+
+			std::pair<node, node> edgeFromIndex(index i) const;
+
 			index id;
 			Aux::SamplingSet<std::pair<node, node>> edges;
 			// only used if edgeProbability > 0.5.
@@ -147,6 +151,7 @@ namespace NetworKit {
 		class CommunityBirthEvent : public CommunityChangeEvent {
 		public:
 			CommunityBirthEvent(count coreSize, count targetSize, double edgeProbability, count numSteps, CKBDynamic& generator);
+			CommunityBirthEvent(count numSteps, CKBDynamic& generator);
 			virtual void nextStep() override;
 		private:
 			count coreSize;
@@ -426,6 +431,7 @@ namespace NetworKit {
 		void eraseNode();
 
 		index nextCommunityId();
+		count sampleNumSteps() const;
 
 		bool hasNode(node u) const { return nodesAlive.contains(u); };
 
@@ -445,6 +451,7 @@ namespace NetworKit {
 		count n;
 		double communityEventProbability;
 		double nodeEventProbability;
+		double perturbationProbability;
 		double epsilon;
 		count numTimesteps;
 		count currentCommunityMemberships;

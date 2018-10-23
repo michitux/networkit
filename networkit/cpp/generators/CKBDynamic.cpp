@@ -10,13 +10,6 @@ namespace NetworKit {
       return std::make_pair(v, u);
     }
 
-    std::pair<node, node> edgeFromIndex(index i) {
-      node u = 1 + std::floor(-0.5 + std::sqrt(0.25 + 2.0 * i));
-      node v = i - (u * (u - 1) / 2);
-
-      return canonicalEdge(u, v);
-    }
-
     /**
      * Returns number of steps you need to wait until the next success (edge) occurs.
      */
@@ -72,10 +65,30 @@ namespace NetworKit {
     generator.addCommunity(CommunityPtr(this));
   }
 
+  void CKBDynamic::Community::verifyInvariants() const {
+    if (storeNonEdges) {
+      for (auto e : edges) {
+        assert(canonicalEdge(e.first, e.second) == e);
+        assert(!nonEdges.contains(e));
+        assert(nodes.contains(e.first));
+        assert(nodes.contains(e.second));
+      }
+
+      for (auto e : nonEdges) {
+        assert(canonicalEdge(e.first, e.second) == e);
+        assert(nodes.contains(e.first));
+        assert(nodes.contains(e.second));
+      }
+
+      assert(nonEdges.size() + edges.size() == getMaximumNumberOfEdges());
+    }
+  }
+
   void CKBDynamic::Community::removeEdge(node u, node v) {
       edges.erase(canonicalEdge(u, v));
       if (storeNonEdges) {
 	nonEdges.insert(canonicalEdge(u, v));
+        verifyInvariants();
       }
       neighbors[v].erase(u);
       neighbors[u].erase(v);
@@ -83,14 +96,26 @@ namespace NetworKit {
   }
 
   void CKBDynamic::Community::addEdge(node u, node v) {
+    assert(u != v);
+    assert(nodes.contains(u));
+    assert(nodes.contains(v));
       neighbors[u].insert(v);
       neighbors[v].insert(u);
       edges.insert(canonicalEdge(u, v));
       if (storeNonEdges) {
 	nonEdges.erase(canonicalEdge(u, v));
+        verifyInvariants();
       }
       generator.addEdge(u, v);
   }
+
+  std::pair<node, node> CKBDynamic::Community::edgeFromIndex(index i) const {
+    node u = 1 + std::floor(-0.5 + std::sqrt(0.25 + 2.0 * i));
+    node v = i - (u * (u - 1) / 2);
+
+    return canonicalEdge(nodes.at(u), nodes.at(v));
+  }
+
 
   void CKBDynamic::Community::removeNode(node u) {
     assert(nodes.contains(u));
@@ -111,6 +136,7 @@ namespace NetworKit {
       for (node i = 0; i < nodes.size(); ++i) {
 	nonEdges.erase(canonicalEdge(u, nodes.at(i)));
       }
+      verifyInvariants();
     }
   }
 
@@ -125,21 +151,29 @@ namespace NetworKit {
   void CKBDynamic::Community::addNode(node u) {
     assert(!nodes.contains(u));
     if (nodes.contains(u)) throw std::runtime_error("Node already in community!");
+    nodes.insert(u);
 
     if (storeNonEdges) {
       for (node i = 0; i < nodes.size(); ++i) {
-	nonEdges.insert(canonicalEdge(u, nodes.at(i)));
+        const node v = nodes.at(i);
+        if (u != v) {
+          nonEdges.insert(canonicalEdge(u, v));
+        }
       }
+
+      verifyInvariants();
     }
 
     neighbors.insert2(u, Aux::SamplingSet<node>());
     const double log_cp = std::log(1.0 - edgeProbability);
 
     for (node next = get_next_edge_distance(log_cp) - 1; next < nodes.size(); next += get_next_edge_distance(log_cp)) {
-      addEdge(u, nodes.at(next));
+      const node v = nodes.at(next);
+      if (u != v) {
+        addEdge(u, nodes.at(next));
+      }
     }
 
-    nodes.insert(u);
     generator.addNodeToCommunity(u, CommunityPtr(this));
   }
 
@@ -204,6 +238,8 @@ namespace NetworKit {
     for (auto e : edgesToRemove) {
       removeEdge(e.first, e.second);
     }
+
+    verifyInvariants();
   }
 
   void CKBDynamic::Community::removeRandomEdges(count k) {
@@ -220,6 +256,7 @@ namespace NetworKit {
 
     if (storeNonEdges) {
       assert(k <= nonEdges.size());
+      verifyInvariants();
 
       for (count i = 0; i < k; ++i) {
 	auto e = nonEdges.at(Aux::Random::index(nonEdges.size()));
@@ -248,7 +285,7 @@ namespace NetworKit {
 
       for (index i = 0; i < nodes.size(); ++i) {
 	const node u = nodes.at(i);
-	for (index j = i; j < nodes.size(); ++j) {
+	for (index j = i + 1; j < nodes.size(); ++j) {
 	  const node v = nodes.at(j);
 
 	  const auto e = canonicalEdge(u, v);
@@ -257,6 +294,8 @@ namespace NetworKit {
 	  }
 	}
       }
+
+      verifyInvariants();
 
       storeNonEdges = true;
     }
@@ -279,16 +318,17 @@ namespace NetworKit {
   }
 
   void CKBDynamic::Community::combineWith(Community& other) {
+    assert(&other != this);
     assert(other.nodes.size() == nodes.size());
 
     for (auto e : other.edges) {
-      if (edges.contains(e)) {
-	generator.removeEdge(e.first, e.second);
-      } else {
-	edges.insert(e);
-	neighbors[e.first].insert(e.second);
-	neighbors[e.second].insert(e.first);
+      // First add edge here to ensure it exists at least once globally
+      // so we don't generate remove/add events globally.
+      if (!edges.contains(e)) {
+        addEdge(e.first, e.second);
       }
+
+      other.removeEdge(e.first, e.second);
     }
 
     other.edges.clear();
@@ -303,6 +343,9 @@ namespace NetworKit {
   }
 
   void CKBDynamic::Community::setAvailable( bool avail ) {
+    if (avail) {
+      assert(nodes.size() > 0);
+    }
     if (this->available != avail) {
       this->available = avail;
       generator.addCommunity(CommunityPtr(this));
@@ -318,10 +361,19 @@ namespace NetworKit {
 
   CKBDynamic::CommunityBirthEvent::CommunityBirthEvent(count coreSize, count targetSize, double edgeProbability, count numSteps, CKBDynamic& generator) : CommunityChangeEvent(generator, numSteps), coreSize(coreSize), targetSize(targetSize), community(new Community(edgeProbability, generator)) {}
 
+  CKBDynamic::CommunityBirthEvent::CommunityBirthEvent(count numSteps, CKBDynamic& generator) : CommunityChangeEvent(generator, numSteps)  {
+    double edgeProbability;
+    std::tie(targetSize, edgeProbability) = generator.communitySizeSampler->drawCommunity();
+    coreSize = std::max<count>(0.1 * targetSize, generator.communitySizeSampler->getMinSize());
+    community = CommunityPtr(new Community(edgeProbability, generator));
+  }
+
   void CKBDynamic::CommunityBirthEvent::nextStep() {
     count numNodesToAdd = (targetSize - community->getNumberOfNodes()) / (numSteps - currentStep);
 
-    if (currentStep == 0) numNodesToAdd = coreSize;
+    if (currentStep == 0) {
+      numNodesToAdd = std::max(coreSize, numNodesToAdd);
+    }
 
     std::vector<node> nodesToAdd = generator.communityNodeSampler.birthCommunityNodes(numNodesToAdd, community->getNodes());
 
@@ -417,8 +469,14 @@ namespace NetworKit {
     ++currentStep;
     if (currentStep == numSteps) {
       active = false;
+      const count oldNodes = communityA->getNumberOfNodes();
+      tlx::unused(oldNodes);
       communityA->combineWith(*communityB);
       generator.removeCommunity(communityB);
+      assert(communityA->getNumberOfNodes() == oldNodes);
+      // This shouldn't change much but otherwise the community will loose half of
+      // the edges in the next perturbation.
+      communityA->changeEdgeProbability(targetEdgeProbability);
       communityA->setAvailable(true);
     }
   }
@@ -545,16 +603,21 @@ namespace NetworKit {
   }
 
   void CKBDynamic::addCommunity(CommunityPtr com) {
+    // FIXME: do not add global community? but impossible because addCommunity is called in constructor...
     if (com->isAvailable()) {
-      // FIXME: if community is too small, remove community again!!
+      // If community is too small, remove community again!!
+      if (com->getNumberOfNodes() < communitySizeSampler->getMinSize()) {
+        INFO("community has only ", com->getNumberOfNodes(), " nodes, destroying.");
+        currentEvents.emplace_back(new CommunityDeathEvent(com, 0, 1, *this));
+      } else {
+        availableCommunities.insert(com);
+        if (com->getNumberOfNodes() >= 2*communitySizeSampler->getMinSize()) {
+          splittableCommunities.insert(com);
+        }
 
-      availableCommunities.insert(com);
-      if (com->getNumberOfNodes() >= 2*communitySizeSampler->getMinSize()) {
-        splittableCommunities.insert(com);
-      }
-
-      if (com->getNumberOfNodes() <= communitySizeSampler->getMaxSize() - communitySizeSampler->getMinSize()) {
-        mergeableCommunities.insert(com);
+        if (com->getNumberOfNodes() <= communitySizeSampler->getMaxSize() - communitySizeSampler->getMinSize()) {
+          mergeableCommunities.insert(com);
+        }
       }
     } else {
       availableCommunities.erase(com);
@@ -577,7 +640,7 @@ namespace NetworKit {
     return result;
   }
 
-  CKBDynamic::CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps) : communityNodeSampler(0, minCommunityMembership, maxCommunityMembership, communityMembershipExponent), communitySizeSampler(new PowerlawCommunitySizeDistribution(minCommunitySize, maxCommunitySize, communitySizeExponent, intraCommunityEdgeProbability, intraCommunityEdgeExponent, minSplitRatio)), n(n), communityEventProbability(communityEventProbability), nodeEventProbability(nodeEventProbability), epsilon(epsilon), numTimesteps(numTimesteps), currentCommunityMemberships(0) {
+  CKBDynamic::CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps) : communityNodeSampler(0, minCommunityMembership, maxCommunityMembership, communityMembershipExponent), communitySizeSampler(new PowerlawCommunitySizeDistribution(minCommunitySize, maxCommunitySize, communitySizeExponent, intraCommunityEdgeProbability, intraCommunityEdgeExponent, minSplitRatio)), n(n), communityEventProbability(communityEventProbability), nodeEventProbability(nodeEventProbability), perturbationProbability(perturbationProbability), epsilon(epsilon), numTimesteps(numTimesteps), currentCommunityMemberships(0) {
   }
 
   std::vector<GraphEvent> CKBDynamic::getGraphEvents() const {
@@ -606,17 +669,18 @@ namespace NetworKit {
       com->removeNode(u);
       // if a community becomes too small, erase it
       if (com->isAvailable() && com->getNumberOfNodes() < communitySizeSampler->getMinSize()) {
-        com->setAvailable(false);
-        while (com->getNumberOfNodes() > 0) {
-          com->removeRandomNode();
-        }
-        removeCommunity(com);
+        INFO("Available community has only ", com->getNumberOfNodes(), " nodes, destroying.");
+        currentEvents.emplace_back(new CommunityDeathEvent(com, 0, 1, *this));
       }
     }
 
     nodesAlive.erase(u);
     communityNodeSampler.removeNode(u);
     globalCommunity->removeNode(u);
+  }
+
+  count CKBDynamic::sampleNumSteps() const {
+    return Aux::Random::integer(5, 15);
   }
 
   void CKBDynamic::run() {
@@ -650,22 +714,19 @@ namespace NetworKit {
       communityEvents.emplace_back(CommunityEvent::TIME_STEP);
 
       numEventDistribution.param(std::binomial_distribution<count>::param_type(communities.size(), communityEventProbability));
-
       const count numCommunityEvents = numEventDistribution(Aux::Random::getURNG());
-      numEventDistribution.param(std::binomial_distribution<count>::param_type(nodesAlive.size(), nodeEventProbability));
 
+      numEventDistribution.param(std::binomial_distribution<count>::param_type(nodesAlive.size(), nodeEventProbability));
       const count numNodeEvents = numEventDistribution(Aux::Random::getURNG());
 
+      INFO("Timestep ", timestep, " generating ", numCommunityEvents, " community events and ", numNodeEvents, " node events");
+
       for (count i = 0; i < numCommunityEvents; ++i) {
-        count numSteps = Aux::Random::integer(5, 15);
+        count numSteps = sampleNumSteps();
         double r = Aux::Random::real();
         if (r < birthProbability) {
           // generate new community
-          double edgeProbability;
-          count communitySize;
-          std::tie(communitySize, edgeProbability) = communitySizeSampler->drawCommunity();
-          count coreSize = std::max<count>(0.1 * communitySize, communitySizeSampler->getMinSize());
-          currentEvents.emplace_back(new CommunityBirthEvent(coreSize, communitySize, edgeProbability, numSteps, *this));
+          currentEvents.emplace_back(new CommunityBirthEvent(numSteps, *this));
         } else if (r < birthProbability + deathProbability) {
           // let a community die
           if (availableCommunities.size() > 0) {
@@ -694,7 +755,7 @@ namespace NetworKit {
             for (count j = 0; j < 20; ++j) {
               comA = mergeableCommunities.at(Aux::Random::index(mergeableCommunities.size()));
               comB = mergeableCommunities.at(Aux::Random::index(mergeableCommunities.size()));
-              if (comA->getNumberOfNodes() + comB->getNumberOfNodes() < communitySizeSampler->getMaxSize()) {
+              if (comA != comB && comA->getNumberOfNodes() + comB->getNumberOfNodes() < communitySizeSampler->getMaxSize()) {
                 found = true;
                 break;
               }
@@ -714,11 +775,13 @@ namespace NetworKit {
       } // generated all new community events
 
       // generate node events
+      const double wantedNodeFraction = n * 1.0 / nodesAlive.size();
+      const double nodeBirthProbability = wantedNodeFraction / (1 + wantedNodeFraction);
       for (count j = 0; j < numNodeEvents; ++j) {
-        if (Aux::Random::real() < 0.5) {
-          eraseNode();
-        } else {
+        if (Aux::Random::real() < nodeBirthProbability) {
           generateNode();
+        } else {
+          eraseNode();
         }
       }
 
@@ -734,7 +797,29 @@ namespace NetworKit {
         }
       }
 
-      // TODO: edge pertubations
+      // edge perturbations
+      if (perturbationProbability > 0) {
+        globalCommunity->perturbEdges(perturbationProbability);
+
+        const double sqrtPerturbationProbability = std::sqrt(perturbationProbability);
+
+        const double log_perturb = std::log(1.0 - sqrtPerturbationProbability);
+
+        for (count ci = get_next_edge_distance(log_perturb) - 1; ci < communities.size(); ci += get_next_edge_distance(log_perturb)) {
+          communities.at(ci)->perturbEdges(sqrtPerturbationProbability);
+        }
+      }
+
+      // adjust event probabilities
+      {
+        const double x = communityNodeSampler.getSumOfDesiredMemberships() * 1.0 / currentCommunityMemberships;
+        birthProbability = 0.5 * x / (1 + x);
+        deathProbability = 0.5 - birthProbability;
+        INFO("At timestep ", timestep, " adjusting birth probability to ", birthProbability, " and death probability to ", deathProbability);
+        INFO("Current memberships: ", currentCommunityMemberships, " desired: ", communityNodeSampler.getSumOfDesiredMemberships(), " number of communities: ", communities.size(), " available: ", availableCommunities.size(), " active events ", currentEvents.size());
+        INFO("Current nodes ", nodesAlive.size(), " current edges: ", edgesAlive.size(), " total graph events ", graphEvents.size(), " total community events ", communityEvents.size());
+      }
+
     }
 
     graphEvents.emplace_back(GraphEvent::TIME_STEP);
