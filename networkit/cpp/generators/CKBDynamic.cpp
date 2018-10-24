@@ -1,5 +1,6 @@
 #include "CKBDynamic.h"
 #include <tlx/unused.hpp>
+#include "../auxiliary/UniqueSampler.h"
 
 
 namespace NetworKit {
@@ -17,35 +18,6 @@ namespace NetworKit {
       return static_cast<count>(1 + floor(log(1.0 - Aux::Random::probability()) / log_cp));
     }
 
-    class UniqueSampler {
-    public:
-      UniqueSampler(count max) : dist(0, max-1), max(max), i(0) {};
-      count draw() {
-	dist.param(std::uniform_int_distribution<count>::param_type(i, max-1));
-	const count r = dist(Aux::Random::getURNG());
-	count result = r;
-
-	auto rit = replace.find(r);
-	if (rit != replace.end()) {
-	  result = rit->second;
-	}
-
-	auto iit = replace.find(i);
-	if (iit == replace.end()) {
-	  replace[r] = i;
-	} else {
-	  replace[r] = iit->second;
-	}
-
-	++i;
-
-	return result;
-      };
-    private:
-      std::uniform_int_distribution<count> dist;
-      count max, i;
-      tlx::btree_map<count, count> replace;
-    };
   }
 
   CKBDynamic::Community::Community(const Community& o) : id(o.generator.nextCommunityId()), edges(o.edges), nonEdges(o.nonEdges), nodes(o.nodes), neighbors(o.neighbors), edgeProbability(o.edgeProbability), available(o.available), storeNonEdges(o.storeNonEdges), generator(o.generator) {
@@ -206,7 +178,7 @@ namespace NetworKit {
     std::vector<std::pair<node, node>> edgesToRemove, edgesToAdd;
 
     {
-      UniqueSampler edgeSampler(edges.size());
+      Aux::UniqueSampler edgeSampler(edges.size());
       for (count i = 0; i < numEdgesToRemove; ++i) {
 	auto e = edges.at(edgeSampler.draw());
 	edgesToRemove.push_back(e);
@@ -214,13 +186,13 @@ namespace NetworKit {
     }
 
     if (storeNonEdges) {
-      UniqueSampler edgeSampler(nonEdges.size());
+      Aux::UniqueSampler edgeSampler(nonEdges.size());
       for (count i = 0; i < numEdgesToAdd; ++i) {
 	auto e = nonEdges.at(edgeSampler.draw());
 	edgesToAdd.push_back(e);
       }
     } else {
-      UniqueSampler edgeSampler(getMaximumNumberOfEdges());
+      Aux::UniqueSampler edgeSampler(getMaximumNumberOfEdges());
       while (edgesToAdd.size() < numEdgesToAdd) {
 	count edgeIndex = edgeSampler.draw();
 	auto e = edgeFromIndex(edgeIndex);
