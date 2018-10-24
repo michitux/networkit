@@ -1,14 +1,14 @@
 #ifndef SAMPLING_SET_H_
 #define SAMPLING_SET_H_
 
-#include <tlx/container/btree_map.hpp>
 #include <vector>
+#include <unordered_map>
 
 namespace Aux {
-	template <typename Key>
+	template <class Key, class Hash = std::hash<Key>>
 	class SamplingSet {
 	private:
-		tlx::btree_map<Key, size_t> positions;
+		std::unordered_map<Key, size_t, Hash> positions;
 		std::vector<Key> elements;
 
 	public:
