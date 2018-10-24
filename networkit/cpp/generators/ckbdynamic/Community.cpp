@@ -132,7 +132,7 @@ namespace NetworKit {
 			verifyInvariants();
 		}
 
-		neighbors.insert2(u, Aux::SamplingSet<node>());
+		neighbors.insert(std::make_pair(u, Aux::SamplingSet<node>()));
 		const double log_cp = std::log(1.0 - edgeProbability);
 
 		for (node next = get_next_edge_distance(log_cp) - 1; next < nodes.size(); next += get_next_edge_distance(log_cp)) {

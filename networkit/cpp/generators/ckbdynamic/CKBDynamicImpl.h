@@ -6,14 +6,13 @@
 #include "../../dynamics/GraphEvent.h"
 #include "../../dynamics/CommunityEvent.h"
 #include "../../base/Algorithm.h"
-#include <tlx/container/btree_set.hpp>
-#include <tlx/container/btree_map.hpp>
 #include "../../auxiliary/SamplingSet.h"
 #include "Community.h"
 #include "BucketSampling.h"
 #include "CommunitySizeDistribution.h"
 #include "CommunityChangeEvent.h"
 #include "../CKBDynamic.h"
+#include "NodePairHash.h"
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
@@ -58,12 +57,12 @@ namespace NetworKit {
 			Aux::SamplingSet<CommunityPtr> mergeableCommunities;
 			Aux::SamplingSet<CommunityPtr> availableCommunities;
 			Aux::SamplingSet<CommunityPtr> communities;
-			std::vector<tlx::btree_set<CommunityPtr>> nodeCommunities;
+			std::vector<std::unordered_set<CommunityPtr>> nodeCommunities;
 			CommunityPtr globalCommunity;
 			count maxCommunityId;
 
 			Aux::SamplingSet<node> nodesAlive;
-			tlx::btree_map<std::pair<node, node>, count> edgesAlive;
+			std::unordered_map<std::pair<node, node>, count, NodePairHash> edgesAlive;
 
 			count n;
 			double communityEventProbability;

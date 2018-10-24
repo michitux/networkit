@@ -2,8 +2,10 @@
 #define CKBDYNAMIC_COMMUNITY_H_
 
 #include <tlx/counting_ptr.hpp>
+#include <tlx/math/integer_log2.hpp>
 #include "../../Globals.h"
 #include "../../auxiliary/SamplingSet.h"
+#include "NodePairHash.h"
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
@@ -102,11 +104,11 @@ namespace NetworKit {
 			std::pair<node, node> edgeFromIndex(index i) const;
 
 			index id;
-			Aux::SamplingSet<std::pair<node, node>> edges;
+			Aux::SamplingSet<std::pair<node, node>, NodePairHash> edges;
 			// only used if edgeProbability > 0.5.
-			Aux::SamplingSet<std::pair<node, node>> nonEdges;
+			Aux::SamplingSet<std::pair<node, node>, NodePairHash> nonEdges;
 			Aux::SamplingSet<node> nodes;
-			tlx::btree_map<node, Aux::SamplingSet<node>> neighbors;
+			std::unordered_map<node, Aux::SamplingSet<node>> neighbors;
 			double edgeProbability;
 			bool available;
 			bool storeNonEdges;
@@ -115,6 +117,17 @@ namespace NetworKit {
 
 		using CommunityPtr = tlx::CountingPtr<Community>;
 	}
+}
+
+namespace std {
+	template <>
+	struct hash<NetworKit::CKBDynamicImpl::CommunityPtr> {
+		std::size_t operator()(const NetworKit::CKBDynamicImpl::CommunityPtr& k) const {
+			using std::size_t;
+			static const size_t shift = tlx::integer_log2_floor(1 + sizeof(NetworKit::CKBDynamicImpl::Community));
+			return reinterpret_cast<size_t>(k.get()) >> shift;
+		};
+	};
 }
 
 #endif

@@ -24,10 +24,10 @@ namespace NetworKit {
 			auto it = edgesAlive.find(e);
 
 			if (it == edgesAlive.end()) {
-				edgesAlive.insert2(e, 1);
+				edgesAlive.insert(std::make_pair(e, 1ul));
 				graphEvents.emplace_back(GraphEvent::EDGE_ADDITION, e.first, e.second);
 			} else {
-				edgesAlive[e] += 1;
+				it->second += 1;
 			}
 		}
 
@@ -39,7 +39,7 @@ namespace NetworKit {
 			}
 
 			if (it->second > 1) {
-				edgesAlive[e] -= 1;
+				--it->second;
 			} else {
 				edgesAlive.erase(it);
 				graphEvents.emplace_back(GraphEvent::EDGE_REMOVAL, e.first, e.second);
