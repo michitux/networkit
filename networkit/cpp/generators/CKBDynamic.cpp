@@ -1,6 +1,7 @@
 #include "CKBDynamic.h"
 #include <tlx/unused.hpp>
 #include "../auxiliary/UniqueSampler.h"
+#include "../auxiliary/SignalHandling.h"
 
 
 namespace NetworKit {
@@ -677,6 +678,8 @@ namespace NetworKit {
   void CKBDynamic::run() {
     if (hasRun) throw std::runtime_error("Error, run has already been called");
 
+    Aux::SignalHandler handler;
+
     // initialization
     globalCommunity = CommunityPtr(new Community(epsilon, *this));
 
@@ -687,6 +690,7 @@ namespace NetworKit {
     const count initialNumberOfNodes = nodesAlive.size();
 
     while (currentCommunityMemberships < communityNodeSampler.getSumOfDesiredMemberships()) {
+      handler.assureRunning();
       count communitySize;
       double edgeProbability;
       std::tie(communitySize, edgeProbability) = communitySizeSampler->drawCommunity();
@@ -703,6 +707,7 @@ namespace NetworKit {
     tlx::unused(mergeProbability);
 
     for (count timestep = 0; timestep < numTimesteps; ++timestep) {
+      handler.assureRunning();
       graphEvents.emplace_back(GraphEvent::TIME_STEP);
       communityEvents.emplace_back(CommunityEvent::TIME_STEP);
 
@@ -715,6 +720,7 @@ namespace NetworKit {
       INFO("Timestep ", timestep, " generating ", numCommunityEvents, " community events and ", numNodeEvents, " node events");
 
       for (count i = 0; i < numCommunityEvents; ++i) {
+        handler.assureRunning();
         count numSteps = sampleNumSteps();
         double r = Aux::Random::real();
         if (r < birthProbability) {
@@ -780,6 +786,7 @@ namespace NetworKit {
 
       // Trigger all current events
       for (size_t e = 0; e < currentEvents.size();) {
+        handler.assureRunning();
         currentEvents[e]->nextStep();
 
         if (!currentEvents[e]->isActive()) {
@@ -799,6 +806,7 @@ namespace NetworKit {
         const double log_perturb = std::log(1.0 - sqrtPerturbationProbability);
 
         for (count ci = get_next_edge_distance(log_perturb) - 1; ci < communities.size(); ci += get_next_edge_distance(log_perturb)) {
+          handler.assureRunning();
           communities.at(ci)->perturbEdges(sqrtPerturbationProbability);
         }
       }
