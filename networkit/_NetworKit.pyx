@@ -2992,13 +2992,13 @@ cdef class LFRGenerator(Algorithm):
 
 cdef extern from "cpp/generators/CKBDynamic.h":
 	cdef cppclass _CKBDynamic "NetworKit::CKBDynamic"(_Algorithm):
-		_CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps) except +
+		_CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps) except +
 		vector[_GraphEvent] getGraphEvents() nogil except +
 		vector[_CommunityEvent] getCommunityEvents() nogil except +
 
 cdef class CKBDynamic(Algorithm):
-	def __cinit__(self, count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps):
-		self._this = new _CKBDynamic(n, minCommunitySize, maxCommunitySize, communitySizeExponent, minSplitRatio, minCommunityMembership, maxCommunityMembership, communityMembershipExponent, communityEventProbability, nodeEventProbability, intraCommunityEdgeProbability, intraCommunityEdgeExponent, epsilon, numTimesteps)
+	def __cinit__(self, count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps):
+		self._this = new _CKBDynamic(n, minCommunitySize, maxCommunitySize, communitySizeExponent, minSplitRatio, minCommunityMembership, maxCommunityMembership, communityMembershipExponent, communityEventProbability, nodeEventProbability, perturbationProbability, intraCommunityEdgeProbability, intraCommunityEdgeExponent, epsilon, numTimesteps)
 
 	def getGraphEvents(self):
 		cdef _GraphEvent ev
