@@ -684,6 +684,8 @@ namespace NetworKit {
       generateNode();
     }
 
+    const count initialNumberOfNodes = nodesAlive.size();
+
     while (currentCommunityMemberships < communityNodeSampler.getSumOfDesiredMemberships()) {
       count communitySize;
       double edgeProbability;
@@ -766,7 +768,7 @@ namespace NetworKit {
       } // generated all new community events
 
       // generate node events
-      const double wantedNodeFraction = n * 1.0 / nodesAlive.size();
+      const double wantedNodeFraction = initialNumberOfNodes * 1.0 / nodesAlive.size();
       const double nodeBirthProbability = wantedNodeFraction / (1 + wantedNodeFraction);
       for (count j = 0; j < numNodeEvents; ++j) {
         if (Aux::Random::real() < nodeBirthProbability) {
