@@ -3,7 +3,6 @@ networkit_add_module(generators
     ChungLuGenerator.cpp
     ClusteredRandomGraphGenerator.cpp
     CKBDynamic.cpp
-    CKBDynamic_BucketSampling.cpp
     DorogovtsevMendesGenerator.cpp
     DynamicBarabasiAlbertGenerator.cpp
     DynamicDGSParser.cpp
@@ -32,7 +31,8 @@ networkit_add_module(generators
     )
 
 networkit_module_link_modules(generators
-        auxiliary base dynamics geometric graph structures)
+        auxiliary base dynamics geometric graph structures generators_ckbdynamic)
 
 add_subdirectory(quadtree)
+add_subdirectory(ckbdynamic)
 add_subdirectory(test)
