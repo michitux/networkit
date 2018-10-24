@@ -1,5 +1,6 @@
 #include "CKBDynamic.h"
 #include <tlx/unused.hpp>
+#include "../auxiliary/UniqueSampler.h"
 
 namespace NetworKit {
 
@@ -94,31 +95,31 @@ namespace NetworKit {
 	std::vector<node> CKBDynamic::BucketSampling::birthCommunityNodes(count communitySize, const Aux::SamplingSet<node>& existingNodes) {
 		std::vector<node> result;
 
-		std::array<double, oversample_fraction> slot_boundaries;
+		std::array<count, oversample_fraction> slot_boundaries;
 
-		slot_boundaries[0] = full_slots.size();
+		slot_boundaries[0] = full_slots.size() * oversample_fraction;
 		for (count i = 1; i < oversample_fraction; ++i) {
 			// The weight of each slot in this array
-			double slot_weight = static_cast<double>(i) / oversample_fraction;
-			double total_slot_weight = static_cast<double>(fractional_slots[i].size()) * slot_weight;
+			const count total_slot_weight = fractional_slots[i].size() * i;
 			slot_boundaries[i] = slot_boundaries[i-1] + total_slot_weight;
 		}
 
-		const double max_slot = slot_boundaries.back();
-		std::uniform_real_distribution<double> distr(0.0, max_slot);
+		const count max_slot = slot_boundaries.back();
+		Aux::UniqueSampler slotSampler(max_slot);
 
-		while (result.size() < communitySize) {
-			const double sampled_slot = distr(Aux::Random::getURNG());
+		// Give up after trying every slot once.
+		for (count attempt = 0; attempt < max_slot && result.size() < communitySize; ++attempt) {
+			const count sampled_slot = slotSampler.draw();
 			node u = 0;
 
 			if (sampled_slot < slot_boundaries[0]) {
-				u = full_slots[static_cast<count>(sampled_slot)].u;
+				u = full_slots[sampled_slot / oversample_fraction].u;
 			} else {
 				for (count i = 1; i < oversample_fraction; ++i) {
 					if (sampled_slot < slot_boundaries[i]) {
-						double stretch_factor = (static_cast<double>(oversample_fraction) / i);
-						double fractional_pos_in_bin = sampled_slot - slot_boundaries[i - 1];
-						u = fractional_slots[i][static_cast<count>(fractional_pos_in_bin * stretch_factor)];
+						const count slot_in_bin = sampled_slot - slot_boundaries[i - 1];
+						const count index_in_bin = slot_in_bin / i;
+						u = fractional_slots[i][index_in_bin];
 						break;
 					}
 				}
