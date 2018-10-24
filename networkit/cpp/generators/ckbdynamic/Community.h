@@ -120,6 +120,7 @@ namespace NetworKit {
 }
 
 namespace std {
+	// inspired by https://stackoverflow.com/questions/20953390/what-is-the-fastest-hash-function-for-pointers
 	template <>
 	struct hash<NetworKit::CKBDynamicImpl::CommunityPtr> {
 		std::size_t operator()(const NetworKit::CKBDynamicImpl::CommunityPtr& k) const {
