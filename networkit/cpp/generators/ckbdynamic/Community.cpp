@@ -161,7 +161,7 @@ namespace NetworKit {
 
 			count numEdgesToAdd = 0, numEdgesToRemove = 0;
 
-			if (desiredNumberOfEdges > edges.size()) {
+			if (desiredNumberOfEdges >= edges.size()) {
 				numEdgesToAdd = edgesToPerturb;
 				const count additionalEdgesDesired = desiredNumberOfEdges - edges.size();
 				if (additionalEdgesDesired < edgesToPerturb) {
@@ -169,7 +169,8 @@ namespace NetworKit {
 				}
 
 				assert(edges.size() + numEdgesToAdd - numEdgesToRemove <= desiredNumberOfEdges);
-			} else if (edges.size() < desiredNumberOfEdges) {
+			} else {
+				assert(edges.size() > desiredNumberOfEdges);
 				numEdgesToRemove = edgesToPerturb;
 				const count edgesToLoose = edges.size() - desiredNumberOfEdges;
 				if (edgesToLoose < edgesToPerturb) {
@@ -177,6 +178,10 @@ namespace NetworKit {
 				}
 
 				assert(edges.size() + numEdgesToAdd - numEdgesToRemove >= desiredNumberOfEdges);
+			}
+
+			if (edgesToPerturb > 0) {
+				assert(std::max(numEdgesToRemove, numEdgesToAdd) == edgesToPerturb);
 			}
 
 			const count numNonEdges = getMaximumNumberOfEdges() - edges.size();
@@ -216,6 +221,10 @@ namespace NetworKit {
 					}
 				}
 			}
+
+			assert(edgesToAdd.size() == numEdgesToAdd);
+			assert(edgesToRemove.size() == numEdgesToRemove);
+			assert(edges.size() + edgesToAdd.size() == getMaximumNumberOfEdges() || std::max(numEdgesToAdd, numEdgesToRemove) == edgesToPerturb);
 
 			for (auto e : edgesToAdd) {
 				addEdge(e.first, e.second);
