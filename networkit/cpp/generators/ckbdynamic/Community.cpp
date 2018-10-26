@@ -157,16 +157,34 @@ namespace NetworKit {
 			const count desiredNumberOfEdges = drawDesiredNumberOfEdges(edgeProbability);
 			std::binomial_distribution<count> distr(edges.size(), prob);
 			const count edgesToPerturb = distr(Aux::Random::getURNG());
-			count numEdgesToAdd = edgesToPerturb, numEdgesToRemove = edgesToPerturb;
+
+
+			count numEdgesToAdd = 0, numEdgesToRemove = 0;
 
 			if (desiredNumberOfEdges > edges.size()) {
-				numEdgesToAdd += desiredNumberOfEdges - edges.size();
+				numEdgesToAdd = edgesToPerturb;
+				const count additionalEdgesDesired = desiredNumberOfEdges - edges.size();
+				if (additionalEdgesDesired < edgesToPerturb) {
+					numEdgesToRemove = edgesToPerturb - additionalEdgesDesired;
+				}
+
+				assert(edges.size() + numEdgesToAdd - numEdgesToRemove <= desiredNumberOfEdges);
 			} else if (edges.size() < desiredNumberOfEdges) {
-				numEdgesToRemove += edges.size() - desiredNumberOfEdges;
+				numEdgesToRemove = edgesToPerturb;
+				const count edgesToLoose = edges.size() - desiredNumberOfEdges;
+				if (edgesToLoose < edgesToPerturb) {
+					numEdgesToAdd = edgesToPerturb - edgesToLoose;
+				}
+
+				assert(edges.size() + numEdgesToAdd - numEdgesToRemove >= desiredNumberOfEdges);
 			}
 
-			count numNonEdges = getMaximumNumberOfEdges() - edges.size();
+			const count numNonEdges = getMaximumNumberOfEdges() - edges.size();
 			if (numEdgesToAdd > numNonEdges) {
+				// As the desired number of edges can never be larger than
+				// getMaximumNumberOfEdges() the following condition holds.
+				assert(numEdgesToAdd - numNonEdges > numEdgesToRemove);
+
 				numEdgesToRemove -= (numEdgesToAdd - numNonEdges);
 				numEdgesToAdd = numNonEdges;
 			}
