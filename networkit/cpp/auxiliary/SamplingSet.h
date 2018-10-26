@@ -46,7 +46,7 @@ namespace Aux {
 		}
 
 		bool contains(Key e) const {
-			return (positions.count(e) > 0);
+			return (positions.find(e) != positions.end());
 		}
 
 		size_t size() const {
