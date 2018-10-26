@@ -85,7 +85,6 @@ namespace NetworKit {
 		}
 
 		void CKBDynamicImpl::addCommunity(CommunityPtr com) {
-			// FIXME: do not add global community? but impossible because addCommunity is called in constructor...
 			if (com->isAvailable()) {
 				// If community is too small, remove community again!!
 				if (com->getNumberOfNodes() < communitySizeSampler->getMinSize()) {
@@ -181,6 +180,8 @@ namespace NetworKit {
 
 			// initialization
 			globalCommunity = CommunityPtr(new Community(epsilon, *this));
+			communities.erase(globalCommunity);
+			assert(!globalCommunity->isAvailable());
 
 			for (node u = 0; u < n; ++u) {
 				generateNode();
