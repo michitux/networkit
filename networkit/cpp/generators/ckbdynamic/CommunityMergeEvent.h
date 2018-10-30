@@ -21,15 +21,14 @@ namespace NetworKit {
 		 */
 		class CommunityMergeEvent : public CommunityChangeEvent {
 		public:
-			CommunityMergeEvent(CommunityPtr communityA, CommunityPtr communityB, count numSteps, CKBDynamicImpl& generator);
+			CommunityMergeEvent(CommunityPtr communityA, CommunityPtr communityB, count targetSize, double targetEdgeProbability, count numSteps, CKBDynamicImpl& generator);
 			virtual void nextStep() override;
 		private:
-			std::vector<node> nodesToAddToA;
-			std::vector<node> nodesToAddToB;
+			std::array<std::vector<node>, 2> nodesToAddTo;
+			std::array<CommunityPtr, 2> communities;
+			count targetSize;
 			double targetEdgeProbability;
 			double targetEdgeProbabilityPerCommunity;
-			CommunityPtr communityA;
-			CommunityPtr communityB;
 		};
 	}
 }
