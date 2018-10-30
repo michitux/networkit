@@ -108,12 +108,13 @@ namespace NetworKit {
 			}
 		}
 
-		void Community::removeRandomNode() {
+		node Community::removeRandomNode() {
 			assert(nodes.size() > 0);
 			if (nodes.size() == 0) throw std::runtime_error("Error, no nodes in community!");
 
-			node u = nodes.at(Aux::Random::index(nodes.size()));
+			const node u = nodes.at(Aux::Random::index(nodes.size()));
 			removeNode(u);
+			return u;
 		}
 
 		void Community::addNode(node u) {

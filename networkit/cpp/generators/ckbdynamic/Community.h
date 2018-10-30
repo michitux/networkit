@@ -31,8 +31,10 @@ namespace NetworKit {
 
 			/**
 			 * Remove a random node from the community.
+			 *
+			 * @return The removed node.
 			 */
-			void removeRandomNode();
+			node removeRandomNode();
 
 			/**
 			 * Adds a node to the community and generates
