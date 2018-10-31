@@ -88,6 +88,7 @@ namespace NetworKit {
 
 			count nodesAdded = 0;
 
+			// TODO: make sure that each community gets at least enough nodes to have the minimum size.
 			if (nonOverlappingNodes() > 0 && totalNodesToAdd > 0) {
 				std::array<count, 2> numNodesToAdd {nodesToAddTo[0].size(), nodesToAddTo[1].size()};
 				if (numNodesToAdd[0] + numNodesToAdd[1] > totalNodesToAdd) {
@@ -118,6 +119,7 @@ namespace NetworKit {
 			if (nodesAdded < totalNodesToAdd) {
 				assert(nonOverlappingNodes() == 0);
 				count numNodesToAdd = totalNodesToAdd - nodesAdded;
+				// FIXME: handle situation when not enough nodes could be sampled.
 				std::vector<node> nodes = generator.communityNodeSampler.birthCommunityNodes(numNodesToAdd, communities[0]->getNodes());
 				for (node u : nodes) {
 					communities[0]->addNode(u);

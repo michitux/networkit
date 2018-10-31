@@ -238,10 +238,11 @@ namespace NetworKit {
 						}
 					} else if (r < birthProbability + deathProbability + splitProbability) {
 						// Split a community
-						if (splittableCommunities.size() > 0) {
-							CommunityPtr com = splittableCommunities.at(Aux::Random::index(splittableCommunities.size()));
-							auto comSizeProb = communitySizeSampler->splitCommunity(com->getNumberOfNodes(), com->getEdgeProbability());
-							currentEvents.emplace_back(new CommunitySplitEvent(com, comSizeProb.first.first, comSizeProb.first.second, comSizeProb.second.first, comSizeProb.second.second, numSteps, *this));
+						if (availableCommunities.size() > 0) {
+							CommunityPtr com = availableCommunities.at(Aux::Random::index(availableCommunities.size()));
+							auto comSizeProbA = communitySizeSampler->drawCommunity();
+							auto comSizeProbB = communitySizeSampler->drawCommunity();
+							currentEvents.emplace_back(new CommunitySplitEvent(com, comSizeProbA.first, comSizeProbA.second, comSizeProbB.first, comSizeProbB.second, numSteps, *this));
 							assert(!com->isAvailable());
 						} else {
 							WARN("No community available for splitting.");
