@@ -45,11 +45,6 @@ namespace NetworKit {
 
 			bool hasNode(node u) const { return nodesAlive.contains(u); };
 
-			std::pair<node, node> canonicalEdge(node u, node v) const {
-				if (u < v) return std::make_pair(u, v);
-				return std::make_pair(v, u);
-			}
-
 			BucketSampling communityNodeSampler;
 			std::unique_ptr<CommunitySizeDistribution> communitySizeSampler;
 		private:

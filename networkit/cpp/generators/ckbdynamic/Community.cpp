@@ -1,6 +1,7 @@
 
 #include "Community.h"
 #include "CKBDynamicImpl.h"
+#include "CommunityEventListener.h"
 #include "../../auxiliary/UniqueSampler.h"
 
 namespace NetworKit {
@@ -16,13 +17,21 @@ namespace NetworKit {
 
 		}
 
-		Community::Community(const Community& o) : id(o.generator.nextCommunityId()), edges(o.edges), nonEdges(o.nonEdges), nodes(o.nodes), neighbors(o.neighbors), edgeProbability(o.edgeProbability), available(o.available), storeNonEdges(o.storeNonEdges), generator(o.generator) {
+		Community::Community(const Community& o) : id(o.generator.nextCommunityId()), edges(o.edges), nonEdges(o.nonEdges), nodes(o.nodes), neighbors(o.neighbors), edgeProbability(o.edgeProbability), available(o.available), storeNonEdges(o.storeNonEdges), generator(o.generator), listeners(o.listeners) {
+
 			for (auto e : edges) {
 				generator.addEdge(e.first, e.second);
+
+				for (CommunityEventListener* listener : listeners) {
+					listener->notifyEdgeAddedToCommunity(e.first, e.second, CommunityPtr(this));
+				}
 			}
 
 			for (auto u : nodes) {
 				generator.addNodeToCommunity(u, CommunityPtr(this));
+				for (CommunityEventListener* listener : listeners) {
+					listener->notifyNodeAddedToCommunity(u, CommunityPtr(this));
+				}
 			}
 
 			generator.addCommunity(CommunityPtr(this));
@@ -33,17 +42,33 @@ namespace NetworKit {
 			generator.addCommunity(CommunityPtr(this));
 		}
 
+		void Community::registerEventListener(CommunityEventListener *listener) {
+			assert(std::find(listeners.begin(), listeners.end(), listener) == listeners.end());
+			listeners.push_back(listener);
+		}
+
+		void Community::unregisterEventListener(CommunityEventListener *listener) {
+			auto it = std::find(listeners.begin(), listeners.end(), listener);
+
+			if (it == listeners.end()) {
+				throw std::runtime_error("Error, listener not found!");
+			}
+
+			std::swap(*it, listeners.back());
+			listeners.pop_back();
+		}
+
 		void Community::verifyInvariants() const {
 			if (storeNonEdges) {
 				for (auto e : edges) {
-					assert(generator.canonicalEdge(e.first, e.second) == e);
+					assert(canonicalEdge(e.first, e.second) == e);
 					assert(!nonEdges.contains(e));
 					assert(nodes.contains(e.first));
 					assert(nodes.contains(e.second));
 				}
 
 				for (auto e : nonEdges) {
-					assert(generator.canonicalEdge(e.first, e.second) == e);
+					assert(canonicalEdge(e.first, e.second) == e);
 					assert(nodes.contains(e.first));
 					assert(nodes.contains(e.second));
 				}
@@ -53,14 +78,19 @@ namespace NetworKit {
 		}
 
 		void Community::removeEdge(node u, node v) {
-			edges.erase(generator.canonicalEdge(u, v));
+			edges.erase(canonicalEdge(u, v));
 			if (storeNonEdges) {
-				nonEdges.insert(generator.canonicalEdge(u, v));
+				nonEdges.insert(canonicalEdge(u, v));
 				verifyInvariants();
 			}
 			neighbors[v].erase(u);
 			neighbors[u].erase(v);
+
 			generator.removeEdge(u, v);
+
+			for (CommunityEventListener* listener : listeners) {
+				listener->notifyEdgeRemovedFromCommunity(u, v, CommunityPtr(this));
+			}
 		}
 
 		void Community::addEdge(node u, node v) {
@@ -69,11 +99,16 @@ namespace NetworKit {
 			assert(nodes.contains(v));
 			neighbors[u].insert(v);
 			neighbors[v].insert(u);
-			edges.insert(generator.canonicalEdge(u, v));
+			edges.insert(canonicalEdge(u, v));
 			if (storeNonEdges) {
-				nonEdges.erase(generator.canonicalEdge(u, v));
+				nonEdges.erase(canonicalEdge(u, v));
 				verifyInvariants();
 			}
+
+			for (CommunityEventListener* listener : listeners) {
+				listener->notifyEdgeAddedToCommunity(u, v, CommunityPtr(this));
+			}
+
 			generator.addEdge(u, v);
 		}
 
@@ -81,7 +116,7 @@ namespace NetworKit {
 			node u = 1 + std::floor(-0.5 + std::sqrt(0.25 + 2.0 * i));
 			node v = i - (u * (u - 1) / 2);
 
-			return generator.canonicalEdge(nodes.at(u), nodes.at(v));
+			return canonicalEdge(nodes.at(u), nodes.at(v));
 		}
 
 
@@ -89,20 +124,22 @@ namespace NetworKit {
 			assert(nodes.contains(u));
 			if (!nodes.contains(u)) throw std::runtime_error("Node not in community!");
 
-			for (node v : neighbors[u]) {
-				// We cannot delete from neighbors[u] because we iterate over it!
-				edges.erase(generator.canonicalEdge(u, v));
-				neighbors[v].erase(u);
-				generator.removeEdge(u, v);
+			while (neighbors[u].size()) {
+				const node v = neighbors[u].at(0);
+				removeEdge(u, v);
 			}
 
 			neighbors.erase(u);
 			nodes.erase(u);
+
+			for (CommunityEventListener* listener : listeners) {
+				listener->notifyNodeRemovedFromCommunity(u, CommunityPtr(this));
+			}
 			generator.removeNodeFromCommunity(u, CommunityPtr(this));
 
 			if (storeNonEdges) {
 				for (node i = 0; i < nodes.size(); ++i) {
-					nonEdges.erase(generator.canonicalEdge(u, nodes.at(i)));
+					nonEdges.erase(canonicalEdge(u, nodes.at(i)));
 				}
 				verifyInvariants();
 			}
@@ -126,7 +163,7 @@ namespace NetworKit {
 				for (node i = 0; i < nodes.size(); ++i) {
 					const node v = nodes.at(i);
 					if (u != v) {
-						nonEdges.insert(generator.canonicalEdge(u, v));
+						nonEdges.insert(canonicalEdge(u, v));
 					}
 				}
 
@@ -143,6 +180,9 @@ namespace NetworKit {
 				}
 			}
 
+			for (CommunityEventListener* listener : listeners) {
+				listener->notifyNodeAddedToCommunity(u, CommunityPtr(this));
+			}
 			generator.addNodeToCommunity(u, CommunityPtr(this));
 		}
 
@@ -264,7 +304,7 @@ namespace NetworKit {
 				while (edges.size() < numEdgesWanted) {
 					node u = nodes.at(Aux::Random::index(nodes.size()));
 					node v = nodes.at(Aux::Random::index(nodes.size()));
-					if (u != v && !edges.contains(generator.canonicalEdge(u, v))) {
+					if (u != v && !edges.contains(canonicalEdge(u, v))) {
 						addEdge(u, v);
 					}
 				}
@@ -284,7 +324,7 @@ namespace NetworKit {
 					for (index j = i + 1; j < nodes.size(); ++j) {
 						const node v = nodes.at(j);
 
-						const auto e = generator.canonicalEdge(u, v);
+						const auto e = canonicalEdge(u, v);
 						if (!edges.contains(e)) {
 							nonEdges.insert(e);
 						}
@@ -317,7 +357,8 @@ namespace NetworKit {
 			assert(&other != this);
 			assert(other.nodes.size() == nodes.size());
 
-			for (auto e : other.edges) {
+			while (other.edges.size() > 0) {
+				const auto e = other.edges.at(0);
 				// First add edge here to ensure it exists at least once globally
 				// so we don't generate remove/add events globally.
 				if (!edges.contains(e)) {
@@ -327,15 +368,16 @@ namespace NetworKit {
 				other.removeEdge(e.first, e.second);
 			}
 
-			other.edges.clear();
-			other.neighbors.clear();
-			other.nonEdges.clear();
+			assert(other.edges.size() == 0);
 
-			for (node u : other.nodes) {
-				generator.removeNodeFromCommunity(u, CommunityPtr(&other));
+			while (other.nodes.size() > 0) {
+				const node u = other.nodes.at(0);
+				other.removeNode(u);
 			}
 
-			other.nodes.clear();
+			assert(other.neighbors.size() == 0);
+			assert(other.nonEdges.size() == 0);
+			assert(other.nodes.size() == 0);
 		}
 
 		void Community::setAvailable( bool avail ) {

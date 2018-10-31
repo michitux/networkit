@@ -20,7 +20,7 @@ namespace NetworKit {
 		}
 
 		void CKBDynamicImpl::addEdge(node u, node v) {
-			auto e = canonicalEdge(u, v);
+			auto e = Community::canonicalEdge(u, v);
 			auto it = edgesAlive.find(e);
 
 			if (it == edgesAlive.end()) {
@@ -32,7 +32,7 @@ namespace NetworKit {
 		}
 
 		void CKBDynamicImpl::removeEdge(node u, node v) {
-			auto e = canonicalEdge(u, v);
+			auto e = Community::canonicalEdge(u, v);
 			auto it = edgesAlive.find(e);
 			if (it == edgesAlive.end()) {
 				throw std::runtime_error("Error, removing edge that does not exist");

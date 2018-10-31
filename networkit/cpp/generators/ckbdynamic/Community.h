@@ -10,9 +10,14 @@
 namespace NetworKit {
 	namespace CKBDynamicImpl {
 		class CKBDynamicImpl;
+		class CommunityEventListener;
 
 		class Community : public tlx::ReferenceCounter {
 		public:
+			static std::pair<node, node> canonicalEdge(node u, node v) {
+				if (u < v) return std::make_pair(u, v);
+				return std::make_pair(v, u);
+			}
 			/**
 			 * Create an exact copy of a given community @a o
 			 *
@@ -21,6 +26,9 @@ namespace NetworKit {
 			Community(const Community& o);
 
 			Community(double edgeProbability, CKBDynamicImpl& generator);
+
+			void registerEventListener(CommunityEventListener* listener);
+			void unregisterEventListener(CommunityEventListener* listener);
 
 			/**
 			 * Remove the given node @a u from the community.
@@ -115,6 +123,8 @@ namespace NetworKit {
 			bool available;
 			bool storeNonEdges;
 			CKBDynamicImpl& generator;
+
+			std::vector<CommunityEventListener*> listeners;
 		};
 
 		using CommunityPtr = tlx::CountingPtr<Community>;

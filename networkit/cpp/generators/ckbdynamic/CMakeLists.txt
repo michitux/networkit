@@ -1,6 +1,7 @@
 networkit_add_module(generators_ckbdynamic
   CKBDynamicImpl.cpp
   Community.cpp
+  CommunityEventListener.cpp
   CommunityChangeEvent.cpp
   CommunityBirthEvent.cpp
   CommunityMergeEvent.cpp
