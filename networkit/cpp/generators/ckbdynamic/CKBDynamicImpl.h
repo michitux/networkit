@@ -48,8 +48,6 @@ namespace NetworKit {
 			BucketSampling communityNodeSampler;
 			std::unique_ptr<CommunitySizeDistribution> communitySizeSampler;
 		private:
-			Aux::SamplingSet<CommunityPtr> splittableCommunities;
-			Aux::SamplingSet<CommunityPtr> mergeableCommunities;
 			Aux::SamplingSet<CommunityPtr> availableCommunities;
 			Aux::SamplingSet<CommunityPtr> communities;
 			std::vector<std::unordered_set<CommunityPtr>> nodeCommunities;

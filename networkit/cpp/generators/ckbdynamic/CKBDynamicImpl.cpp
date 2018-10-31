@@ -52,16 +52,6 @@ namespace NetworKit {
 				communityEvents.emplace_back(CommunityEvent::NODE_JOINS_COMMUNITY, u, com->getId());
 				++currentCommunityMemberships;
 				communityNodeSampler.assignCommunity(u);
-
-				if (com->isAvailable()) {
-					if (com->getNumberOfNodes() == 2*communitySizeSampler->getMinSize()) {
-						splittableCommunities.insert(com);
-					}
-
-					if (com->getNumberOfNodes() > (communitySizeSampler->getMaxSize() - communitySizeSampler->getMinSize())) {
-						mergeableCommunities.erase(com);
-					}
-				}
 			}
 		}
 
@@ -71,16 +61,6 @@ namespace NetworKit {
 				communityEvents.emplace_back(CommunityEvent::NODE_LEAVES_COMMUNITY, u, com->getId());
 				communityNodeSampler.leaveCommunity(u);
 				--currentCommunityMemberships;
-
-				if (com->isAvailable()) {
-					if (com->getNumberOfNodes() < 2*communitySizeSampler->getMinSize()) {
-						splittableCommunities.erase(com);
-					}
-
-					if (com->getNumberOfNodes() <= communitySizeSampler->getMaxSize()) {
-						mergeableCommunities.insert(com);
-					}
-				}
 			}
 		}
 
@@ -92,18 +72,9 @@ namespace NetworKit {
 					currentEvents.emplace_back(new CommunityDeathEvent(com, 0, 1, *this));
 				} else {
 					availableCommunities.insert(com);
-					if (com->getNumberOfNodes() >= 2*communitySizeSampler->getMinSize()) {
-						splittableCommunities.insert(com);
-					}
-
-					if (com->getNumberOfNodes() <= communitySizeSampler->getMaxSize() - communitySizeSampler->getMinSize()) {
-						mergeableCommunities.insert(com);
-					}
 				}
 			} else {
 				availableCommunities.erase(com);
-				splittableCommunities.erase(com);
-				mergeableCommunities.erase(com);
 			}
 			communities.insert(com);
 		}
@@ -111,8 +82,6 @@ namespace NetworKit {
 		void CKBDynamicImpl::removeCommunity(CommunityPtr com) {
 			availableCommunities.erase(com);
 			communities.erase(com);
-			mergeableCommunities.erase(com);
-			splittableCommunities.erase(com);
 		}
 
 		index CKBDynamicImpl::nextCommunityId() {
