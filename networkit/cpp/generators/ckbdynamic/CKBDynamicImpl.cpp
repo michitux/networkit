@@ -248,25 +248,22 @@ namespace NetworKit {
 						}
 					} else {
 						// merge two communities
-						if (mergeableCommunities.size() > 1) {
-							CommunityPtr comA, comB;
-							bool found = false;
-							for (count j = 0; j < 20; ++j) {
-								comA = mergeableCommunities.at(Aux::Random::index(mergeableCommunities.size()));
-								comB = mergeableCommunities.at(Aux::Random::index(mergeableCommunities.size()));
-								if (comA != comB && comA->getNumberOfNodes() + comB->getNumberOfNodes() < communitySizeSampler->getMaxSize()) {
-									found = true;
-									break;
-								}
+						if (availableCommunities.size() > 1) {
+							index ia = Aux::Random::integer(availableCommunities.size() - 1);
+							index ib = Aux::Random::integer(1, availableCommunities.size() - 1);
+							if (ia == ib) {
+								ib = 0;
 							}
 
-							if (found) {
-								currentEvents.emplace_back(new CommunityMergeEvent(comA, comB, numSteps, *this));
-								assert(!comA->isAvailable());
-								assert(!comB->isAvailable());
-							} else {
-								WARN("In 20 trials, no two communities found to merge.");
-							}
+							CommunityPtr comA = availableCommunities.at(ia);
+							CommunityPtr comB = availableCommunities.at(ib);
+
+							count targetSize;
+							double targetEdgeProbability;
+							std::tie(targetSize, targetEdgeProbability) = communitySizeSampler->drawCommunity();
+							currentEvents.emplace_back(new CommunityMergeEvent(comA, comB, targetSize, targetEdgeProbability, numSteps, *this));
+							assert(!comA->isAvailable());
+							assert(!comB->isAvailable());
 						} else {
 							WARN("No two communities available for merge.");
 						}
@@ -316,7 +313,6 @@ namespace NetworKit {
 					const double x = communityNodeSampler.getSumOfDesiredMemberships() * 1.0 / currentCommunityMemberships;
 					birthProbability = 0.5 * x / (1 + x);
 					deathProbability = 0.5 - birthProbability;
-					INFO("At timestep ", timestep, " adjusting birth probability to ", birthProbability, " and death probability to ", deathProbability);
 					INFO("Current memberships: ", currentCommunityMemberships, " desired: ", communityNodeSampler.getSumOfDesiredMemberships(), " number of communities: ", communities.size(), " available: ", availableCommunities.size(), " active events ", currentEvents.size());
 					INFO("Current nodes ", nodesAlive.size(), " current edges: ", edgesAlive.size(), " total graph events ", graphEvents.size(), " total community events ", communityEvents.size());
 				}
