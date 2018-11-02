@@ -48,6 +48,8 @@ namespace NetworKit {
 			BucketSampling communityNodeSampler;
 			std::unique_ptr<CommunitySizeDistribution> communitySizeSampler;
 		private:
+			void finishTimeStep();
+
 			Aux::SamplingSet<CommunityPtr> availableCommunities;
 			Aux::SamplingSet<CommunityPtr> communities;
 			std::vector<std::unordered_set<CommunityPtr>> nodeCommunities;
@@ -56,6 +58,11 @@ namespace NetworKit {
 
 			Aux::SamplingSet<node> nodesAlive;
 			std::unordered_map<std::pair<node, node>, count, NodePairHash> edgesAlive;
+
+			// Events of the current time step
+			std::unordered_map<std::pair<node, node>, GraphEvent, NodePairHash> currentEdgeEvents;
+			std::vector<node> currentErasedNodes;
+			std::unordered_map<std::pair<index, node>, CommunityEvent, NodePairHash> currentCommunityEvents;
 
 			count n;
 			double communityEventProbability;

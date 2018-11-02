@@ -25,7 +25,13 @@ namespace NetworKit {
 
 			if (it == edgesAlive.end()) {
 				edgesAlive.insert(std::make_pair(e, 1ul));
-				graphEvents.emplace_back(GraphEvent::EDGE_ADDITION, e.first, e.second);
+				auto evIt = currentEdgeEvents.find(e);
+				if (evIt != currentEdgeEvents.end()) {
+					assert(evIt->second.type == GraphEvent::EDGE_REMOVAL);
+					currentEdgeEvents.erase(evIt);
+				} else {
+					currentEdgeEvents.emplace(e, GraphEvent(GraphEvent::EDGE_ADDITION, e.first, e.second));
+				}
 			} else {
 				it->second += 1;
 			}
@@ -42,14 +48,28 @@ namespace NetworKit {
 				--it->second;
 			} else {
 				edgesAlive.erase(it);
-				graphEvents.emplace_back(GraphEvent::EDGE_REMOVAL, e.first, e.second);
+				auto evIt = currentEdgeEvents.find(e);
+				if (evIt != currentEdgeEvents.end()) {
+					assert(evIt->second.type == GraphEvent::EDGE_ADDITION);
+					currentEdgeEvents.erase(evIt);
+				} else {
+					currentEdgeEvents.emplace(e, GraphEvent(GraphEvent::EDGE_REMOVAL, e.first, e.second));
+				}
 			}
 		}
 
 		void CKBDynamicImpl::addNodeToCommunity(node u, CommunityPtr com) {
 			if (com != globalCommunity) {
 				nodeCommunities[u].insert(com);
-				communityEvents.emplace_back(CommunityEvent::NODE_JOINS_COMMUNITY, u, com->getId());
+				auto comNode = std::make_pair(com->getId(), u);
+				auto it = currentCommunityEvents.find(comNode);
+				if (it != currentCommunityEvents.end()) {
+					assert(it->second.type == CommunityEvent::NODE_LEAVES_COMMUNITY);
+					currentCommunityEvents.erase(it);
+				} else {
+					currentCommunityEvents.emplace(comNode, CommunityEvent(CommunityEvent::NODE_JOINS_COMMUNITY, u, com->getId()));
+				}
+
 				++currentCommunityMemberships;
 				communityNodeSampler.assignCommunity(u);
 			}
@@ -58,7 +78,14 @@ namespace NetworKit {
 		void CKBDynamicImpl::removeNodeFromCommunity(node u, CommunityPtr com) {
 			if (com != globalCommunity) {
 				nodeCommunities[u].erase(com);
-				communityEvents.emplace_back(CommunityEvent::NODE_LEAVES_COMMUNITY, u, com->getId());
+				auto comNode = std::make_pair(com->getId(), u);
+				auto it = currentCommunityEvents.find(comNode);
+				if (it != currentCommunityEvents.end()) {
+					assert(it->second.type == CommunityEvent::NODE_JOINS_COMMUNITY);
+					currentCommunityEvents.erase(it);
+				} else {
+					currentCommunityEvents.emplace(comNode, CommunityEvent(CommunityEvent::NODE_LEAVES_COMMUNITY, u, com->getId()));
+				}
 				communityNodeSampler.leaveCommunity(u);
 				--currentCommunityMemberships;
 			}
@@ -118,24 +145,54 @@ namespace NetworKit {
 				nodesAlive.insert(v);
 				nodeCommunities.emplace_back();
 				globalCommunity->addNode(v);
+				graphEvents.emplace_back(GraphEvent::NODE_ADDITION, v);
 			}
 		}
 
 		void CKBDynamicImpl::eraseNode() {
-			node u = nodesAlive.at(Aux::Random::index(nodesAlive.size()));
-			while (nodeCommunities[u].size() > 0) {
-				CommunityPtr com = *nodeCommunities[u].begin();
-				com->removeNode(u);
-				// if a community becomes too small, erase it
-				if (com->isAvailable() && com->getNumberOfNodes() < communitySizeSampler->getMinSize()) {
-					INFO("Available community has only ", com->getNumberOfNodes(), " nodes, destroying.");
-					currentEvents.emplace_back(new CommunityDeathEvent(com, 0, 1, *this));
-				}
-			}
+			std::vector<node> removedNodes;
+			removedNodes.push_back(nodesAlive.at(Aux::Random::index(nodesAlive.size())));
+			node v = communityNodeSampler.removeNode(removedNodes.back());
+			// Also remove the additionally removed node if there was any.
+			if (v != none) removedNodes.push_back(v);
 
-			nodesAlive.erase(u);
-			communityNodeSampler.removeNode(u);
-			globalCommunity->removeNode(u);
+			for (node u : removedNodes) {
+				while (nodeCommunities[u].size() > 0) {
+					CommunityPtr com = *nodeCommunities[u].begin();
+					com->removeNode(u);
+					// if a community becomes too small, erase it
+					if (com->isAvailable() && com->getNumberOfNodes() < communitySizeSampler->getMinSize()) {
+						INFO("Available community has only ", com->getNumberOfNodes(), " nodes, destroying.");
+						currentEvents.emplace_back(new CommunityDeathEvent(com, 0, 1, *this));
+					}
+				}
+
+				assert(nodesAlive.contains(u));
+				nodesAlive.erase(u);
+				globalCommunity->removeNode(u);
+				currentErasedNodes.push_back(u);
+			}
+		}
+
+		void CKBDynamicImpl::finishTimeStep() {
+			for (const auto &it : currentEdgeEvents) {
+				graphEvents.push_back(it.second);
+			}
+			currentEdgeEvents.clear();
+
+			for (const auto &it : currentCommunityEvents) {
+				communityEvents.push_back(it.second);
+			}
+			currentCommunityEvents.clear();
+
+			// Ensure that node removals are after edge events.
+			for (node u : currentErasedNodes) {
+				graphEvents.emplace_back(GraphEvent::NODE_REMOVAL, u);
+			}
+			currentErasedNodes.clear();
+
+			communityEvents.emplace_back(CommunityEvent::TIME_STEP);
+			graphEvents.emplace_back(GraphEvent::TIME_STEP);
 		}
 
 		count CKBDynamicImpl::sampleNumSteps() const {
@@ -171,15 +228,15 @@ namespace NetworKit {
 				com->setAvailable(true);
 			}
 
+			// Finish initial graph generation.
+			finishTimeStep();
+
 			std::binomial_distribution<count> numEventDistribution;
 			double deathProbability = 0.25, birthProbability = 0.25, splitProbability = 0.25, mergeProbability = 0.25;
 			tlx::unused(mergeProbability);
 
 			for (count timestep = 0; timestep < numTimesteps; ++timestep) {
 				handler.assureRunning();
-				graphEvents.emplace_back(GraphEvent::TIME_STEP);
-				communityEvents.emplace_back(CommunityEvent::TIME_STEP);
-
 				numEventDistribution.param(std::binomial_distribution<count>::param_type(communities.size(), communityEventProbability));
 				const count numCommunityEvents = numEventDistribution(Aux::Random::getURNG());
 
@@ -243,12 +300,17 @@ namespace NetworKit {
 				// generate node events
 				const double wantedNodeFraction = initialNumberOfNodes * 1.0 / nodesAlive.size();
 				const double nodeBirthProbability = wantedNodeFraction / (1 + wantedNodeFraction);
-				for (count j = 0; j < numNodeEvents; ++j) {
-					if (Aux::Random::real() < nodeBirthProbability) {
-						generateNode();
-					} else {
-						eraseNode();
-					}
+
+				// First generate all death events, then all birth events.
+				// This ensures that no node that is born in this time step dies again in this time step.
+				numEventDistribution.param(std::binomial_distribution<count>::param_type(numNodeEvents, nodeBirthProbability));
+				const count nodesBorn = numEventDistribution(Aux::Random::getURNG());
+
+				for (count j = 0; j < (numNodeEvents - nodesBorn); ++j) {
+					eraseNode();
+				}
+				for (count j = 0; j < nodesBorn; ++j) {
+					generateNode();
 				}
 
 				// Trigger all current events
@@ -287,10 +349,9 @@ namespace NetworKit {
 					INFO("Current nodes ", nodesAlive.size(), " current edges: ", edgesAlive.size(), " total graph events ", graphEvents.size(), " total community events ", communityEvents.size());
 				}
 
-			}
+				finishTimeStep();
 
-			graphEvents.emplace_back(GraphEvent::TIME_STEP);
-			communityEvents.emplace_back(CommunityEvent::TIME_STEP);
+			}
 
 			hasRun = true;
 		}

@@ -223,7 +223,7 @@ namespace NetworKit {
 			nodes[u].nodes_by_memberships_pos = nodes_by_memberships[degree].size();
 			nodes_by_memberships[degree].push_back(u);
 
-			count u_fractional_slot = degree % oversample_fraction;
+			int64_t u_fractional_slot = degree % oversample_fraction;
 			count u_additional_full_slots = degree / oversample_fraction;
 			count num_full_slots = degree;
 
@@ -412,7 +412,10 @@ namespace NetworKit {
 		}
 
 		node BucketSampling::removeNode(node nodeId) {
-			if (nodes[nodeId].degree == 0) return none;
+			assert(nodes[nodeId].degree > 0);
+			if (nodes[nodeId].degree == 0) {
+				throw std::runtime_error("Error, node has already been removed");
+			}
 
 			sumOfDesiredMemberships -= nodes[nodeId].degree;
 			node result = removeNode(nodeId, true);
