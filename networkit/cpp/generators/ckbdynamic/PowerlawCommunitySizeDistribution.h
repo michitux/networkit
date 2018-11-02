@@ -19,10 +19,6 @@ namespace NetworKit {
 			PowerlawCommunitySizeDistribution(count minSize, count maxSize, double gamma, double alpha, double densityGamma, double minSplitRatio);
 
 			virtual std::pair<count, double> drawCommunity() override;
-
-			virtual std::pair<count, double> mergeCommunities(count sizeA, double probabilityA, count sizeB, double probabilityB, count combinedNodes) override;
-
-			virtual std::pair<std::pair<count, double>, std::pair<count, double>> splitCommunity(count size, double probability) override;
 		};
 	}
 }
