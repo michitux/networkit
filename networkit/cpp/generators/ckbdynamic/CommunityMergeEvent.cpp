@@ -88,18 +88,41 @@ namespace NetworKit {
 
 			count nodesAdded = 0;
 
-			// TODO: make sure that each community gets at least enough nodes to have the minimum size.
-			if (nonOverlappingNodes() > 0 && totalNodesToAdd > 0) {
+			// At minimum, we need to add enough nodes such that both communities reach the minimum size.
+			const count minSize = generator.communitySizeSampler->getMinSize();
+			std::array<count, 2> minNodesToAdd {0,0};
+			for (count c = 0; c < 2; ++c) {
+				if (communities[c]->getNumberOfNodes() < minSize) {
+					minNodesToAdd[c] = minSize - communities[c]->getNumberOfNodes();
+				}
+			}
+
+			assert(communities[0]->getNumberOfNodes() + nodesToAddTo[0].size() == communities[1]->getNumberOfNodes() + nodesToAddTo[1].size());
+
+			if (nonOverlappingNodes() > 0 && (totalNodesToAdd > 0 || minNodesToAdd[0] + minNodesToAdd[1] > 0)) {
 				std::array<count, 2> numNodesToAdd {nodesToAddTo[0].size(), nodesToAddTo[1].size()};
-				if (numNodesToAdd[0] + numNodesToAdd[1] > totalNodesToAdd) {
+
+				// If we have more non-overlapping nodes than nodes to be added, select some.
+				// However, select only adding all non-overlapping nodes achieves the minimum size.
+				if (numNodesToAdd[0] + numNodesToAdd[1] > totalNodesToAdd && communities[0]->getNumberOfNodes() + nodesToAddTo[0].size() > minSize) {
 					numNodesToAdd[0] = numNodesToAdd[0] * totalNodesToAdd / nonOverlappingNodes();
 					numNodesToAdd[1] = totalNodesToAdd - numNodesToAdd[0];
 
+					// Always round the other way if the previous allocation is infeasible.
+					// Apply probabilitic rounding if there is enough possibility for change.
 					if (numNodesToAdd[1] > nodesToAddTo[1].size() || (nodesToAddTo[0].size() > numNodesToAdd[0] && numNodesToAdd[1] > 0 && Aux::Random::real() < nodesToAddTo[0].size() *  totalNodesToAdd *  1.0 / nonOverlappingNodes() - numNodesToAdd[0])) {
 						++numNodesToAdd[0];
 						--numNodesToAdd[1];
 					}
-					assert(numNodesToAdd[0] + numNodesToAdd[1] == totalNodesToAdd);
+
+					// Ensure that if possible, we are adding at least the minimum amount of nodes required to reach the minimum community size.
+					for (count c = 0; c < 2; ++c) {
+						if (numNodesToAdd[c] < minNodesToAdd[c]) {
+							numNodesToAdd[c] = minNodesToAdd[c];
+							numNodesToAdd[1-c] = std::max(totalNodesToAdd > numNodesToAdd[c] ? totalNodesToAdd - numNodesToAdd[c] : 0, minNodesToAdd[1 - c]);
+						}
+					}
+					assert(numNodesToAdd[0] + numNodesToAdd[1] >= totalNodesToAdd);
 					assert(numNodesToAdd[0] <= nodesToAddTo[0].size());
 					assert(numNodesToAdd[1] <= nodesToAddTo[1].size());
 				}
@@ -116,14 +139,40 @@ namespace NetworKit {
 				}
 			}
 
-			if (nodesAdded < totalNodesToAdd) {
+			if (nodesAdded < totalNodesToAdd || communities[0]->getNumberOfNodes() < minSize) {
+				// Assert the overlap is empty now
 				assert(nonOverlappingNodes() == 0);
+				assert(communities[0]->getNumberOfNodes() == communities[1]->getNumberOfNodes());
 				count numNodesToAdd = totalNodesToAdd - nodesAdded;
-				// FIXME: handle situation when not enough nodes could be sampled.
+				if (communities[0]->getNumberOfNodes() + numNodesToAdd < minSize) {
+					numNodesToAdd = minSize - communities[0]->getNumberOfNodes();
+				}
+
 				std::vector<node> nodes = generator.communityNodeSampler.birthCommunityNodes(numNodesToAdd, communities[0]->getNodes());
-				for (node u : nodes) {
-					communities[0]->addNode(u);
-					communities[1]->addNode(u);
+				if (nodes.size() < numNodesToAdd) {
+					// Delay event completion if not enough nodes could be sampled.
+					if (currentStep + 1 == numSteps) {
+						++numSteps;
+					}
+				}
+
+				// If we are in the really unlucky situation that we could not even get enough nodes to achieve the minimum size,
+				// let both communities die and let the whole event die.
+				if (communities[0]->getNumberOfNodes() + nodes.size() < minSize) {
+					for (count c = 0; c < 2; ++c) {
+						communities[c]->unregisterEventListener(this);
+						while (communities[c]->getNumberOfNodes() > 0) {
+							communities[c]->removeRandomNode();
+						}
+						generator.removeCommunity(communities[c]);
+					}
+					active = false;
+					return;
+				} else {
+					for (node u : nodes) {
+						communities[0]->addNode(u);
+						communities[1]->addNode(u);
+					}
 				}
 			}
 
@@ -143,6 +192,7 @@ namespace NetworKit {
 				// the edges in the next perturbation.
 				communities[0]->changeEdgeProbability(targetEdgeProbability);
 				communities[0]->setAvailable(true);
+				assert(communities[0]->getNumberOfNodes() == targetSize);
 			}
 		}
 

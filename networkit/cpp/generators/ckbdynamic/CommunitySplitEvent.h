@@ -21,9 +21,9 @@ namespace NetworKit {
 			virtual void notifyNodeRemovedFromCommunity(node u, CommunityPtr com) override;
 		private:
 			std::array<Aux::SamplingSet<node>, 2> nodesToRemove;
-			std::array<count, 2> targetSize;
-			std::array<double, 2> targetEdgeProbability;
-			std::array<CommunityPtr, 2> communities;
+                        const std::array<count, 2> targetSize;
+                        const std::array<double, 2> targetEdgeProbability;
+                        const std::array<CommunityPtr, 2> communities;
 		};
 	}
 }
