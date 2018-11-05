@@ -120,6 +120,7 @@ namespace NetworKit {
 		CKBDynamicImpl::CKBDynamicImpl(const CKBDynamic::param_type &params) :
 			communityNodeSampler(0, params.minCommunityMembership, params.maxCommunityMembership, params.communityMembershipExponent),
 			communitySizeSampler(new PowerlawCommunitySizeDistribution(params.minCommunitySize, params.maxCommunitySize, params.communitySizeExponent, params.intraCommunityEdgeProbability, params.intraCommunityEdgeExponent, params.minSplitRatio)),
+			maxCommunityId(0),
 			n(params.n),
 			communityEventProbability(params.communityEventProbability),
 			nodeEventProbability(params.nodeEventProbability),
