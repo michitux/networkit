@@ -7,10 +7,11 @@ networkit_add_module(dynamics
     GraphEventHandler.cpp
     GraphEventProxy.cpp
     GraphUpdater.cpp
+    CoverUpdater.cpp
     )
 
 networkit_module_link_modules(dynamics
-        auxiliary base graph)
+        auxiliary base graph structures)
 
 add_subdirectory(test)
 

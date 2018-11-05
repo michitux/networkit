@@ -8316,6 +8316,35 @@ cdef class GraphUpdater:
 		with nogil:
 			self._this.update(_stream)
 
+cdef extern from "cpp/dynamics/CoverUpdater.h":
+	cdef cppclass _CoverUpdater "NetworKit::CoverUpdater":
+		_CoverUpdater(_Cover G) except +
+		void update(vector[_CommunityEvent] stream) nogil except +
+
+cdef class CoverUpdater:
+	""" Updates a cover according to a stream of community events.
+
+	Parameters
+	----------
+	C : Cover
+	 	initial cover
+	"""
+	cdef _CoverUpdater* _this
+	cdef Cover _C
+
+	def __cinit__(self, Cover C):
+		self._C = C
+		self._this = new _CoverUpdater(C._this)
+
+	def __dealloc__(self):
+		del self._this
+
+	def update(self, stream):
+		cdef vector[_CommunityEvent] _stream
+		for ev in stream:
+			_stream.push_back(_CommunityEvent(ev.type, ev.u, ev.community))
+		with nogil:
+			self._this.update(_stream)
 
 # Module: coarsening
 
