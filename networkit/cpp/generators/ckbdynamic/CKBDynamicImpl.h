@@ -13,6 +13,7 @@
 #include "CommunityChangeEvent.h"
 #include "../CKBDynamic.h"
 #include "NodePairHash.h"
+#include "../PowerlawDegreeSequence.h"
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
@@ -45,10 +46,11 @@ namespace NetworKit {
 
 			bool hasNode(node u) const { return nodesAlive.contains(u); };
 
-			BucketSampling communityNodeSampler;
 			std::unique_ptr<CommunitySizeDistribution> communitySizeSampler;
 		private:
+			PowerlawDegreeSequence membershipDistribution;
 			void finishTimeStep();
+			void assignNodesToCommunities();
 
 			Aux::SamplingSet<CommunityPtr> availableCommunities;
 			Aux::SamplingSet<CommunityPtr> communities;
@@ -57,6 +59,8 @@ namespace NetworKit {
 			count maxCommunityId;
 
 			Aux::SamplingSet<node> nodesAlive;
+			std::vector<count> desiredMemberships;
+			count sumOfDesiredMemberships;
 			std::unordered_map<std::pair<node, node>, count, NodePairHash> edgesAlive;
 
 			// Events of the current time step

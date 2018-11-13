@@ -71,7 +71,6 @@ namespace NetworKit {
 				}
 
 				++currentCommunityMemberships;
-				communityNodeSampler.assignCommunity(u);
 			}
 		}
 
@@ -86,7 +85,6 @@ namespace NetworKit {
 				} else {
 					currentCommunityEvents.emplace(comNode, CommunityEvent(CommunityEvent::NODE_LEAVES_COMMUNITY, u, com->getId()));
 				}
-				communityNodeSampler.leaveCommunity(u);
 				--currentCommunityMemberships;
 			}
 		}
@@ -118,9 +116,10 @@ namespace NetworKit {
 		}
 
 		CKBDynamicImpl::CKBDynamicImpl(const CKBDynamic::param_type &params) :
-			communityNodeSampler(0, params.minCommunityMembership, params.maxCommunityMembership, params.communityMembershipExponent),
 			communitySizeSampler(new PowerlawCommunitySizeDistribution(params.minCommunitySize, params.maxCommunitySize, params.communitySizeExponent, params.intraCommunityEdgeProbability, params.intraCommunityEdgeExponent, params.minSplitRatio)),
+			membershipDistribution(params.minCommunityMembership, params.maxCommunityMembership, params.communityMembershipExponent),
 			maxCommunityId(0),
+			sumOfDesiredMemberships(0),
 			n(params.n),
 			communityEventProbability(params.communityEventProbability),
 			nodeEventProbability(params.nodeEventProbability),
@@ -128,6 +127,7 @@ namespace NetworKit {
 			epsilon(params.epsilon),
 			numTimesteps(params.numTimesteps),
 			currentCommunityMemberships(0) {
+			membershipDistribution.run();
 		}
 
 		std::vector<GraphEvent> CKBDynamicImpl::getGraphEvents() const {
@@ -141,38 +141,34 @@ namespace NetworKit {
 		}
 
 		void CKBDynamicImpl::generateNode() {
-			node u = communityNodeSampler.addNode();
-			for (node v = u; v < communityNodeSampler.getNumberOfNodes(); ++v) {
-				nodesAlive.insert(v);
-				nodeCommunities.emplace_back();
-				globalCommunity->addNode(v);
-				graphEvents.emplace_back(GraphEvent::NODE_ADDITION, v);
-			}
+			node u = desiredMemberships.size();
+			desiredMemberships.push_back(membershipDistribution.getDegree());
+			sumOfDesiredMemberships += desiredMemberships.back();
+			nodesAlive.insert(u);
+			nodeCommunities.emplace_back();
+			globalCommunity->addNode(u);
+			graphEvents.emplace_back(GraphEvent::NODE_ADDITION, u);
 		}
 
 		void CKBDynamicImpl::eraseNode() {
-			std::vector<node> removedNodes;
-			removedNodes.push_back(nodesAlive.at(Aux::Random::index(nodesAlive.size())));
-			node v = communityNodeSampler.removeNode(removedNodes.back());
-			// Also remove the additionally removed node if there was any.
-			if (v != none) removedNodes.push_back(v);
+			node u = nodesAlive.at(Aux::Random::index(nodesAlive.size()));
+			sumOfDesiredMemberships -= desiredMemberships[u];
+			desiredMemberships[u] = 0;
 
-			for (node u : removedNodes) {
-				while (nodeCommunities[u].size() > 0) {
-					CommunityPtr com = *nodeCommunities[u].begin();
-					com->removeNode(u);
-					// if a community becomes too small, erase it
-					if (com->isAvailable() && com->getNumberOfNodes() < communitySizeSampler->getMinSize()) {
-						INFO("Available community has only ", com->getNumberOfNodes(), " nodes, destroying.");
-						currentEvents.emplace_back(new CommunityDeathEvent(com, 0, 1, *this));
-					}
+			while (nodeCommunities[u].size() > 0) {
+				CommunityPtr com = *nodeCommunities[u].begin();
+				com->removeNode(u);
+				// if a community becomes too small, erase it
+				if (com->isAvailable() && com->getNumberOfNodes() < communitySizeSampler->getMinSize()) {
+					INFO("Available community has only ", com->getNumberOfNodes(), " nodes, destroying.");
+					currentEvents.emplace_back(new CommunityDeathEvent(com, 0, 1, *this));
 				}
-
-				assert(nodesAlive.contains(u));
-				nodesAlive.erase(u);
-				globalCommunity->removeNode(u);
-				currentErasedNodes.push_back(u);
 			}
+
+			assert(nodesAlive.contains(u));
+			nodesAlive.erase(u);
+			globalCommunity->removeNode(u);
+			currentErasedNodes.push_back(u);
 		}
 
 		void CKBDynamicImpl::finishTimeStep() {
@@ -200,6 +196,7 @@ namespace NetworKit {
 			return Aux::Random::integer(5, 15);
 		}
 
+
 		void CKBDynamicImpl::run() {
 			if (hasRun) throw std::runtime_error("Error, run has already been called");
 
@@ -216,18 +213,18 @@ namespace NetworKit {
 
 			const count initialNumberOfNodes = nodesAlive.size();
 
-			while (currentCommunityMemberships < communityNodeSampler.getSumOfDesiredMemberships()) {
+			while (currentCommunityMemberships < sumOfDesiredMemberships) {
 				handler.assureRunning();
 				count communitySize;
 				double edgeProbability;
 				std::tie(communitySize, edgeProbability) = communitySizeSampler->drawCommunity();
-				std::vector<node> comNodes(communityNodeSampler.birthCommunityNodes(communitySize));
+
 				CommunityPtr com(new Community(edgeProbability, *this));
-				for (node u : comNodes) {
-					com->addNode(u);
-				}
+				com->setDesiredNumberOfNodes(communitySize);
 				com->setAvailable(true);
 			}
+
+			assignNodesToCommunities();
 
 			// Finish initial graph generation.
 			finishTimeStep();
@@ -341,12 +338,14 @@ namespace NetworKit {
 					}
 				}
 
+				assignNodesToCommunities();
+
 				// adjust event probabilities
 				{
-					const double x = communityNodeSampler.getSumOfDesiredMemberships() * 1.0 / currentCommunityMemberships;
+					const double x = sumOfDesiredMemberships * 1.0 / currentCommunityMemberships;
 					birthProbability = 0.5 * x / (1 + x);
 					deathProbability = 0.5 - birthProbability;
-					INFO("Current memberships: ", currentCommunityMemberships, " desired: ", communityNodeSampler.getSumOfDesiredMemberships(), " number of communities: ", communities.size(), " available: ", availableCommunities.size(), " active events ", currentEvents.size());
+					INFO("Current memberships: ", currentCommunityMemberships, " desired: ", sumOfDesiredMemberships, " number of communities: ", communities.size(), " available: ", availableCommunities.size(), " active events ", currentEvents.size());
 					INFO("Current nodes ", nodesAlive.size(), " current edges: ", edgesAlive.size(), " total graph events ", graphEvents.size(), " total community events ", communityEvents.size());
 				}
 
@@ -357,5 +356,73 @@ namespace NetworKit {
 			hasRun = true;
 		}
 
+		void CKBDynamicImpl::assignNodesToCommunities() {
+			count totalMissingMembers = 0;
+			std::vector<std::vector<CommunityPtr>> communitiesByDesiredNodes;
+			std::unordered_map<CommunityPtr, count> missingMembers;
+
+			for (CommunityPtr com : communities) {
+				const count desired = com->getDesiredNumberOfNodes();
+				const count actual = com->getNumberOfNodes();
+				assert(actual <= desired);
+				if (desired > actual) {
+					totalMissingMembers += desired - actual;
+					missingMembers[com] = desired - actual;
+					if (communitiesByDesiredNodes.size() <= desired) {
+						communitiesByDesiredNodes.resize(desired + 1);
+					}
+
+					communitiesByDesiredNodes[desired].push_back(com);
+				}
+			}
+
+			std::vector<std::vector<node>> nodesByDesiredMemberships;
+			count totalMissingMemberships = 0;
+
+			for (node u : nodesAlive) {
+				const count desired = desiredMemberships[u];
+				const count actual = nodeCommunities[u].size();
+
+				if (desired > actual) {
+					totalMissingMemberships += desired - actual;
+					if (nodesByDesiredMemberships.size() < desired) {
+						nodesByDesiredMemberships.resize(desired + 1);
+					}
+
+					nodesByDesiredMemberships[desired].push_back(u);
+				}
+			}
+
+			// TODO: Do something about imbalances between totalMissingMemberships and totalMissingMembers.
+			// If totalMissingMemberships > totalMissingMembers, a) find nodes that have too many memberships and remove those nodes from some of them and b) create an empty bogus community that is removed again afterwards.
+			// If totalMissingMembers > totalMissingMemberships, find nodes to which we can assign additional memberships, i.e., nodes that are not much over their allocated memberships.
+
+			std::unordered_map<node, std::vector<CommunityPtr>> freshAssignments;
+
+			for (auto nnit = nodesByDesiredMemberships.rbegin(); nnit != nodesByDesiredMemberships.rend(); ++nnit) {
+				for (node u : *nnit) {
+					count communitiesToFind = desiredMemberships[u] - nodeCommunities[u].size();
+					for (auto ccit = communitiesByDesiredNodes.rbegin(); ccit != communitiesByDesiredNodes.rend() && communitiesToFind > 0; ++ccit) {
+						for (CommunityPtr com : *ccit) {
+							// TODO: actually remove communities with missingMembers = 0 to speed this up.
+							if (!com->hasNode(u) && missingMembers[com] > 0) {
+								--missingMembers[com];
+								freshAssignments[u].push_back(com);
+								--communitiesToFind;
+								if (communitiesToFind == 0) {
+									break;
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// TODO: collect all nodes that have not found enough communities and add them to remaining communities, creating duplicates.
+
+			// TODO: Randomize freshAssignments using curveball or edge switches and thereby try to eliminate duplicates.
+
+			// TODO: Actually assign nodes to communities, thereby eliminating any remaining duplicates.
+		}
 	}
 }

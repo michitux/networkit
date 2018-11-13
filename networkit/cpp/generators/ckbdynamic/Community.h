@@ -87,6 +87,10 @@ namespace NetworKit {
 
 			count getNumberOfNodes() const { return nodes.size(); };
 
+			count getDesiredNumberOfNodes() const { return desiredSize; };
+
+			void setDesiredNumberOfNodes(count size) { desiredSize = size; };
+
 			count getNumberOfEdges() const { return edges.size(); };
 
 			count getMaximumNumberOfEdges() const { return (nodes.size() * (nodes.size() - 1) / 2); }
@@ -114,6 +118,7 @@ namespace NetworKit {
 			std::pair<node, node> edgeFromIndex(index i) const;
 
 			index id;
+			count desiredSize;
 			Aux::SamplingSet<std::pair<node, node>, NodePairHash> edges;
 			// only used if edgeProbability > 0.5.
 			Aux::SamplingSet<std::pair<node, node>, NodePairHash> nonEdges;

@@ -17,7 +17,7 @@ namespace NetworKit {
 
 		}
 
-		Community::Community(const Community& o) : id(o.generator.nextCommunityId()), edges(o.edges), nonEdges(o.nonEdges), nodes(o.nodes), neighbors(o.neighbors), edgeProbability(o.edgeProbability), available(o.available), storeNonEdges(o.storeNonEdges), generator(o.generator), listeners(o.listeners) {
+		Community::Community(const Community& o) : id(o.generator.nextCommunityId()), desiredSize(o.desiredSize), edges(o.edges), nonEdges(o.nonEdges), nodes(o.nodes), neighbors(o.neighbors), edgeProbability(o.edgeProbability), available(o.available), storeNonEdges(o.storeNonEdges), generator(o.generator), listeners(o.listeners) {
 
 			for (auto e : edges) {
 				generator.addEdge(e.first, e.second);
@@ -38,7 +38,7 @@ namespace NetworKit {
 		}
 
 
-		Community::Community(double edgeProbability, CKBDynamicImpl& generator) : id(generator.nextCommunityId()), edgeProbability(edgeProbability), available(false), storeNonEdges(edgeProbability > 0.6), generator(generator) {
+		Community::Community(double edgeProbability, CKBDynamicImpl& generator) : id(generator.nextCommunityId()), desiredSize(0), edgeProbability(edgeProbability), available(false), storeNonEdges(edgeProbability > 0.6), generator(generator) {
 			generator.addCommunity(CommunityPtr(this));
 		}
 
