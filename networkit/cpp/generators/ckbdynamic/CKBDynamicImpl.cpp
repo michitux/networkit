@@ -358,61 +358,140 @@ namespace NetworKit {
 
 		void CKBDynamicImpl::assignNodesToCommunities() {
 			count totalMissingMembers = 0;
-			std::vector<std::vector<CommunityPtr>> communitiesByDesiredNodes;
-			std::unordered_map<CommunityPtr, count> missingMembers;
 
-			for (CommunityPtr com : communities) {
-				const count desired = com->getDesiredNumberOfNodes();
-				const count actual = com->getNumberOfNodes();
-				assert(actual <= desired);
-				if (desired > actual) {
-					totalMissingMembers += desired - actual;
-					missingMembers[com] = desired - actual;
-					if (communitiesByDesiredNodes.size() <= desired) {
-						communitiesByDesiredNodes.resize(desired + 1);
+			// TODO: Do something about imbalances between totalMissingMemberships and totalMissingMembers.
+			// If totalMissingMemberships > totalMissingMembers, a) find nodes that have too many memberships and remove those nodes from some of them and b) create empty communities of size 1 that are removed afterwards.
+			// If totalMissingMembers > totalMissingMemberships, find nodes to which we can assign additional memberships, i.e., nodes that are not much over their allocated memberships.
+			std::vector<std::pair<CommunityPtr, count>> communitiesByDesiredMembers;
+
+			{
+				std::vector<count> numCommunitiesWithDesired;
+
+				auto getMissing = [](const CommunityPtr &com) {
+					const count desired = com->getDesiredNumberOfNodes();
+					const count actual = com->getNumberOfNodes();
+					assert(actual <= desired);
+					return desired - actual;
+				};
+
+				for (CommunityPtr com : communities) {
+					if (getMissing(com) == 0) continue;
+					const count desired = com->getDesiredNumberOfNodes();
+
+					if (desired >= numCommunitiesWithDesired.size()) {
+						numCommunitiesWithDesired.resize(desired + 1);
 					}
 
-					communitiesByDesiredNodes[desired].push_back(com);
+					++numCommunitiesWithDesired[desired];
+				}
+
+				if (numCommunitiesWithDesired.size() == 0) {
+					return;
+				}
+
+				count sum = 0;
+				for (auto it = numCommunitiesWithDesired.rbegin(); it != numCommunitiesWithDesired.rend(); ++it) {
+					const count tmp = *it;
+					*it = sum;
+					sum += tmp;
+				}
+
+				communitiesByDesiredMembers.resize(sum);
+
+				for (CommunityPtr com : communities) {
+					const count missing = getMissing(com);
+					const count desired = com->getDesiredNumberOfNodes();
+					if (missing == 0) continue;
+
+					totalMissingMembers += missing;
+					communitiesByDesiredMembers[numCommunitiesWithDesired[desired]] = {com, missing};
+					++numCommunitiesWithDesired[desired];
 				}
 			}
 
-			std::vector<std::vector<node>> nodesByDesiredMemberships;
 			count totalMissingMemberships = 0;
 
+			// This map records for every node for which the desired number of memberships can impossibly be satisfied how many can be satisfied.
+			std::unordered_map<node, count> satisfiableMemberships;
 			for (node u : nodesAlive) {
 				const count desired = desiredMemberships[u];
 				const count actual = nodeCommunities[u].size();
 
 				if (desired > actual) {
-					totalMissingMemberships += desired - actual;
-					if (nodesByDesiredMemberships.size() < desired) {
-						nodesByDesiredMemberships.resize(desired + 1);
+					count missing = desired - actual;
+					count satisfiable = 0;
+					for (auto it = communitiesByDesiredMembers.begin(); satisfiable < missing && it != communitiesByDesiredMembers.end(); ++it) {
+						if (!it->first->hasNode(u)) {
+							++satisfiable;
+						}
 					}
 
-					nodesByDesiredMemberships[desired].push_back(u);
+					if (satisfiable < missing) {
+						satisfiableMemberships[u] = satisfiable;
+					}
+
+					totalMissingMemberships += satisfiable;
 				}
 			}
 
-			// TODO: Do something about imbalances between totalMissingMemberships and totalMissingMembers.
-			// If totalMissingMemberships > totalMissingMembers, a) find nodes that have too many memberships and remove those nodes from some of them and b) create an empty bogus community that is removed again afterwards.
-			// If totalMissingMembers > totalMissingMemberships, find nodes to which we can assign additional memberships, i.e., nodes that are not much over their allocated memberships.
+			if (totalMissingMemberships < totalMissingMembers) {
+				// TODO: find additional nodes to assign
+			}
 
-			std::unordered_map<node, std::vector<CommunityPtr>> freshAssignments;
+			std::vector<node> nodesByDesiredMemberships;
 
-			for (auto nnit = nodesByDesiredMemberships.rbegin(); nnit != nodesByDesiredMemberships.rend(); ++nnit) {
-				for (node u : *nnit) {
-					count communitiesToFind = desiredMemberships[u] - nodeCommunities[u].size();
-					for (auto ccit = communitiesByDesiredNodes.rbegin(); ccit != communitiesByDesiredNodes.rend() && communitiesToFind > 0; ++ccit) {
-						for (CommunityPtr com : *ccit) {
-							// TODO: actually remove communities with missingMembers = 0 to speed this up.
-							if (!com->hasNode(u) && missingMembers[com] > 0) {
-								--missingMembers[com];
-								freshAssignments[u].push_back(com);
-								--communitiesToFind;
-								if (communitiesToFind == 0) {
-									break;
-								}
-							}
+			{
+				std::vector<count> nodesPerDesired;
+
+				for (node u : nodesAlive) {
+					const count desired = desiredMemberships[u];
+					const count actual = nodeCommunities[u].size();
+
+					if (desired > actual) {
+						if (nodesPerDesired.size() < desired) {
+							nodesPerDesired.resize(desired + 1);
+						}
+
+						++nodesPerDesired[desired];
+					}
+				}
+				count sum = 0;
+				// Reverse prefix sum so the actual order is reversed
+				for (auto it = nodesPerDesired.rbegin(); it != nodesPerDesired.rend(); ++it) {
+					const count temp = *it;
+					*it = sum;
+					sum += temp;
+				}
+
+				nodesByDesiredMemberships.resize(sum);
+
+				for (node u : nodesAlive) {
+					const count desired = desiredMemberships[u];
+					const count actual = nodeCommunities[u].size();
+
+					if (desired > actual) {
+						nodesByDesiredMemberships[nodesPerDesired[desired]] = u;
+						++nodesPerDesired[desired];
+					}
+				}
+			}
+
+
+			std::vector<std::vector<CommunityPtr>> freshAssignments;
+
+			for (node lu = 0; lu < nodesByDesiredMemberships.size(); ++lu) {
+				const node u = nodesByDesiredMemberships[lu];
+				count communitiesToFind = desiredMemberships[u] - nodeCommunities[u].size();
+				for (auto cit = communitiesByDesiredMembers.begin(); cit != communitiesByDesiredMembers.end() && communitiesToFind > 0; ++cit) {
+					// TODO: actually remove communities with missing = 0 to speed this up.
+					const CommunityPtr &com = cit->first;
+					count &missing = cit->second;
+					if (!com->hasNode(u) && missing > 0) {
+						--missing;
+						freshAssignments[lu].push_back(com);
+						--communitiesToFind;
+						if (communitiesToFind == 0) {
+							break;
 						}
 					}
 				}
