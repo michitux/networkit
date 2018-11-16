@@ -359,23 +359,95 @@ namespace NetworKit {
 		void CKBDynamicImpl::assignNodesToCommunities() {
 			count totalMissingMembers = 0;
 
+			std::vector<CommunityPtr> communitiesWithMissingMembers;
+
+			for (CommunityPtr com : communities) {
+				const count desired = com->getDesiredNumberOfNodes();
+				const count actual = com->getNumberOfNodes();
+				assert(actual <= desired);
+
+				if (actual < desired) {
+					communitiesWithMissingMembers.push_back(com);
+					totalMissingMembers += desired - actual;
+				}
+			}
+
+			if (totalMissingMembers == 0) return;
+
+			count totalMissingMemberships = 0;
+
+			for (node u : nodesAlive) {
+				const count desired = desiredMemberships[u];
+				const count actual = nodeCommunities[u].size();
+
+				if (desired > actual) {
+					totalMissingMemberships += desired - actual;
+				}
+			}
+
 			// TODO: Do something about imbalances between totalMissingMemberships and totalMissingMembers.
 			// If totalMissingMemberships > totalMissingMembers, a) find nodes that have too many memberships and remove those nodes from some of them and b) create empty communities of size 1 that are removed afterwards.
 			// If totalMissingMembers > totalMissingMemberships, find nodes to which we can assign additional memberships, i.e., nodes that are not much over their allocated memberships.
+
+			// If we have more node slots free than
+			// communities that are missing some members,
+			// try to find nodes that got additional
+			// members where we can remove some of them.
+			// In order to not to disturb merge and split
+			// events, we do not take communities that are
+			// not available.
+			// FIXME: make split and merge events more
+			// robust for random node exchanges.
+			if (totalMissingMembers < totalMissingMemberships) {
+				std::vector<std::pair<node, CommunityPtr>> nodesWithAdditionalMemberships;
+				std::vector<CommunityPtr> ac;
+				for (node u : nodesAlive) {
+					if (desiredMemberships[u] < nodeCommunities[u].size()) {
+						count numTooMany = nodeCommunities[u].size() - desiredMemberships[u];
+						for (const CommunityPtr &com : nodeCommunities[u]) {
+							if (com->isAvailable()) {
+								ac.push_back(com);
+							}
+						}
+
+						if (ac.size() > numTooMany) {
+							const index i = Aux::Random::index(ac.size());
+							std::swap(ac[i], ac.back());
+							ac.pop_back();
+						}
+
+						for (CommunityPtr com : ac) {
+							nodesWithAdditionalMemberships.emplace_back(u, com);
+						}
+
+						ac.clear();
+					}
+				}
+
+				std::shuffle(nodesWithAdditionalMemberships.begin(), nodesWithAdditionalMemberships.end(), Aux::Random::getURNG());
+
+				while (!nodesWithAdditionalMemberships.empty() && totalMissingMembers < totalMissingMemberships) {
+					const std::pair<node, CommunityPtr> u_com = nodesWithAdditionalMemberships.back();
+					nodesWithAdditionalMemberships.pop_back();
+
+					bool alreadyListed = (u_com.second->getDesiredNumberOfNodes() > u_com.second->getNumberOfNodes());
+
+					u_com.second->removeNode(u_com.first);
+					++totalMissingMembers;
+
+					if (!alreadyListed) {
+						communitiesWithMissingMembers.push_back(u_com.second);
+					}
+				}
+			}
+
+
 			std::vector<std::pair<CommunityPtr, count>> communitiesByDesiredMembers;
 
 			{
 				std::vector<count> numCommunitiesWithDesired;
 
-				auto getMissing = [](const CommunityPtr &com) {
-					const count desired = com->getDesiredNumberOfNodes();
-					const count actual = com->getNumberOfNodes();
-					assert(actual <= desired);
-					return desired - actual;
-				};
-
-				for (CommunityPtr com : communities) {
-					if (getMissing(com) == 0) continue;
+				for (CommunityPtr com : communitiesWithMissingMembers) {
 					const count desired = com->getDesiredNumberOfNodes();
 
 					if (desired >= numCommunitiesWithDesired.size()) {
@@ -383,10 +455,6 @@ namespace NetworKit {
 					}
 
 					++numCommunitiesWithDesired[desired];
-				}
-
-				if (numCommunitiesWithDesired.size() == 0) {
-					return;
 				}
 
 				count sum = 0;
@@ -398,18 +466,13 @@ namespace NetworKit {
 
 				communitiesByDesiredMembers.resize(sum);
 
-				for (CommunityPtr com : communities) {
-					const count missing = getMissing(com);
+				for (CommunityPtr com : communitiesWithMissingMembers) {
 					const count desired = com->getDesiredNumberOfNodes();
-					if (missing == 0) continue;
-
-					totalMissingMembers += missing;
-					communitiesByDesiredMembers[numCommunitiesWithDesired[desired]] = {com, missing};
+					const count actual = com->getNumberOfNodes();
+					communitiesByDesiredMembers[numCommunitiesWithDesired[desired]] = {com, desired - actual};
 					++numCommunitiesWithDesired[desired];
 				}
 			}
-
-			count totalMissingMemberships = 0;
 
 			// This map records for every node for which the desired number of memberships can impossibly be satisfied how many can be satisfied.
 			std::unordered_map<node, count> satisfiableMemberships;
@@ -429,8 +492,6 @@ namespace NetworKit {
 					if (satisfiable < missing) {
 						satisfiableMemberships[u] = satisfiable;
 					}
-
-					totalMissingMemberships += satisfiable;
 				}
 			}
 
