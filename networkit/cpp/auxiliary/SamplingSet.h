@@ -53,6 +53,10 @@ namespace Aux {
 			return elements.size();
 		}
 
+		bool empty() const {
+			return elements.empty();
+		}
+
 		Key at(size_t pos) const {
 			return elements[pos];
 		}
