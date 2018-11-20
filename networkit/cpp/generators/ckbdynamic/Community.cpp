@@ -382,7 +382,7 @@ namespace NetworKit {
 
 		void Community::setAvailable( bool avail ) {
 			if (avail) {
-				assert(nodes.size() > 0);
+				assert(getDesiredNumberOfNodes() > 0);
 			}
 			if (this->available != avail) {
 				this->available = avail;

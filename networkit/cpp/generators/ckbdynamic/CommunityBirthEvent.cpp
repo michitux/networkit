@@ -14,43 +14,22 @@ namespace NetworKit {
 	}
 
 	void CommunityBirthEvent::nextStep() {
-		count numNodesToAdd = (targetSize - community->getNumberOfNodes()) / (numSteps - currentStep);
+		count nextSize = targetSize / (numSteps - currentStep);
 
 		// Ensure that after every step the community has at least coreSize nodes,
 		// even if nodes have been deleted in the meantime.
-		if (community->getNumberOfNodes() < coreSize) {
-			numNodesToAdd = std::max(coreSize - community->getNumberOfNodes(), numNodesToAdd);
+		if (nextSize < coreSize) {
+			nextSize = coreSize;
 		}
 
-		std::vector<node> nodesToAdd = generator.communityNodeSampler.birthCommunityNodes(numNodesToAdd, community->getNodes());
-
+		community->setDesiredNumberOfNodes(nextSize);
 		// If we did not get enough nodes to make the community larger than the minimum size
 		// let the community die.
-		if (nodesToAdd.size() + community->getNumberOfNodes() < coreSize) {
-			INFO("Sampler returned too few nodes, letting the community die.");
+		++currentStep;
+
+		if (currentStep == numSteps) {
 			active = false;
-			while (community->getNumberOfNodes() > 0) {
-				community->removeRandomNode();
-			}
-			generator.removeCommunity(community);
-		} else {
-			for (node u : nodesToAdd) {
-				assert(generator.hasNode(u));
-				community->addNode(u);
-			}
-
-			++currentStep;
-
-			if (currentStep == numSteps) {
-				if (community->getNumberOfNodes() == targetSize) {
-					active = false;
-					community->setAvailable(true);
-				} else {
-					// Delay event completion because not enough nodes could be requested.
-					INFO("Delaying community birth because not enough nodes could be sampled.");
-					--currentStep;
-				}
-			}
+			community->setAvailable(true);
 		}
 	}
 	}

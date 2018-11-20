@@ -5,7 +5,7 @@
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
-		CommunityMergeEvent::CommunityMergeEvent(CommunityPtr communityA, CommunityPtr communityB, count targetSize, double targetEdgeProbability, count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps), communities({communityA, communityB}), targetSize(targetSize), targetEdgeProbability(targetEdgeProbability) {
+		CommunityMergeEvent::CommunityMergeEvent(CommunityPtr communityA, CommunityPtr communityB, count targetSize, double targetEdgeProbability, count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps), communities({communityA, communityB}), targetSize(targetSize), targetEdgeProbability(targetEdgeProbability), communitiesMerged(false) {
 			targetEdgeProbabilityPerCommunity = 1 - std::sqrt(1 - targetEdgeProbability);
 
 			for (count c = 0; c < 2; ++c) {
@@ -27,9 +27,9 @@ namespace NetworKit {
 
 			const count estimatedOverlap = communities[0]->getNumberOfNodes() - nodesToAddTo[1].size();
 
-			assert(estimatedOverlap == communities[1]->getNumberOfNodes() - nodesToAddTo[0].size());
+			assert(communitiesMerged || estimatedOverlap == communities[1]->getNumberOfNodes() - nodesToAddTo[0].size());
 			const count estimatedMergedSize = communities[0]->getNumberOfNodes() + nodesToAddTo[0].size();
-			assert(estimatedMergedSize == communities[1]->getNumberOfNodes() + nodesToAddTo[1].size());
+			assert(communitiesMerged || estimatedMergedSize == communities[1]->getNumberOfNodes() + nodesToAddTo[1].size());
 
 			const count totalNodesToAdd = estimatedOverlap > targetSize ? 0 : (targetSize - estimatedOverlap) / (numSteps - currentStep);
 			const count totalNodesToRemove = estimatedMergedSize < targetSize ? 0 : (estimatedMergedSize - targetSize) / (numSteps - currentStep);
@@ -51,9 +51,10 @@ namespace NetworKit {
 						++nodesToRemove[0];
 						--nodesToRemove[1];
 					}
+
+					assert(nodesToRemove[0] + nodesToRemove[1] == totalNodesToRemove);
 				}
 
-				assert(nodesToRemove[0] + nodesToRemove[1] == totalNodesToRemove);
 				assert(nodesToRemove[0] <= nodesToAddTo[0].size());
 				assert(nodesToRemove[1] <= nodesToAddTo[1].size());
 
@@ -65,25 +66,36 @@ namespace NetworKit {
 						communities[1-c]->removeNode(u);
 						++nodesRemoved;
 					}
+
+					communities[1-c]->setDesiredNumberOfNodes(communities[1-c]->getNumberOfNodes());
 				}
+			}
+
+			if (nonOverlappingNodes() == 0) {
+				mergeCommunities();
 			}
 
 			if (nodesRemoved < totalNodesToRemove) {
 				assert(nonOverlappingNodes() == 0);
 				for (; nodesRemoved < totalNodesToRemove; ++nodesRemoved) {
 					assert(communities[0]->getNumberOfNodes() > 0);
-					assert(communities[0]->getNumberOfNodes() == communities[1]->getNumberOfNodes());
-					const node u = communities[0]->removeRandomNode();
-					communities[1]->removeNode(u);
+					// communities[1] doesn't exist anymore
+					communities[0]->removeRandomNode();
 				}
+
+				communities[0]->setDesiredNumberOfNodes(communities[0]->getNumberOfNodes());
 			}
 
 
-			for (count c = 0; c < 2; ++c) {
-				// first adapt the probability so new
-				// nodes get directly the right amount
-				// of neighbors
-				adaptProbability(communities[c], targetEdgeProbabilityPerCommunity);
+			if (communitiesMerged) {
+				adaptProbability(communities[0], targetEdgeProbability);
+			} else {
+				for (count c = 0; c < 2; ++c) {
+					// first adapt the probability so new
+					// nodes get directly the right amount
+					// of neighbors
+					adaptProbability(communities[c], targetEdgeProbabilityPerCommunity);
+				}
 			}
 
 			count nodesAdded = 0;
@@ -95,9 +107,10 @@ namespace NetworKit {
 				if (communities[c]->getNumberOfNodes() < minSize) {
 					minNodesToAdd[c] = minSize - communities[c]->getNumberOfNodes();
 				}
+				if (communitiesMerged) break;
 			}
 
-			assert(communities[0]->getNumberOfNodes() + nodesToAddTo[0].size() == communities[1]->getNumberOfNodes() + nodesToAddTo[1].size());
+			assert(communitiesMerged || communities[0]->getNumberOfNodes() + nodesToAddTo[0].size() == communities[1]->getNumberOfNodes() + nodesToAddTo[1].size());
 
 			if (nonOverlappingNodes() > 0 && (totalNodesToAdd > 0 || minNodesToAdd[0] + minNodesToAdd[1] > 0)) {
 				std::array<count, 2> numNodesToAdd {nodesToAddTo[0].size(), nodesToAddTo[1].size()};
@@ -130,70 +143,59 @@ namespace NetworKit {
 				for (count c = 0; c < 2; ++c) {
 					for (count i = 0; i < numNodesToAdd[c]; ++i) {
 						const node u = nodesToAddTo[c].at(Aux::Random::index(nodesToAddTo[c].size()));
-						nodesToAddTo[c].erase(u);
 
 						assert(communities[1-c]->hasNode(u));
 						communities[c]->addNode(u);
+						nodesToAddTo[c].erase(u);
 						++nodesAdded;
 					}
+
+					communities[c]->setDesiredNumberOfNodes(communities[c]->getNumberOfNodes());
 				}
 			}
 
 			if (nodesAdded < totalNodesToAdd || communities[0]->getNumberOfNodes() < minSize) {
 				// Assert the overlap is empty now
-				assert(nonOverlappingNodes() == 0);
-				assert(communities[0]->getNumberOfNodes() == communities[1]->getNumberOfNodes());
+				if (nonOverlappingNodes() > 0) throw std::logic_error("There are nodes not in the overlap but we did not add them even though we should");
+
+				mergeCommunities();
+
 				count numNodesToAdd = totalNodesToAdd - nodesAdded;
 				if (communities[0]->getNumberOfNodes() + numNodesToAdd < minSize) {
 					numNodesToAdd = minSize - communities[0]->getNumberOfNodes();
 				}
 
-				std::vector<node> nodes = generator.communityNodeSampler.birthCommunityNodes(numNodesToAdd, communities[0]->getNodes());
-				if (nodes.size() < numNodesToAdd) {
-					// Delay event completion if not enough nodes could be sampled.
-					if (currentStep + 1 == numSteps) {
-						++numSteps;
-					}
-				}
-
-				// If we are in the really unlucky situation that we could not even get enough nodes to achieve the minimum size,
-				// let both communities die and let the whole event die.
-				if (communities[0]->getNumberOfNodes() + nodes.size() < minSize) {
-					for (count c = 0; c < 2; ++c) {
-						communities[c]->unregisterEventListener(this);
-						while (communities[c]->getNumberOfNodes() > 0) {
-							communities[c]->removeRandomNode();
-						}
-						generator.removeCommunity(communities[c]);
-					}
-					active = false;
-					return;
-				} else {
-					for (node u : nodes) {
-						communities[0]->addNode(u);
-						communities[1]->addNode(u);
-					}
-				}
+				communities[0]->setDesiredNumberOfNodes(communities[0]->getNumberOfNodes() + numNodesToAdd);
 			}
 
 			++currentStep;
 			if (currentStep == numSteps) {
-				for (count c = 0; c < 2; ++c) {
-					communities[c]->unregisterEventListener(this);
-				}
+				mergeCommunities();
+
+				communities[0]->unregisterEventListener(this);
 
 				active = false;
-				const count oldNodes = communities[0]->getNumberOfNodes();
-				tlx::unused(oldNodes);
-				communities[0]->combineWith(*communities[1]);
-				generator.removeCommunity(communities[1]);
-				assert(communities[0]->getNumberOfNodes() == oldNodes);
-				// This shouldn't change much but otherwise the community will loose half of
-				// the edges in the next perturbation.
 				communities[0]->changeEdgeProbability(targetEdgeProbability);
 				communities[0]->setAvailable(true);
-				assert(communities[0]->getNumberOfNodes() == targetSize);
 			}
+		}
+
+		void CommunityMergeEvent::mergeCommunities() {
+			if (communitiesMerged) return;
+
+			communities[1]->unregisterEventListener(this);
+
+			const count oldNodes = communities[0]->getNumberOfNodes();
+			tlx::unused(oldNodes);
+			communities[0]->combineWith(*communities[1]);
+			generator.removeCommunity(communities[1]);
+			assert(communities[0]->getNumberOfNodes() == oldNodes);
+
+			// Set the edge probability to the probability that should match the combined number of edges
+			double probNonEdge = 1.0 - communities[0]->getEdgeProbability();
+			communities[0]->changeEdgeProbability(1.0 - probNonEdge*probNonEdge);
+
+			communitiesMerged = true;
 		}
 
 		void CommunityMergeEvent::notifyNodeRemovedFromCommunity(node u, CommunityPtr com) {
@@ -201,6 +203,16 @@ namespace NetworKit {
 
 			for (count c = 0; c < 2; ++c) {
 				nodesToAddTo[c].erase(u);
+			}
+		}
+
+		void CommunityMergeEvent::notifyNodeAddedToCommunity(node u, CommunityPtr com) {
+			if (!communitiesMerged) {
+				if (com == communities[0]) {
+					assert(nodesToAddTo[0].contains(u));
+				} else {
+					assert(nodesToAddTo[1].contains(u));
+				}
 			}
 		}
 	}

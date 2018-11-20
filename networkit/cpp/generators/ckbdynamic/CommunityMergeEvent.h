@@ -25,12 +25,16 @@ namespace NetworKit {
 			CommunityMergeEvent(CommunityPtr communityA, CommunityPtr communityB, count targetSize, double targetEdgeProbability, count numSteps, CKBDynamicImpl& generator);
 			virtual void nextStep() override;
 			virtual void notifyNodeRemovedFromCommunity(node u, CommunityPtr com) override;
+			virtual void notifyNodeAddedToCommunity(node u, CommunityPtr com) override;
 		private:
+			void mergeCommunities();
 			std::array<Aux::SamplingSet<node>, 2> nodesToAddTo;
 			std::array<CommunityPtr, 2> communities;
 			count targetSize;
 			double targetEdgeProbability;
 			double targetEdgeProbabilityPerCommunity;
+			// If the two communities were already merged into one.
+			bool communitiesMerged;
 		};
 	}
 }

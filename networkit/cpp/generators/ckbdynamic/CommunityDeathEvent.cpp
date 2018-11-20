@@ -23,6 +23,8 @@ namespace NetworKit {
 				community->removeRandomNode();
 			}
 
+			community->setDesiredNumberOfNodes(community->getNumberOfNodes());
+
 			++currentStep;
 
 			if (currentStep == numSteps) {

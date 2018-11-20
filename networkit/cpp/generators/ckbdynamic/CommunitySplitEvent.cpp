@@ -84,41 +84,17 @@ namespace NetworKit {
 
 				adaptProbability(communities[com], targetEdgeProbability[com]);
 
+				count numNodesToAdd = 0;
+
 				// Add nodes to achieve target size, and at least the minimum size in the current step
 				if (targetSize[com] > (communities[com]->getNumberOfNodes() - nodesToRemove[com].size())) {
-					count numNodesToAdd = (targetSize[com] + nodesToRemove[com].size() - communities[com]->getNumberOfNodes()) / (numSteps - currentStep);
+					numNodesToAdd = (targetSize[com] + nodesToRemove[com].size() - communities[com]->getNumberOfNodes()) / (numSteps - currentStep);
 					if (communities[com]->getNumberOfNodes() + numNodesToAdd < generator.communitySizeSampler->getMinSize()) {
 						numNodesToAdd = generator.communitySizeSampler->getMinSize() - communities[com]->getNumberOfNodes();
 					}
-
-					if (numNodesToAdd > 0) {
-						assert(communities[com]->getNumberOfNodes() + numNodesToAdd - nodesToRemove[com].size() <= targetSize[com]);
-						const std::vector<node> nodesToAdd = generator.communityNodeSampler.birthCommunityNodes(numNodesToAdd, communities[com]->getNodes());
-
-						if (nodesToAdd.size() < numNodesToAdd) {
-							// delay event if we are in the last step
-							if (currentStep + 1 == numSteps) {
-								++numSteps;
-							}
-						}
-
-						// After this step, the community will be too small to survive.
-						// Give up this community!
-						if (communities[com]->getNumberOfNodes() + nodesToAdd.size() < generator.communitySizeSampler->getMinSize()) {
-							while (communities[com]->getNumberOfNodes() > 0) {
-								communities[com]->removeRandomNode();
-							}
-
-							generator.removeCommunity(communities[com]);
-						} else {
-							for (node u : nodesToAdd) {
-								communities[com]->addNode(u);
-							}
-
-                            assert(communities[com]->getNumberOfNodes() - nodesToRemove[com].size() <= targetSize[com]);
-						}
-					}
 				}
+
+				communities[com]->setDesiredNumberOfNodes(communities[com]->getNumberOfNodes() + numNodesToAdd);
 			}
 
 			++currentStep;
@@ -126,12 +102,7 @@ namespace NetworKit {
 				active = false;
 				for (count com = 0; com < 2; ++com) {
 					communities[com]->unregisterEventListener(this);
-
-					// Do not mark community as available if it has died due to getting too small.
-					if (communities[com]->getNumberOfNodes() > 0) {
-						assert(communities[com]->getNumberOfNodes() == targetSize[com]);
-						communities[com]->setAvailable(true);
-					}
+					communities[com]->setAvailable(true);
 				}
 			}
 		}
