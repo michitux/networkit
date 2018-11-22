@@ -401,7 +401,7 @@ namespace NetworKit {
 							}
 						}
 
-						if (ac.size() > numTooMany) {
+						while (ac.size() > numTooMany) {
 							const index i = Aux::Random::index(ac.size());
 							std::swap(ac[i], ac.back());
 							ac.pop_back();
@@ -551,7 +551,7 @@ namespace NetworKit {
 					const node u = nodesByDesiredMemberships[lu];
 
 					// Desired memberships with over assignment
-					count fdwo = desiredMemberships[u] * (1.0 + overAssignment);
+					double fdwo = desiredMemberships[u] * (1.0 + overAssignment);
 					count dwo = desiredMemberships[u] * (1.0 + overAssignment);
 					if (Aux::Random::real() < fdwo - dwo) {
 						++dwo;
@@ -610,7 +610,7 @@ namespace NetworKit {
 							}
 
 							index toAssign = 0;
-							if (possibleOverAssignment[0] < possibleOverAssignment[1]) {
+							if (possibleOverAssignment[0] > possibleOverAssignment[1]) {
 								toAssign = 1;
 							}
 
