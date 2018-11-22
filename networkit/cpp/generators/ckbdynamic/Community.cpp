@@ -92,7 +92,7 @@ namespace NetworKit {
 
 
 		void Community::removeNode(node u) {
-			assert(nodes.contains(u));
+			assert(nodes.contains(u)); // assert for gdb in gtest which catches exceptions
 			if (!nodes.contains(u)) throw std::runtime_error("Node not in community!");
 
 			while (neighbors[u].size()) {
@@ -117,7 +117,7 @@ namespace NetworKit {
 		}
 
 		node Community::removeRandomNode() {
-			assert(nodes.size() > 0);
+			assert(nodes.size() > 0); // assert for gdb in gtest which catches exceptions
 			if (nodes.size() == 0) throw std::runtime_error("Error, no nodes in community!");
 
 			const node u = nodes.at(Aux::Random::index(nodes.size()));
@@ -126,7 +126,7 @@ namespace NetworKit {
 		}
 
 		void Community::addNode(node u) {
-			assert(!nodes.contains(u));
+			assert(!nodes.contains(u)); // assert for gdb in gtest which catches exceptions
 			if (nodes.contains(u)) throw std::runtime_error("Node already in community!");
 			nodes.insert(u);
 
