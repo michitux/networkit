@@ -1,7 +1,6 @@
 
 #include "Community.h"
 #include "CKBDynamicImpl.h"
-#include "CommunityEventListener.h"
 #include "../../auxiliary/UniqueSampler.h"
 
 namespace NetworKit {
@@ -17,20 +16,16 @@ namespace NetworKit {
 
 		}
 
-		Community::Community(const Community& o) : id(o.generator.nextCommunityId()), desiredSize(o.desiredSize), edges(o.edges), nonEdges(o.nonEdges), nodes(o.nodes), neighbors(o.neighbors), edgeProbability(o.edgeProbability), available(o.available), storeNonEdges(o.storeNonEdges), generator(o.generator), listeners(o.listeners) {
+		Community::Community(const Community& o) : id(o.generator.nextCommunityId()), desiredSize(o.desiredSize), edges(o.edges), nonEdges(o.nonEdges), nodes(o.nodes), neighbors(o.neighbors), edgeProbability(o.edgeProbability), storeNonEdges(o.storeNonEdges), generator(o.generator), currentEvent(o.currentEvent) {
 
 			for (auto e : edges) {
 				generator.addEdge(e.first, e.second);
-
-				for (CommunityEventListener* listener : listeners) {
-					listener->notifyEdgeAddedToCommunity(e.first, e.second, CommunityPtr(this));
-				}
 			}
 
 			for (auto u : nodes) {
 				generator.addNodeToCommunity(u, CommunityPtr(this));
-				for (CommunityEventListener* listener : listeners) {
-					listener->notifyNodeAddedToCommunity(u, CommunityPtr(this));
+				if (currentEvent != nullptr) {
+					currentEvent->notifyNodeAddedToCommunity(u, CommunityPtr(this));
 				}
 			}
 
@@ -38,24 +33,8 @@ namespace NetworKit {
 		}
 
 
-		Community::Community(double edgeProbability, CKBDynamicImpl& generator) : id(generator.nextCommunityId()), desiredSize(0), edgeProbability(edgeProbability), available(false), storeNonEdges(edgeProbability > 0.6), generator(generator) {
+		Community::Community(double edgeProbability, CKBDynamicImpl& generator) : id(generator.nextCommunityId()), desiredSize(0), edgeProbability(edgeProbability), storeNonEdges(edgeProbability > 0.6), generator(generator), currentEvent(nullptr) {
 			generator.addCommunity(CommunityPtr(this));
-		}
-
-		void Community::registerEventListener(CommunityEventListener *listener) {
-			assert(std::find(listeners.begin(), listeners.end(), listener) == listeners.end());
-			listeners.push_back(listener);
-		}
-
-		void Community::unregisterEventListener(CommunityEventListener *listener) {
-			auto it = std::find(listeners.begin(), listeners.end(), listener);
-
-			if (it == listeners.end()) {
-				throw std::runtime_error("Error, listener not found!");
-			}
-
-			std::swap(*it, listeners.back());
-			listeners.pop_back();
 		}
 
 		void Community::verifyInvariants() const {
@@ -87,10 +66,6 @@ namespace NetworKit {
 			neighbors[u].erase(v);
 
 			generator.removeEdge(u, v);
-
-			for (CommunityEventListener* listener : listeners) {
-				listener->notifyEdgeRemovedFromCommunity(u, v, CommunityPtr(this));
-			}
 		}
 
 		void Community::addEdge(node u, node v) {
@@ -103,10 +78,6 @@ namespace NetworKit {
 			if (storeNonEdges) {
 				nonEdges.erase(canonicalEdge(u, v));
 				verifyInvariants();
-			}
-
-			for (CommunityEventListener* listener : listeners) {
-				listener->notifyEdgeAddedToCommunity(u, v, CommunityPtr(this));
 			}
 
 			generator.addEdge(u, v);
@@ -132,8 +103,8 @@ namespace NetworKit {
 			neighbors.erase(u);
 			nodes.erase(u);
 
-			for (CommunityEventListener* listener : listeners) {
-				listener->notifyNodeRemovedFromCommunity(u, CommunityPtr(this));
+			if (currentEvent != nullptr) {
+				currentEvent->notifyNodeRemovedFromCommunity(u, CommunityPtr(this));
 			}
 			generator.removeNodeFromCommunity(u, CommunityPtr(this));
 
@@ -180,8 +151,8 @@ namespace NetworKit {
 				}
 			}
 
-			for (CommunityEventListener* listener : listeners) {
-				listener->notifyNodeAddedToCommunity(u, CommunityPtr(this));
+			if (currentEvent != nullptr) {
+				currentEvent->notifyNodeAddedToCommunity(u, CommunityPtr(this));
 			}
 			generator.addNodeToCommunity(u, CommunityPtr(this));
 		}
@@ -380,14 +351,15 @@ namespace NetworKit {
 			assert(other.nodes.size() == 0);
 		}
 
-		void Community::setAvailable( bool avail ) {
-			if (avail) {
-				assert(getDesiredNumberOfNodes() > 0);
-			}
-			if (this->available != avail) {
-				this->available = avail;
+		void Community::setCurrentEvent(CommunityChangeEvent *event) {
+			if (event != this->currentEvent) {
+				this->currentEvent = event;
 				generator.addCommunity(CommunityPtr(this));
 			}
+		}
+
+		bool Community::canRemoveNode() const {
+			return currentEvent == nullptr || currentEvent->canRemoveNode();
 		}
 	}
 }

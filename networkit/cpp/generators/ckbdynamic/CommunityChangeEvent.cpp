@@ -11,5 +11,9 @@ namespace NetworKit {
 			com->changeEdgeProbability(prob);
 		}
 
+		void CommunityChangeEvent::notifyNodeAddedToCommunity(node, CommunityPtr) {}
+		void CommunityChangeEvent::notifyNodeRemovedFromCommunity(node, CommunityPtr) {}
+
+		bool CommunityChangeEvent::canRemoveNode() const { return true; }
 	}
 }

@@ -2,7 +2,6 @@
 #define COMMUNITY_MERGE_EVENT_H_
 
 #include "CommunityChangeEvent.h"
-#include "CommunityEventListener.h"
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
@@ -20,12 +19,13 @@ namespace NetworKit {
 		 * edges (needs special support in the community
 		 * object).
 		 */
-		class CommunityMergeEvent : public CommunityChangeEvent, public CommunityEventListener {
+		class CommunityMergeEvent : public CommunityChangeEvent {
 		public:
 			CommunityMergeEvent(CommunityPtr communityA, CommunityPtr communityB, count targetSize, double targetEdgeProbability, count numSteps, CKBDynamicImpl& generator);
 			virtual void nextStep() override;
 			virtual void notifyNodeRemovedFromCommunity(node u, CommunityPtr com) override;
 			virtual void notifyNodeAddedToCommunity(node u, CommunityPtr com) override;
+			virtual bool canRemoveNode() const override;
 		private:
 			void mergeCommunities();
 			std::array<Aux::SamplingSet<node>, 2> nodesToAddTo;

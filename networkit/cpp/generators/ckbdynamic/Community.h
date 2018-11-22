@@ -10,7 +10,7 @@
 namespace NetworKit {
 	namespace CKBDynamicImpl {
 		class CKBDynamicImpl;
-		class CommunityEventListener;
+		class CommunityChangeEvent;
 
 		class Community : public tlx::ReferenceCounter {
 		public:
@@ -26,9 +26,6 @@ namespace NetworKit {
 			Community(const Community& o);
 
 			Community(double edgeProbability, CKBDynamicImpl& generator);
-
-			void registerEventListener(CommunityEventListener* listener);
-			void unregisterEventListener(CommunityEventListener* listener);
 
 			/**
 			 * Remove the given node @a u from the community.
@@ -101,9 +98,11 @@ namespace NetworKit {
 
 			index getId() const { return id; };
 
-			bool isAvailable() const { return available; }
+			bool isAvailable() const { return currentEvent == nullptr; }
 
-			void setAvailable(bool available);
+			void setCurrentEvent(CommunityChangeEvent* event);
+
+			bool canRemoveNode() const;
 		private:
 			void removeEdge(node u, node v);
 			void addEdge(node u, node v);
@@ -125,11 +124,9 @@ namespace NetworKit {
 			Aux::SamplingSet<node> nodes;
 			std::unordered_map<node, Aux::SamplingSet<node>> neighbors;
 			double edgeProbability;
-			bool available;
 			bool storeNonEdges;
 			CKBDynamicImpl& generator;
-
-			std::vector<CommunityEventListener*> listeners;
+			CommunityChangeEvent* currentEvent;
 		};
 
 		using CommunityPtr = tlx::CountingPtr<Community>;

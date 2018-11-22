@@ -58,10 +58,8 @@ namespace NetworKit {
 			assert(communities[0]->getNumberOfNodes() - nodesToRemove[0].size() <= targetSize[0]);
 			assert(communities[1]->getNumberOfNodes() - nodesToRemove[1].size() <= targetSize[1]);
 
-			communities[0]->setAvailable(false);
-			communities[1]->setAvailable(false);
-			communities[0]->registerEventListener(this);
-			communities[1]->registerEventListener(this);
+			communities[0]->setCurrentEvent(this);
+			communities[1]->setCurrentEvent(this);
 		}
 
 		void CommunitySplitEvent::nextStep() {
@@ -101,8 +99,7 @@ namespace NetworKit {
 			if (currentStep == numSteps) {
 				active = false;
 				for (count com = 0; com < 2; ++com) {
-					communities[com]->unregisterEventListener(this);
-					communities[com]->setAvailable(true);
+					communities[com]->setCurrentEvent(nullptr);
 				}
 			}
 		}
@@ -115,6 +112,10 @@ namespace NetworKit {
 				assert(com == communities[1]);
 				nodesToRemove[1].erase(u);
 			}
+		}
+
+		bool CommunitySplitEvent::canRemoveNode() const {
+			return false;
 		}
 
 	}

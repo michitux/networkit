@@ -9,7 +9,7 @@ namespace NetworKit {
 			targetEdgeProbabilityPerCommunity = 1 - std::sqrt(1 - targetEdgeProbability);
 
 			for (count c = 0; c < 2; ++c) {
-				communities[c]->registerEventListener(this);
+				communities[c]->setCurrentEvent(this);
 
 				// Get a list of nodes to be added to community c
 				for (node u : communities[1-c]->getNodes()) {
@@ -17,8 +17,6 @@ namespace NetworKit {
 						nodesToAddTo[c].insert(u);
 					}
 				}
-
-				communities[c]->setAvailable(false);
 			}
 
 		}
@@ -179,18 +177,16 @@ namespace NetworKit {
 			if (currentStep == numSteps) {
 				mergeCommunities();
 
-				communities[0]->unregisterEventListener(this);
-
-				active = false;
 				communities[0]->changeEdgeProbability(targetEdgeProbability);
-				communities[0]->setAvailable(true);
+				communities[0]->setCurrentEvent(nullptr);
+				active = false;
 			}
 		}
 
 		void CommunityMergeEvent::mergeCommunities() {
 			if (communitiesMerged) return;
 
-			communities[1]->unregisterEventListener(this);
+			communities[1]->setCurrentEvent(nullptr);
 
 			const count oldNodes = communities[0]->getNumberOfNodes();
 			tlx::unused(oldNodes);
@@ -221,6 +217,10 @@ namespace NetworKit {
 					assert(nodesToAddTo[1].contains(u));
 				}
 			}
+		}
+
+		bool CommunityMergeEvent::canRemoveNode() const {
+			return communitiesMerged;
 		}
 	}
 }

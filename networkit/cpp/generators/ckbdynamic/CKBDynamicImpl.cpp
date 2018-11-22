@@ -194,7 +194,7 @@ namespace NetworKit {
 			// initialization
 			globalCommunity = CommunityPtr(new Community(epsilon, *this));
 			communities.erase(globalCommunity);
-			assert(!globalCommunity->isAvailable());
+			availableCommunities.erase(globalCommunity);
 
 			for (node u = 0; u < n; ++u) {
 				generateNode();
@@ -212,7 +212,6 @@ namespace NetworKit {
 
 				CommunityPtr com(new Community(edgeProbability, *this));
 				com->setDesiredNumberOfNodes(communitySize);
-				com->setAvailable(true);
 				sumOfDesiredMembers += communitySize;
 			}
 
@@ -392,7 +391,7 @@ namespace NetworKit {
 					if (desiredMemberships[u] < nodeCommunities[u].size()) {
 						count numTooMany = nodeCommunities[u].size() - desiredMemberships[u];
 						for (const CommunityPtr &com : nodeCommunities[u]) {
-							if (com->isAvailable()) {
+							if (com->canRemoveNode()) {
 								ac.push_back(com);
 							}
 						}

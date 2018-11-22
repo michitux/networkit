@@ -5,7 +5,7 @@ namespace NetworKit {
 	namespace CKBDynamicImpl {
 
 		CommunityDeathEvent::CommunityDeathEvent(CommunityPtr community, count coreSize, count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps), community(community), coreSize(coreSize) {
-			community->setAvailable(false);
+			community->setCurrentEvent(this);
 		}
 
 		void CommunityDeathEvent::nextStep() {
@@ -29,6 +29,7 @@ namespace NetworKit {
 
 			if (currentStep == numSteps) {
 				active = false;
+				community->setCurrentEvent(nullptr);
 				generator.removeCommunity(community);
 			}
 		}

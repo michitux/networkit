@@ -4,13 +4,16 @@
 namespace NetworKit {
 	namespace CKBDynamicImpl {
 
-	CommunityBirthEvent::CommunityBirthEvent(count coreSize, count targetSize, double edgeProbability, count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps), coreSize(coreSize), targetSize(targetSize), community(new Community(edgeProbability, generator)) {}
+	CommunityBirthEvent::CommunityBirthEvent(count coreSize, count targetSize, double edgeProbability, count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps), coreSize(coreSize), targetSize(targetSize), community(new Community(edgeProbability, generator)) {
+		community->setCurrentEvent(this);
+	}
 
 	CommunityBirthEvent::CommunityBirthEvent(count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps)	{
 		double edgeProbability;
 		std::tie(targetSize, edgeProbability) = generator.communitySizeSampler->drawCommunity();
 		coreSize = std::max<count>(0.1 * targetSize, generator.communitySizeSampler->getMinSize());
 		community = CommunityPtr(new Community(edgeProbability, generator));
+		community->setCurrentEvent(this);
 	}
 
 	void CommunityBirthEvent::nextStep() {
@@ -29,7 +32,7 @@ namespace NetworKit {
 
 		if (currentStep == numSteps) {
 			active = false;
-			community->setAvailable(true);
+			community->setCurrentEvent(nullptr);
 		}
 	}
 	}
