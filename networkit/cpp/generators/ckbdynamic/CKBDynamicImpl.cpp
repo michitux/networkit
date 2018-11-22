@@ -320,13 +320,9 @@ namespace NetworKit {
 				if (perturbationProbability > 0) {
 					globalCommunity->perturbEdges(perturbationProbability);
 
-					const double sqrtPerturbationProbability = std::sqrt(perturbationProbability);
-
-					const double log_perturb = std::log(1.0 - sqrtPerturbationProbability);
-
-					for (count ci = get_next_edge_distance(log_perturb) - 1; ci < communities.size(); ci += get_next_edge_distance(log_perturb)) {
+					for (CommunityPtr com : communities) {
 						handler.assureRunning();
-						communities.at(ci)->perturbEdges(sqrtPerturbationProbability);
+						com->perturbEdges(perturbationProbability);
 					}
 				}
 
