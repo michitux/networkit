@@ -8,7 +8,6 @@ networkit_add_module(generators_ckbdynamic
   CommunityDeathEvent.cpp
   CommunitySplitEvent.cpp
   PowerlawCommunitySizeDistribution.cpp
-  BucketSampling.cpp
 )
 
 networkit_module_link_modules(generators_ckbdynamic

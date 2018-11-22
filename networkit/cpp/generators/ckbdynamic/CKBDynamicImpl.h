@@ -8,7 +8,6 @@
 #include "../../base/Algorithm.h"
 #include "../../auxiliary/SamplingSet.h"
 #include "Community.h"
-#include "BucketSampling.h"
 #include "CommunitySizeDistribution.h"
 #include "CommunityChangeEvent.h"
 #include "../CKBDynamic.h"
