@@ -41,6 +41,13 @@ namespace NetworKit {
 
 			count nodesRemoved = 0;
 
+			// Reset the desired number of nodes to the actual number of nodes.
+			// If any change shall happen, it will be requested below.
+			communities[0]->setDesiredNumberOfNodes(communities[0]->getNumberOfNodes());
+			if (!communitiesMerged) {
+				communities[1]->setDesiredNumberOfNodes(communities[1]->getNumberOfNodes());
+			}
+
 			if (nonOverlappingNodes() > 0 && totalNodesToRemove > 0) {
 				std::array<count, 2> nodesToRemove {nodesToAddTo[0].size(), nodesToAddTo[1].size()};
 				if (nodesToRemove[0] + nodesToRemove[1] > totalNodesToRemove) {
