@@ -449,7 +449,7 @@ namespace NetworKit {
 				}
 
 				count sum = 0;
-				for (auto it = numCommunitiesWithDesired.rbegin(); it != numCommunitiesWithDesired.rend(); ++it) {
+				for (auto it = numCommunitiesWithDesired.begin(); it != numCommunitiesWithDesired.end(); ++it) {
 					const count tmp = *it;
 					*it = sum;
 					sum += tmp;
@@ -513,16 +513,19 @@ namespace NetworKit {
 				}
 			}
 
+			double overAssignment = 0;
+
 			auto greedilyAssignNodes =
 				[&]() {
 					for (node lu = 0; lu < nodesByDesiredMemberships.size(); ++lu) {
 						const node u = nodesByDesiredMemberships[lu];
 						if (nodeIsParticipating[lu]) {
 							count communitiesToFind = numInitialCommunitiesToAssign[lu] - freshAssignments[lu].size();
-							for (auto cit = communitiesByDesiredMembers.begin(); cit != communitiesByDesiredMembers.end() && communitiesToFind > 0; ++cit) {
-								// TODO: actually remove communities with missing = 0 to speed this up.
-								const CommunityPtr &com = cit->first;
-								count &missing = cit->second;
+							index last_empty = communitiesByDesiredMembers.size();
+							for (index i = 0; i < communitiesByDesiredMembers.size() && communitiesToFind > 0; ++i) {
+								const index ci = communitiesByDesiredMembers.size() - i - 1;
+								const CommunityPtr &com = communitiesByDesiredMembers[ci].first;
+								count &missing = communitiesByDesiredMembers[ci].second;
 								if (missing > 0 && !com->hasNode(u)) {
 									if (freshAssignments[lu].insert(com) == 1) {
 										--missing;
@@ -533,7 +536,28 @@ namespace NetworKit {
 										}
 									}
 								}
+
+								if (missing == 0) {
+									last_empty = ci;
+								}
 							}
+
+							if (last_empty < communitiesByDesiredMembers.size()) {
+								index wi = last_empty;
+								for (index ri = last_empty; ri < communitiesByDesiredMembers.size(); ++ri) {
+									if (communitiesByDesiredMembers[ri].second > 0) {
+										communitiesByDesiredMembers[wi] = communitiesByDesiredMembers[ri];
+										++wi;
+									}
+								}
+
+								while (communitiesByDesiredMembers.size() > wi) {
+									communitiesByDesiredMembers.pop_back();
+								}
+
+							}
+
+							assert(freshAssignments[lu].size() + nodeCommunities[u].size() <= desiredMemberships[u] || overAssignment > 0);
 						}
 					}
 				};
@@ -543,7 +567,6 @@ namespace NetworKit {
 
 			// second step: if communities still want nodes, find out how many memberships are missing and add additional nodes to nodesParticipating.
 			// FIXME: should we initialize overAssignment differently and possibly already in the very first assignment step?
-			double overAssignment = 0;
 			while (stillMissingMembers > 0) {
 				overAssignment += std::max(0.01, stillMissingMembers * 1.0 / sumOfDesiredMemberships);
 
@@ -572,7 +595,7 @@ namespace NetworKit {
 
 			// third step: randomize community assignments of nodesParticipating, balance assignments if there were over-assignments.
 
-			for (count round = 0; round < 10; ++round) {
+			for (count round = 0; round < 100; ++round) {
 				std::shuffle(nodesParticipating.begin(), nodesParticipating.end(), Aux::Random::getURNG());
 
 				for (count i = 0; i + 1 < nodesParticipating.size(); i += 2) {
@@ -629,6 +652,7 @@ namespace NetworKit {
 				for (CommunityPtr com : freshAssignments[lu]) {
 					com->addNode(u);
 				}
+				assert(nodeCommunities[u].size() <= desiredMemberships[u] || overAssignment > 0);
 			}
 		}
 	}
