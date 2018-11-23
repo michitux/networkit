@@ -104,8 +104,8 @@ namespace NetworKit {
 
 			bool canRemoveNode() const;
 		private:
-			void removeEdge(node u, node v);
-			void addEdge(node u, node v);
+			void removeEdge(node u, node v, bool nodeLeft);
+			void addEdge(node u, node v, bool nodeJoined);
 
 			void removeRandomEdges(count k);
 			void addRandomEdges(count k);

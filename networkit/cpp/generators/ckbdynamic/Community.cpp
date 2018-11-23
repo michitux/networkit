@@ -19,7 +19,7 @@ namespace NetworKit {
 		Community::Community(const Community& o) : id(o.generator.nextCommunityId()), desiredSize(o.desiredSize), edges(o.edges), nonEdges(o.nonEdges), nodes(o.nodes), neighbors(o.neighbors), edgeProbability(o.edgeProbability), storeNonEdges(o.storeNonEdges), generator(o.generator), currentEvent(o.currentEvent) {
 
 			for (auto e : edges) {
-				generator.addEdge(e.first, e.second);
+				generator.addEdge(e.first, e.second, false);
 			}
 
 			for (auto u : nodes) {
@@ -56,7 +56,7 @@ namespace NetworKit {
 			}
 		}
 
-		void Community::removeEdge(node u, node v) {
+		void Community::removeEdge(node u, node v, bool nodeLeft) {
 			edges.erase(canonicalEdge(u, v));
 			if (storeNonEdges) {
 				nonEdges.insert(canonicalEdge(u, v));
@@ -65,10 +65,10 @@ namespace NetworKit {
 			neighbors[v].erase(u);
 			neighbors[u].erase(v);
 
-			generator.removeEdge(u, v);
+			generator.removeEdge(u, v, nodeLeft);
 		}
 
-		void Community::addEdge(node u, node v) {
+		void Community::addEdge(node u, node v, bool nodeJoined) {
 			assert(u != v);
 			assert(nodes.contains(u));
 			assert(nodes.contains(v));
@@ -80,7 +80,7 @@ namespace NetworKit {
 				verifyInvariants();
 			}
 
-			generator.addEdge(u, v);
+			generator.addEdge(u, v, nodeJoined);
 		}
 
 		std::pair<node, node> Community::edgeFromIndex(index i) const {
@@ -97,7 +97,7 @@ namespace NetworKit {
 
 			while (neighbors[u].size()) {
 				const node v = neighbors[u].at(0);
-				removeEdge(u, v);
+				removeEdge(u, v, true);
 			}
 
 			neighbors.erase(u);
@@ -147,7 +147,7 @@ namespace NetworKit {
 			for (node next = get_next_edge_distance(log_cp) - 1; next < nodes.size(); next += get_next_edge_distance(log_cp)) {
 				const node v = nodes.at(next);
 				if (u != v) {
-					addEdge(u, nodes.at(next));
+					addEdge(u, nodes.at(next), true);
 				}
 			}
 
@@ -239,11 +239,11 @@ namespace NetworKit {
 			assert(edges.size() + edgesToAdd.size() == getMaximumNumberOfEdges() || std::max(numEdgesToAdd, numEdgesToRemove) == edgesToPerturb);
 
 			for (auto e : edgesToAdd) {
-				addEdge(e.first, e.second);
+				addEdge(e.first, e.second, false);
 			}
 
 			for (auto e : edgesToRemove) {
-				removeEdge(e.first, e.second);
+				removeEdge(e.first, e.second, false);
 			}
 
 			verifyInvariants();
@@ -254,7 +254,7 @@ namespace NetworKit {
 
 			for (count i = 0; i < k; ++i) {
 				auto e = edges.at(Aux::Random::index(edges.size()));
-				removeEdge(e.first, e.second);
+				removeEdge(e.first, e.second, false);
 			}
 		}
 
@@ -267,7 +267,7 @@ namespace NetworKit {
 
 				for (count i = 0; i < k; ++i) {
 					auto e = nonEdges.at(Aux::Random::index(nonEdges.size()));
-					addEdge(e.first, e.second);
+					addEdge(e.first, e.second, false);
 				}
 			} else {
 				const count numEdgesWanted = edges.size() + k;
@@ -276,7 +276,7 @@ namespace NetworKit {
 					node u = nodes.at(Aux::Random::index(nodes.size()));
 					node v = nodes.at(Aux::Random::index(nodes.size()));
 					if (u != v && !edges.contains(canonicalEdge(u, v))) {
-						addEdge(u, v);
+						addEdge(u, v, false);
 					}
 				}
 			}
@@ -333,10 +333,10 @@ namespace NetworKit {
 				// First add edge here to ensure it exists at least once globally
 				// so we don't generate remove/add events globally.
 				if (!edges.contains(e)) {
-					addEdge(e.first, e.second);
+					addEdge(e.first, e.second, false);
 				}
 
-				other.removeEdge(e.first, e.second);
+				other.removeEdge(e.first, e.second, false);
 			}
 
 			assert(other.edges.size() == 0);

@@ -10,7 +10,7 @@
 namespace NetworKit {
 	class CKBDynamic : public Algorithm {
 	public:
-		CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, count numTimesteps);
+		CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, double edgeSharpness, count numTimesteps);
 
 		virtual void run() override;
 
@@ -32,6 +32,7 @@ namespace NetworKit {
 			double intraCommunityEdgeProbability;
 			double intraCommunityEdgeExponent;
 			double epsilon;
+			double edgeSharpness;
 			count numTimesteps;
 		};
 	private:

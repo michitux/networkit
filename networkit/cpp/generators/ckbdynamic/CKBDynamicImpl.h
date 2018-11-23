@@ -13,6 +13,7 @@
 #include "../CKBDynamic.h"
 #include "NodePairHash.h"
 #include "../PowerlawDegreeSequence.h"
+#include "EventStreamGenerator.h"
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
@@ -23,15 +24,11 @@ namespace NetworKit {
 
 			virtual void run() override;
 
-			std::vector<GraphEvent> getGraphEvents() const;
-			std::vector<CommunityEvent> getCommunityEvents() const;
-		private:
-			std::vector<GraphEvent> graphEvents;
-			std::vector<CommunityEvent> communityEvents;
-		public:
+			std::vector<GraphEvent> getGraphEvents();
+			std::vector<CommunityEvent> getCommunityEvents();
 
-			void addEdge(node u, node v);
-			void removeEdge(node u, node v);
+			void addEdge(node u, node v, bool nodeJoined);
+			void removeEdge(node u, node v, bool nodeLeft);
 			void addNodeToCommunity(node u, CommunityPtr com);
 			void removeNodeFromCommunity(node u, CommunityPtr com);
 			void addCommunity(CommunityPtr com);
@@ -48,7 +45,6 @@ namespace NetworKit {
 			std::unique_ptr<CommunitySizeDistribution> communitySizeSampler;
 		private:
 			PowerlawDegreeSequence membershipDistribution;
-			void finishTimeStep();
 			void assignNodesToCommunities();
 
 			Aux::SamplingSet<CommunityPtr> availableCommunities;
@@ -60,18 +56,16 @@ namespace NetworKit {
 			Aux::SamplingSet<node> nodesAlive;
 			std::vector<count> desiredMemberships;
 			count sumOfDesiredMemberships;
-			std::unordered_map<std::pair<node, node>, count, NodePairHash> edgesAlive;
 
-			// Events of the current time step
-			std::unordered_map<std::pair<node, node>, GraphEvent, NodePairHash> currentEdgeEvents;
-			std::vector<node> currentErasedNodes;
-			std::unordered_map<std::pair<index, node>, CommunityEvent, NodePairHash> currentCommunityEvents;
+			count currentTimeStep;
+			EventStreamGenerator eventStream;
 
 			count n;
 			double communityEventProbability;
 			double nodeEventProbability;
 			double perturbationProbability;
 			double epsilon;
+			double edgeSharpness;
 			count numTimesteps;
 			count currentCommunityMemberships;
 			std::vector<std::unique_ptr<CommunityChangeEvent>> currentEvents;

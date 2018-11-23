@@ -19,57 +19,44 @@ namespace NetworKit {
 
 		}
 
-		void CKBDynamicImpl::addEdge(node u, node v) {
+		void CKBDynamicImpl::addEdge(node u, node v, bool nodeJoined) {
 			auto e = Community::canonicalEdge(u, v);
-			auto it = edgesAlive.find(e);
+			index ts = currentTimeStep;
 
-			if (it == edgesAlive.end()) {
-				edgesAlive.insert(std::make_pair(e, 1ul));
-				auto evIt = currentEdgeEvents.find(e);
-				if (evIt != currentEdgeEvents.end()) {
-					assert(evIt->second.type == GraphEvent::EDGE_REMOVAL);
-					currentEdgeEvents.erase(evIt);
+			if (edgeSharpness < 1 && nodeJoined && currentTimeStep > 0) {
+				std::geometric_distribution<count> geom(edgeSharpness);
+				count offset = geom(Aux::Random::getURNG());
+				if (offset < ts) {
+					ts -= offset;
 				} else {
-					currentEdgeEvents.emplace(e, GraphEvent(GraphEvent::EDGE_ADDITION, e.first, e.second));
+					ts = 0;
 				}
-			} else {
-				it->second += 1;
 			}
+
+			eventStream.addEdge(ts, e.first, e.second);
 		}
 
-		void CKBDynamicImpl::removeEdge(node u, node v) {
+		void CKBDynamicImpl::removeEdge(node u, node v, bool nodeLeft) {
 			auto e = Community::canonicalEdge(u, v);
-			auto it = edgesAlive.find(e);
-			if (it == edgesAlive.end()) {
-				throw std::runtime_error("Error, removing edge that does not exist");
-			}
+			index ts = currentTimeStep;
 
-			if (it->second > 1) {
-				--it->second;
-			} else {
-				edgesAlive.erase(it);
-				auto evIt = currentEdgeEvents.find(e);
-				if (evIt != currentEdgeEvents.end()) {
-					assert(evIt->second.type == GraphEvent::EDGE_ADDITION);
-					currentEdgeEvents.erase(evIt);
+			if (edgeSharpness < 1 && nodeLeft && currentTimeStep > 0) {
+				std::geometric_distribution<count> geom(edgeSharpness);
+				count offset = geom(Aux::Random::getURNG());
+				if (offset + ts < numTimesteps) {
+					ts += offset;
 				} else {
-					currentEdgeEvents.emplace(e, GraphEvent(GraphEvent::EDGE_REMOVAL, e.first, e.second));
+					ts = numTimesteps;
 				}
 			}
+
+			eventStream.removeEdge(ts, e.first, e.second);
 		}
 
 		void CKBDynamicImpl::addNodeToCommunity(node u, CommunityPtr com) {
 			if (com != globalCommunity) {
 				nodeCommunities[u].insert(com);
-				auto comNode = std::make_pair(com->getId(), u);
-				auto it = currentCommunityEvents.find(comNode);
-				if (it != currentCommunityEvents.end()) {
-					assert(it->second.type == CommunityEvent::NODE_LEAVES_COMMUNITY);
-					currentCommunityEvents.erase(it);
-				} else {
-					currentCommunityEvents.emplace(comNode, CommunityEvent(CommunityEvent::NODE_JOINS_COMMUNITY, u, com->getId()));
-				}
-
+				eventStream.nodeJoinsCommunity(currentTimeStep, u, com->getId());
 				++currentCommunityMemberships;
 			}
 		}
@@ -77,14 +64,7 @@ namespace NetworKit {
 		void CKBDynamicImpl::removeNodeFromCommunity(node u, CommunityPtr com) {
 			if (com != globalCommunity) {
 				nodeCommunities[u].erase(com);
-				auto comNode = std::make_pair(com->getId(), u);
-				auto it = currentCommunityEvents.find(comNode);
-				if (it != currentCommunityEvents.end()) {
-					assert(it->second.type == CommunityEvent::NODE_JOINS_COMMUNITY);
-					currentCommunityEvents.erase(it);
-				} else {
-					currentCommunityEvents.emplace(comNode, CommunityEvent(CommunityEvent::NODE_LEAVES_COMMUNITY, u, com->getId()));
-				}
+				eventStream.nodeLeavesCommunity(currentTimeStep, u, com->getId());
 				--currentCommunityMemberships;
 			}
 		}
@@ -114,24 +94,27 @@ namespace NetworKit {
 			membershipDistribution(params.minCommunityMembership, params.maxCommunityMembership, params.communityMembershipExponent),
 			maxCommunityId(0),
 			sumOfDesiredMemberships(0),
+			currentTimeStep(0),
+			eventStream(params.numTimesteps + 1),
 			n(params.n),
 			communityEventProbability(params.communityEventProbability),
 			nodeEventProbability(params.nodeEventProbability),
 			perturbationProbability(params.perturbationProbability),
 			epsilon(params.epsilon),
+			edgeSharpness(params.edgeSharpness),
 			numTimesteps(params.numTimesteps),
 			currentCommunityMemberships(0) {
 			membershipDistribution.run();
 		}
 
-		std::vector<GraphEvent> CKBDynamicImpl::getGraphEvents() const {
+		std::vector<GraphEvent> CKBDynamicImpl::getGraphEvents() {
 			this->assureFinished();
-			return std::move(graphEvents);
+			return eventStream.getGraphEvents();
 		}
 
-		std::vector<CommunityEvent> CKBDynamicImpl::getCommunityEvents() const {
+		std::vector<CommunityEvent> CKBDynamicImpl::getCommunityEvents() {
 			this->assureFinished();
-			return std::move(communityEvents);
+			return eventStream.getCommunityEvents();
 		}
 
 		void CKBDynamicImpl::generateNode() {
@@ -141,7 +124,7 @@ namespace NetworKit {
 			nodesAlive.insert(u);
 			nodeCommunities.emplace_back();
 			globalCommunity->addNode(u);
-			graphEvents.emplace_back(GraphEvent::NODE_ADDITION, u);
+			eventStream.addNode(currentTimeStep, u);
 		}
 
 		void CKBDynamicImpl::eraseNode() {
@@ -157,28 +140,7 @@ namespace NetworKit {
 			assert(nodesAlive.contains(u));
 			nodesAlive.erase(u);
 			globalCommunity->removeNode(u);
-			currentErasedNodes.push_back(u);
-		}
-
-		void CKBDynamicImpl::finishTimeStep() {
-			for (const auto &it : currentEdgeEvents) {
-				graphEvents.push_back(it.second);
-			}
-			currentEdgeEvents.clear();
-
-			for (const auto &it : currentCommunityEvents) {
-				communityEvents.push_back(it.second);
-			}
-			currentCommunityEvents.clear();
-
-			// Ensure that node removals are after edge events.
-			for (node u : currentErasedNodes) {
-				graphEvents.emplace_back(GraphEvent::NODE_REMOVAL, u);
-			}
-			currentErasedNodes.clear();
-
-			communityEvents.emplace_back(CommunityEvent::TIME_STEP);
-			graphEvents.emplace_back(GraphEvent::TIME_STEP);
+			eventStream.removeNode(currentTimeStep, u);
 		}
 
 		count CKBDynamicImpl::sampleNumSteps() const {
@@ -195,6 +157,7 @@ namespace NetworKit {
 			globalCommunity = CommunityPtr(new Community(epsilon, *this));
 			communities.erase(globalCommunity);
 			availableCommunities.erase(globalCommunity);
+			currentTimeStep = 0;
 
 			for (node u = 0; u < n; ++u) {
 				generateNode();
@@ -217,14 +180,11 @@ namespace NetworKit {
 
 			assignNodesToCommunities();
 
-			// Finish initial graph generation.
-			finishTimeStep();
-
 			std::binomial_distribution<count> numEventDistribution;
 			double deathProbability = 0.25, birthProbability = 0.25, splitProbability = 0.25, mergeProbability = 0.25;
 			tlx::unused(mergeProbability);
 
-			for (count timestep = 0; timestep < numTimesteps; ++timestep) {
+			for (currentTimeStep = 1; currentTimeStep <= numTimesteps; ++currentTimeStep) {
 				handler.assureRunning();
 				numEventDistribution.param(std::binomial_distribution<count>::param_type(communities.size(), communityEventProbability));
 				const count numCommunityEvents = numEventDistribution(Aux::Random::getURNG());
@@ -232,7 +192,7 @@ namespace NetworKit {
 				numEventDistribution.param(std::binomial_distribution<count>::param_type(nodesAlive.size(), nodeEventProbability));
 				const count numNodeEvents = numEventDistribution(Aux::Random::getURNG());
 
-				INFO("Timestep ", timestep, " generating ", numCommunityEvents, " community events and ", numNodeEvents, " node events");
+				INFO("Timestep ", currentTimeStep, " generating ", numCommunityEvents, " community events and ", numNodeEvents, " node events");
 
 				for (count i = 0; i < numCommunityEvents; ++i) {
 					handler.assureRunning();
@@ -333,12 +293,10 @@ namespace NetworKit {
 					birthProbability = 0.5 * x / (1 + x);
 					deathProbability = 0.5 - birthProbability;
 					INFO("Current memberships: ", currentCommunityMemberships, " desired: ", sumOfDesiredMemberships, " number of communities: ", communities.size(), " available: ", availableCommunities.size(), " active events ", currentEvents.size());
-					INFO("Current nodes ", nodesAlive.size(), " current edges: ", edgesAlive.size(), " total graph events ", graphEvents.size(), " total community events ", communityEvents.size());
 				}
-
-				finishTimeStep();
-
 			}
+
+			eventStream.run();
 
 			hasRun = true;
 		}
