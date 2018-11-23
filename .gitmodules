@@ -4,3 +4,6 @@
 [submodule "extlibs/tlx"]
 	path = extlibs/tlx
 	url = https://github.com/tlx/tlx
+[submodule "extlibs/adaptagrams"]
+	path = extlibs/adaptagrams
+	url = https://github.com/mjwybrow/adaptagrams.git

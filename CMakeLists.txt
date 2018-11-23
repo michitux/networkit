@@ -47,6 +47,20 @@ if (NOT ${OpenCV_FOUND})
   set(NETWORKIT_CXX_FLAGS "${NETWORKIT_CXX_FLAGS} -DNOOPENCV")
 endif()
 
+include(ExternalProject)
+set(ADAPTAGRAMS_DIR ${PROJECT_BINARY_DIR}/adaptagrams)
+ExternalProject_Add(adaptagrams
+  PREFIX ${ADAPTAGRAMS_DIR}
+  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/extlibs/adaptagrams/cola/"
+  BUILD_IN_SOURCE 1
+  CONFIGURE_COMMAND mkdir -p m4 && autoreconf --install --verbose && ./configure --prefix "${CMAKE_BINARY_DIR}"
+)
+
+set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:${CMAKE_BINARY_DIR}/lib/pkgconfig")
+find_package(PkgConfig REQUIRED)
+pkg_search_module(COLA REQUIRED libcola)
+include_directories("${COLA_INCLUDEDIR}")
+
 if (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR
 	("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR
 	("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
@@ -154,7 +168,9 @@ if(NETWORKIT_BUILD_CORE AND NETWORKIT_MONOLITH)
 			LIBRARY DESTINATION .
 			ARCHIVE DESTINATION .)
 
-	target_link_libraries(networkit PRIVATE tlx ${OpenCV_LIBS})
+	add_dependencies(networkit adaptagrams)
+
+	target_link_libraries(networkit PRIVATE tlx ${OpenCV_LIBS} ${COLA_LIBRARIES} ${COLA_LDFLAGS})
 endif()
 
 if(NETWORKIT_PYTHON)
@@ -214,7 +230,9 @@ function(networkit_add_module modname)
 			COMPILE_FLAGS "${NETWORKIT_CXX_FLAGS}"
 			LINK_FLAGS "${NETWORKIT_LINK_FLAGS}")
 
-		target_link_libraries(${MODULE_TARGET} PRIVATE tlx ${OpenCV_LIBS})
+		add_dependencies(${MODULE_TARGET} adaptagrams)
+
+		target_link_libraries(${MODULE_TARGET} PRIVATE tlx ${OpenCV_LIBS} ${COLA_LIBRARIES} ${COLA_LDFLAGS})
 
 		# All tests added to this module will will also become a dependency
 		# of networkit_tests_MODNAME. This target hence allows to build all
@@ -302,6 +320,8 @@ if (NETWORKIT_BUILD_TESTS)
 				networkit
 				tlx
 				${OpenCV_LIBS}
+				${COLA_LIBRARIES}
+				${COLA_LDFLAGS}
 		)
 
 		set_target_properties(networkit_tests PROPERTIES

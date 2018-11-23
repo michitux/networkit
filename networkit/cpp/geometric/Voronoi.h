@@ -6,6 +6,7 @@
 #endif
 #include "Point2D.h"
 #include "../base/Algorithm.h"
+#include <libcola/cola.h>
 
 namespace NetworKit {
 
