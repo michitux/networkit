@@ -568,25 +568,21 @@ namespace NetworKit {
 					if (communitiesToShuffle.size() > 0) {
 						std::shuffle(communitiesToShuffle.begin(), communitiesToShuffle.end(), Aux::Random::getURNG());
 
-						// Assure that, if possible, no node has no community at the end
-						for (count j = 0; j < 2 && !communitiesToShuffle.empty(); ++j) {
-							if (freshAssignments[ln[j]].empty() && nodeCommunities[uv[j]].empty()) {
-								freshAssignments[ln[j]].insert(communitiesToShuffle.back());
-								communitiesToShuffle.pop_back();
-							}
-						}
-
 						while (!communitiesToShuffle.empty()) {
 							// Calculate the percentage of the desired memberships we would get if we assigned the community
 							// to the first/second node.
 							std::array<double, 2> possibleOverAssignment;
+							std::array<double, 2> currentOverAssignment;
 
 							for (index j = 0; j < 2; ++j) {
-								possibleOverAssignment[j] = (freshAssignments[ln[j]].size() + nodeCommunities[uv[j]].size() + 1.0) * 1.0 / desiredMemberships[uv[j]];
+								const count assignments = freshAssignments[ln[j]].size() + nodeCommunities[uv[j]].size();
+								const count desired = desiredMemberships[uv[j]];
+								currentOverAssignment[j] = assignments * 1.0 / desired;
+								possibleOverAssignment[j] = (assignments + 1.0) * 1.0 / desired;
 							}
 
 							index toAssign = 0;
-							if (possibleOverAssignment[0] > possibleOverAssignment[1]) {
+							if ((currentOverAssignment[0] >= 1 && possibleOverAssignment[0] > possibleOverAssignment[1]) || (currentOverAssignment[0] < 1 && currentOverAssignment[0] > currentOverAssignment[1])) {
 								toAssign = 1;
 							}
 
