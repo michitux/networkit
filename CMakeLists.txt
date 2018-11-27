@@ -53,7 +53,7 @@ ExternalProject_Add(adaptagrams
   PREFIX ${ADAPTAGRAMS_DIR}
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/extlibs/adaptagrams/cola/"
   BUILD_IN_SOURCE 1
-  CONFIGURE_COMMAND mkdir -p m4 && autoreconf --install --verbose && ./configure --prefix "${PROJECT_BINARY_DIR}" --libdir "${PROJECT_BINARY_DIR}"
+  CONFIGURE_COMMAND mkdir -p m4 && autoreconf --install --verbose && ./configure --prefix "${PROJECT_BINARY_DIR}" --libdir "${PROJECT_BINARY_DIR}" CXXFLAGS=-std=c++11
 )
 
 set(COLA_INCLUDEDIR "${PROJECT_BINARY_DIR}/include")
