@@ -12,8 +12,8 @@
 #include "CommunityChangeEvent.h"
 #include "../CKBDynamic.h"
 #include "NodePairHash.h"
-#include "../PowerlawDegreeSequence.h"
 #include "EventStreamGenerator.h"
+#include "CommunityMembershipDistribution.h"
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
@@ -44,7 +44,7 @@ namespace NetworKit {
 
 			std::unique_ptr<CommunitySizeDistribution> communitySizeSampler;
 		private:
-			PowerlawDegreeSequence membershipDistribution;
+			std::unique_ptr<CommunityMembershipDistribution> membershipDistribution;
 			void assignNodesToCommunities();
 
 			Aux::SamplingSet<CommunityPtr> availableCommunities;

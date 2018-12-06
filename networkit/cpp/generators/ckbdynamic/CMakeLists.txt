@@ -6,7 +6,10 @@ networkit_add_module(generators_ckbdynamic
   CommunityMergeEvent.cpp
   CommunityDeathEvent.cpp
   CommunitySplitEvent.cpp
+  CustomCommunityMembershipDistribution.cpp
+  CustomCommunitySizeDistribution.cpp
   EventStreamGenerator.cpp
+  PowerlawCommunityMembershipDistribution.cpp
   PowerlawCommunitySizeDistribution.cpp
 )
 

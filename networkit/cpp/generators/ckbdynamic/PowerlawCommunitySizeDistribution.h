@@ -12,11 +12,10 @@ namespace NetworKit {
 			PowerlawDegreeSequence sequence;
 			double alpha;
 			double densityGamma;
-			double minSplitRatio;
 
 			double getProbability(count size) const;
 		public:
-			PowerlawCommunitySizeDistribution(count minSize, count maxSize, double gamma, double alpha, double densityGamma, double minSplitRatio);
+			PowerlawCommunitySizeDistribution(count minSize, count maxSize, double gamma, double alpha, double densityGamma);
 
 			virtual std::pair<count, double> drawCommunity() override;
 		};

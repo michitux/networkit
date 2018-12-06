@@ -3,8 +3,10 @@
 
 
 namespace NetworKit {
-	CKBDynamic::CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, double minSplitRatio, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, double edgeSharpness, count numTimesteps) :
-		parameters({n, minCommunitySize, maxCommunitySize, communitySizeExponent, minSplitRatio, minCommunityMembership, maxCommunityMembership, communityMembershipExponent, communityEventProbability, nodeEventProbability, perturbationProbability, intraCommunityEdgeProbability, intraCommunityEdgeExponent, epsilon, edgeSharpness, numTimesteps}) {}
+	CKBDynamic::CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, double edgeSharpness, count numTimesteps) :
+		parameters({n, minCommunitySize, maxCommunitySize, communitySizeExponent, minCommunityMembership, maxCommunityMembership, communityMembershipExponent, communityEventProbability, nodeEventProbability, perturbationProbability, intraCommunityEdgeProbability, intraCommunityEdgeExponent, epsilon, edgeSharpness, numTimesteps, nullptr, nullptr}) {}
+
+	CKBDynamic::CKBDynamic(count n, const Graph& G, const Cover& C, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double edgeSharpness, count numTimesteps) : parameters({n, 0, 0, .0, 0, 0, .0, communityEventProbability, nodeEventProbability, perturbationProbability, .0, .0, .0, edgeSharpness, numTimesteps, &G, &C}) {}
 
 	void CKBDynamic::run() {
 		hasRun = false;

@@ -3,7 +3,10 @@
 #include "CommunityBirthEvent.h"
 #include "CommunitySplitEvent.h"
 #include "CommunityMergeEvent.h"
+#include "CustomCommunitySizeDistribution.h"
+#include "CustomCommunityMembershipDistribution.h"
 #include "PowerlawCommunitySizeDistribution.h"
+#include "PowerlawCommunityMembershipDistribution.h"
 #include "../../auxiliary/SignalHandling.h"
 #include <tlx/unused.hpp>
 
@@ -90,8 +93,8 @@ namespace NetworKit {
 		}
 
 		CKBDynamicImpl::CKBDynamicImpl(const CKBDynamic::param_type &params) :
-			communitySizeSampler(new PowerlawCommunitySizeDistribution(params.minCommunitySize, params.maxCommunitySize, params.communitySizeExponent, params.intraCommunityEdgeProbability, params.intraCommunityEdgeExponent, params.minSplitRatio)),
-			membershipDistribution(params.minCommunityMembership, params.maxCommunityMembership, params.communityMembershipExponent),
+			communitySizeSampler(nullptr),
+			membershipDistribution(nullptr),
 			maxCommunityId(0),
 			sumOfDesiredMemberships(0),
 			currentTimeStep(0),
@@ -104,7 +107,17 @@ namespace NetworKit {
 			edgeSharpness(params.edgeSharpness),
 			numTimesteps(params.numTimesteps),
 			currentCommunityMemberships(0) {
-			membershipDistribution.run();
+
+			if (params.G != nullptr && params.C != nullptr) {
+				communitySizeSampler.reset(new CustomCommunitySizeDistribution(*params.G, *params.C));
+				epsilon = static_cast<CustomCommunitySizeDistribution*>(communitySizeSampler.get())->getEpsilon();
+				membershipDistribution.reset(new CustomCommunityMembershipDistribution(*params.G, *params.C));
+
+			} else {
+				communitySizeSampler.reset(new PowerlawCommunitySizeDistribution(params.minCommunitySize, params.maxCommunitySize, params.communitySizeExponent, params.intraCommunityEdgeProbability, params.intraCommunityEdgeExponent));
+				membershipDistribution.reset(new PowerlawCommunityMembershipDistribution(params.minCommunityMembership, params.maxCommunityMembership, params.communityMembershipExponent));
+			}
+
 		}
 
 		std::vector<GraphEvent> CKBDynamicImpl::getGraphEvents() {
@@ -119,7 +132,7 @@ namespace NetworKit {
 
 		void CKBDynamicImpl::generateNode() {
 			node u = desiredMemberships.size();
-			desiredMemberships.push_back(membershipDistribution.getDegree());
+			desiredMemberships.push_back(membershipDistribution->drawMemberships());
 			sumOfDesiredMemberships += desiredMemberships.back();
 			nodesAlive.insert(u);
 			nodeCommunities.emplace_back();
