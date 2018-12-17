@@ -9,6 +9,7 @@ networkit_add_module(community
     DissimilarityMeasure.cpp
     DynamicNMIDistance.cpp
     EdgeCut.cpp
+    EgoSplitting.cpp
     GraphClusteringTools.cpp
     GraphStructuralRandMeasure.cpp
     HubDominance.cpp

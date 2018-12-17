@@ -49,7 +49,7 @@ Partition UnionFind::toPartition() {
 	Partition p(parent.size());
 	p.setUpperBound(parent.size());
 	for (index e = 0; e < parent.size(); ++e) {
-		p.moveToSubset(find(e), e);
+		p.addToSubset(find(e), e);
 	}	
 	return p;
 }
