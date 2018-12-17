@@ -112,12 +112,12 @@ void EgoSplitting::createPersonaClustering() {
     plp.run();
     personaPartition = plp.getPartition();
     personaPartition.compact();
-    assert(personaPartition.upperBound() < G.upperNodeIdBound());
+    assert(personaPartition.upperBound() <= personaGraph.upperNodeIdBound());
 }
 
 void EgoSplitting::createCover() {
     cover = Cover(G.upperNodeIdBound());
-    cover.setUpperBound(G.upperNodeIdBound());
+    cover.setUpperBound(personaPartition.upperBound());
     G.forNodes([&](node u) {
         for (index i = personaOffsets[u]; i < personaOffsets[u + 1]; ++i) {
             cover.addToSubset(personaPartition.subsetOf(i), u);

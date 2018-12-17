@@ -4836,6 +4836,28 @@ cdef class CutClustering(CommunityDetector):
 			pyResult[res.first] = Partition().setThis(res.second)
 		return pyResult
 
+cdef extern from "cpp/community/EgoSplitting.h":
+	cdef cppclass _EgoSplitting "NetworKit::EgoSplitting"(_Algorithm):
+		_EgoSplitting(_Graph G) except +
+		_Cover getCover() except +
+
+cdef class EgoSplitting(Algorithm):
+	"""
+	Nice docstring (+ constructor arguments)
+	"""
+	cdef Graph _G
+
+	def __cinit__(self, Graph G not None):
+		self._G = G
+		self._this = new _EgoSplitting(G._this)
+
+	"""
+	Docstring
+	"""
+	def getCover(self):
+		return Cover().setThis((<_EgoSplitting*>(self._this)).getCover())
+
+
 cdef class DissimilarityMeasure:
 	""" Abstract base class for partition/community dissimilarity measures """
 	# TODO: use conventional class design of parametrized constructor, run-method and getters
