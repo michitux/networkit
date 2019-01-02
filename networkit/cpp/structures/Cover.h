@@ -76,8 +76,6 @@ public:
 		return this->data[e];
 	}
 
-
-
 	/**
 	 * Check if cover assigns a valid subset to the element @a e.
 	 *
@@ -228,6 +226,7 @@ public:
 	 */
 	template<typename Callback> void parallelForEntries(Callback handle) const;
 
+	void removeSubset(index s);
 
 
 

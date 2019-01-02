@@ -185,4 +185,10 @@ std::set<index> Cover::getSubsetIds() const {
 	return ids;
 }
 
+void Cover::removeSubset(NetworKit::index s) {
+	for (node n : getMembers(s)) {
+		removeFromSubset(s, n);
+	}
+}
+
 } /* namespace NetworKit */

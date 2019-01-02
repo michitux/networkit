@@ -705,24 +705,26 @@ TEST_F(CommunityGTest, testPartitionFragmentation) {
     EXPECT_DOUBLE_EQ(0.9, frag3.getWeightedAverage());
 }
 
-
 TEST_F(CommunityGTest, testEgoSplitting) {
-    ClusteredRandomGraphGenerator gen(100, 4, 0.1, 0.02);
+    ClusteredRandomGraphGenerator gen(100, 2, 0.4, 0.02);
     Graph G = gen.generate();
 
-    EgoSplitting algo(G);
+    std::function<Partition(Graph&)> clusterAlgo = [](Graph &G){
+        PLP clustAlgo(G);
+        clustAlgo.run();
+        return clustAlgo.getPartition();
+    };
+    EgoSplitting algo(G, clusterAlgo, clusterAlgo);
     algo.run();
     Cover cover = algo.getCover();
 
     auto isProperCover = [](const Graph &G, const Cover &cover) {
-        G.forNodes([&](node u) {
-            auto comms = cover.subsetsOf(u);
-            EXPECT_GT(comms.size(), 0);
-        });
+        for (auto size : cover.subsetSizes()) {
+            EXPECT_GT(size, 4) << "discard communities with 4 or less nodes";
+        }
         return true;
     };
     EXPECT_TRUE(isProperCover(G, cover));
-
 }
 
 
