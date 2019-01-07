@@ -4836,9 +4836,30 @@ cdef class CutClustering(CommunityDetector):
 			pyResult[res.first] = Partition().setThis(res.second)
 		return pyResult
 
+cdef cppclass ClusteringFunctionWrapper:
+	void* callback
+	void setCallback(object callback):
+		this.callback = <void*>callback
+	_Partition cython_call_operator(_Graph& G) nogil:
+		cdef bool_t error = False
+		cdef string message
+		with gil:
+			pyG = Graph()
+			pyG.setThis(G)
+
+			try:
+				pyP = (<object>callback)(pyG)
+			except Exception as e:
+				error = True
+				message = stdstring("An Exception occurred in the clustering callback: {0}".format(e))
+			if (error):
+				throw_runtime_error(message)
+
+			return move((<Partition>(pyP))._this)
+
 cdef extern from "cpp/community/EgoSplitting.h":
 	cdef cppclass _EgoSplitting "NetworKit::EgoSplitting"(_Algorithm):
-		_EgoSplitting(_Graph G) except +
+		_EgoSplitting(_Graph G, ClusteringFunctionWrapper, ClusteringFunctionWrapper) except +
 		_Cover getCover() except +
 
 cdef class EgoSplitting(Algorithm):
@@ -4846,10 +4867,18 @@ cdef class EgoSplitting(Algorithm):
 	Nice docstring (+ constructor arguments)
 	"""
 	cdef Graph _G
+	cdef object _localClusteringCallback
+	cdef object _globalClusteringCallback
+	cdef ClusteringFunctionWrapper localCallback
+	cdef ClusteringFunctionWrapper globalCallback
 
-	def __cinit__(self, Graph G not None):
+	def __cinit__(self, Graph G not None, object localClusteringCallback not None, object globalClusteringCallback not None):
 		self._G = G
-		self._this = new _EgoSplitting(G._this)
+		self._localClusteringCallback = localClusteringCallback
+		self._globalClusteringCallback = globalClusteringCallback
+		self.localCallback.setCallback(localClusteringCallback)
+		self.globalCallback.setCallback(globalClusteringCallback)
+		self._this = new _EgoSplitting(G._this, self.localCallback, self.globalCallback)
 
 	"""
 	Docstring

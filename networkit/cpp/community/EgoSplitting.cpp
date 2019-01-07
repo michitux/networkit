@@ -18,8 +18,8 @@
 namespace NetworKit {
 
 EgoSplitting::EgoSplitting(const Graph &G,
-                           const std::function<Partition(Graph &)> &localClusterAlgo,
-                           const std::function<Partition(Graph &)> &globalClusterAlgo)
+                           std::function<Partition(Graph &)> localClusterAlgo,
+                           std::function<Partition(Graph &)> globalClusterAlgo)
         : G(G), localClusterAlgo(localClusterAlgo), globalClusterAlgo(globalClusterAlgo) {
     egoNets.resize(G.upperNodeIdBound());
     personaOffsets.resize(G.upperNodeIdBound() + 1, 0);
@@ -48,7 +48,7 @@ void EgoSplitting::createEgoNets() {
         egoNets[i].emplace(none, 0);
     }
 
-    G.balancedParallelForNodes([&](node u) {
+    G.forNodes([&](node u) {
         auto tid = omp_get_thread_num();
 
         // Assign IDs from 0 to degree-1 to neighbors
