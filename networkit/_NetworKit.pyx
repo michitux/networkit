@@ -6060,7 +6060,7 @@ cdef class CutClustering(CommunityDetector):
 
 cdef extern from "cpp/community/QuasiThresholdEditingLocalMover.h":
 	cdef cppclass _QuasiThresholdEditingLocalMover "NetworKit::QuasiThresholdEditingLocalMover":
-		_QuasiThresholdEditingLocalMover(_Graph G, vector[node] parents, count maxIterations, bool moveSubtrees) except +
+		_QuasiThresholdEditingLocalMover(_Graph G, vector[node] parents, count maxIterations, bool_t moveSubtrees) except +
 		void run() except +
 		count getNumberOfEdits() const
 		count getUsedIterations() const
@@ -6072,7 +6072,7 @@ cdef class QuasiThresholdEditingLocalMover:
 	cdef _QuasiThresholdEditingLocalMover *_this
 	cdef Graph _G
 
-	def __cinit__(self, Graph G, vector[node] parents, count maxIterations, bool moveSubtrees = False):
+	def __cinit__(self, Graph G, vector[node] parents, count maxIterations, bool_t moveSubtrees = False):
 		self._G = G
 		self._this = new _QuasiThresholdEditingLocalMover(G._this, parents, maxIterations, moveSubtrees)
 

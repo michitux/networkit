@@ -24,6 +24,7 @@ networkit_add_module(generators
     RmatGenerator.cpp
     StaticDegreeSequenceGenerator.cpp
     StochasticBlockmodel.cpp
+    TreeReachabilityGraphGenerator.cpp
     WattsStrogatzGenerator.cpp
     )
 
