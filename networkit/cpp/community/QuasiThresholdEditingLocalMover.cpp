@@ -2,11 +2,13 @@
  *
  */
 
-#include "QuasiThresholdEditingLocalMover.h"
-#include "../generators/TreeReachabilityGraphGenerator.h"
 #include <unordered_set>
-#include "../graph/DynamicForest.h"
-#include "../auxiliary/SignalHandling.h"
+
+#include <networkit/community/QuasiThresholdEditingLocalMover.hpp>
+#include <networkit/generators/TreeReachabilityGraphGenerator.hpp>
+#include <networkit/graph/DynamicForest.hpp>
+#include <networkit/auxiliary/SignalHandling.hpp>
+#include <networkit/auxiliary/Log.hpp>
 
 NetworKit::QuasiThresholdEditingLocalMover::QuasiThresholdEditingLocalMover(const NetworKit::Graph &G, const std::vector< NetworKit::node > &parent, NetworKit::count maxIterations, bool moveSubtrees)
 : G(G), maxIterations(maxIterations), moveSubtrees(moveSubtrees), numEdits(none) {
@@ -410,7 +412,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 				dynamicForest.dfsFrom(nodeToMove, [&](node d) {
 					marker[d] = true;
 					++subtreeSize;
-				}, [](node d) {});
+				}, [](node) {});
 
 				count subtreeExtDegree = 0;
 				dynamicForest.dfsFrom(nodeToMove, [&](node d) {
@@ -487,7 +489,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 					G.forNeighborsOf(d, [&](node v) {
 						numNeighbors[v] = 0;
 					});
-				}, [](node d) {});
+				}, [](node) {});
 
 				TRACE("After subtree moving, ", savedEdits, " edits will be saved");
 				TRACE("After subtree moving (quadratic) algorithm wants to have new parent ", bestParent, " and new children ", bestChildren);

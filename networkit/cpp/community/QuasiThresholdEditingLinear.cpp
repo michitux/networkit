@@ -2,10 +2,11 @@
  *
  */
 
-#include "QuasiThresholdEditingLinear.h"
-#include "../edgescores/TriangleEdgeScore.h"
-#include "../auxiliary/SignalHandling.h"
 #include <unordered_map>
+
+#include <networkit/community/QuasiThresholdEditingLinear.hpp>
+#include <networkit/edgescores/TriangleEdgeScore.hpp>
+#include <networkit/auxiliary/SignalHandling.hpp>
 
 NetworKit::QuasiThresholdEditingLinear::QuasiThresholdEditingLinear(const NetworKit::Graph &G) : G(G), hasRun(false) {
 }

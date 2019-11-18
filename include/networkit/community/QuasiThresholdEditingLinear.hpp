@@ -1,7 +1,7 @@
 #ifndef QUASITHRESHOLDEDITINGLINEAR_H
 #define QUASITHRESHOLDEDITINGLINEAR_H
 
-#include "../graph/Graph.h"
+#include <networkit/graph/Graph.hpp>
 
 namespace NetworKit {
 

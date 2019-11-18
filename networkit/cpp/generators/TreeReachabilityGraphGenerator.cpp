@@ -2,8 +2,9 @@
  *
  */
 
-#include "TreeReachabilityGraphGenerator.h"
 #include <stack>
+
+#include <networkit/generators/TreeReachabilityGraphGenerator.hpp>
 
 NetworKit::TreeReachabilityGraphGenerator::TreeReachabilityGraphGenerator(const NetworKit::Graph &input) : input(input) {
 

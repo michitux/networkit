@@ -1,10 +1,11 @@
 #ifndef DYNAMICFOREST_H
 #define DYNAMICFOREST_H
 
-#include "../Globals.h"
-#include "Graph.h"
 #include <unordered_set>
 #include <stack>
+
+#include <networkit/Globals.hpp>
+#include <networkit/graph/Graph.hpp>
 
 namespace NetworKit {
 

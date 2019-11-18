@@ -1,7 +1,7 @@
 #ifndef TREEREACHABILITYGRAPHGENERATOR_H
 #define TREEREACHABILITYGRAPHGENERATOR_H
 
-#include "../graph/Graph.h"
+#include <networkit/graph/Graph.hpp>
 
 namespace NetworKit {
 

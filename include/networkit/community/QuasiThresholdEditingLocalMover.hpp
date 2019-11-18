@@ -1,8 +1,8 @@
 #ifndef QUASITHRESHOLDEDITINGLOCALMOVER_H
 #define QUASITHRESHOLDEDITINGLOCALMOVER_H
 
-#include "../graph/Graph.h"
-#include "../structures/Cover.h"
+#include <networkit/graph/Graph.hpp>
+#include <networkit/structures/Cover.hpp>
 
 namespace NetworKit {
 

@@ -2,7 +2,7 @@
  *
  */
 
-#include "DynamicForest.h"
+#include <networkit/graph/DynamicForest.hpp>
 
 NetworKit::DynamicForest::DynamicForest(const NetworKit::Graph &G) : nodes(G.upperNodeIdBound()) {
 	G.forNodes([&](node u) {
@@ -73,7 +73,7 @@ NetworKit::Graph NetworKit::DynamicForest::toGraph() const {
 	Graph result(nodes.size(), false, true);
 
 	for (node r : roots) {
-		dfsFrom(r, [](node u) {}, [&](node u) {
+		dfsFrom(r, [](node) {}, [&](node u) {
 			if (parent(u) != none) {
 				result.addEdge(u, parent(u));
 			}

@@ -3626,7 +3626,7 @@ cdef class LFRGenerator(Algorithm):
 # 	def fit(cls, Graph G):
 # 		return cls(G)
 
-cdef extern from "cpp/generators/TreeReachabilityGraphGenerator.h":
+cdef extern from "<networkit/generators/TreeReachabilityGraphGenerator.hpp>":
 	cdef cppclass _TreeReachabilityGraphGenerator "NetworKit::TreeReachabilityGraphGenerator":
 		_TreeReachabilityGraphGenerator(const _Graph &input) except +
 		void run() except +
@@ -6058,7 +6058,7 @@ cdef class CutClustering(CommunityDetector):
 			pyResult[res.first] = Partition().setThis(res.second)
 		return pyResult
 
-cdef extern from "cpp/community/QuasiThresholdEditingLocalMover.h":
+cdef extern from "<networkit/community/QuasiThresholdEditingLocalMover.hpp>":
 	cdef cppclass _QuasiThresholdEditingLocalMover "NetworKit::QuasiThresholdEditingLocalMover":
 		_QuasiThresholdEditingLocalMover(_Graph G, vector[node] parents, count maxIterations, bool_t moveSubtrees) except +
 		void run() except +
@@ -6099,7 +6099,7 @@ cdef class QuasiThresholdEditingLocalMover:
 		return self._this.getParents()
 
 
-cdef extern from "cpp/community/QuasiThresholdEditingLinear.h":
+cdef extern from "<networkit/community/QuasiThresholdEditingLinear.hpp>":
 	cdef cppclass _QuasiThresholdEditingLinear "NetworKit::QuasiThresholdEditingLinear":
 		_QuasiThresholdEditingLinear(_Graph G) except +
 		void run() except +
