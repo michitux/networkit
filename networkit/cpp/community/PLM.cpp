@@ -19,9 +19,9 @@
 namespace NetworKit {
 
 PLM::PLM(const Graph &G, bool refine, double gamma, std::string par, count maxIter, bool turbo,
-         bool recurse)
+         bool recurse, bool measure_time)
     : CommunityDetectionAlgorithm(G), parallelism(std::move(par)), refine(refine), gamma(gamma),
-      maxIter(maxIter), turbo(turbo), recurse(recurse) {}
+      maxIter(maxIter), turbo(turbo), recurse(recurse), measure_time(measure_time) {}
 
 PLM::PLM(const Graph& G, const PLM& other) : CommunityDetectionAlgorithm(G), parallelism(other.parallelism), refine(other.refine), gamma(other.gamma), maxIter(other.maxIter), turbo(other.turbo), recurse(other.recurse) {}
 
@@ -63,9 +63,9 @@ void PLM::run() {
     // stores the list of neighboring communities, one vector per thread
     std::vector<std::vector<index> > neigh_comm;
 
-
+    bool parallel = parallelism != "none" && parallelism != "none randomized";
     if (turbo) {
-        if (this->parallelism != "none" && this->parallelism != "none randomized") { // initialize arrays for all threads only when actually needed
+        if (parallel) { // initialize arrays for all threads only when actually needed
             turboAffinity.resize(omp_get_max_threads());
             neigh_comm.resize(omp_get_max_threads());
             for (auto &it : turboAffinity) {
@@ -80,8 +80,10 @@ void PLM::run() {
 
     // try to improve modularity by moving a node to neighboring clusters
     auto tryMove = [&](node u) {
-        // trying to move node u
-        index tid = omp_get_thread_num();
+        // TRACE("trying to move node " , u);
+        index tid = 0;
+        if (parallel)
+            tid = omp_get_thread_num();
 
         // collect edge weight to neighbor clusters
         std::map<index, edgeweight> affinity;
@@ -217,41 +219,55 @@ void PLM::run() {
     handler.assureRunning();
     // first move phase
     Aux::Timer timer;
-    timer.start();
+    if (measure_time) timer.start();
 
     movePhase();
 
-    timer.stop();
-    timing["move"].push_back(timer.elapsedMilliseconds());
+    if (measure_time) {
+        timer.stop();
+        timing["move"].push_back(timer.elapsedMilliseconds());
+    }
     handler.assureRunning();
     if (recurse && change) {
         DEBUG("nodes moved, so begin coarsening and recursive call");
 
-        timer.start();
+        if (measure_time) timer.start();
+        ParallelPartitionCoarsening coarsening(*G, zeta, parallel);
+        coarsening.run();
+        if (measure_time) {
+            timer.stop();
+            timing["coarsen"].push_back(timer.elapsedMilliseconds());
+        }
 
-        std::pair<Graph, std::vector<node>> coarsened = coarsen(*G, zeta); // coarsen graph according to communities
-
-        timer.stop();
-        timing["coarsen"].push_back(timer.elapsedMilliseconds());
-
-        PLM onCoarsened(coarsened.first, this->refine, this->gamma, this->parallelism, this->maxIter, this->turbo);
+        PLM onCoarsened(coarsening.getCoarseGraph(), refine, gamma, parallelism, maxIter, turbo,
+                        recurse, measure_time);
         onCoarsened.run();
-        Partition zetaCoarse = onCoarsened.getPartition();
+        const Partition& zetaCoarse = onCoarsened.getPartition();
 
         // get timings
-        auto tim = onCoarsened.getTiming();
-        for (count t : tim["move"]) {
-            timing["move"].push_back(t);
-        }
-        for (count t : tim["coarsen"]) {
-            timing["coarsen"].push_back(t);
-        }
-        for (count t : tim["refine"]) {
-            timing["refine"].push_back(t);
+        if (measure_time) {
+            auto tim = onCoarsened.getTiming();
+            for (count t : tim["move"]) {
+                timing["move"].push_back(t);
+            }
+            for (count t : tim["coarsen"]) {
+                timing["coarsen"].push_back(t);
+            }
+            for (count t : tim["refine"]) {
+                timing["refine"].push_back(t);
+            }
         }
 
-        DEBUG("coarse graph has ", coarsened.first.numberOfNodes(), " nodes and ", coarsened.first.numberOfEdges(), " edges");
-        zeta = prolong(coarsened.first, zetaCoarse, *G, coarsened.second); // unpack communities in coarse graph onto fine graph
+        DEBUG("coarse graph has ", coarsening.getCoarseGraph().numberOfNodes(), " nodes and ", coarsening.getCoarseGraph().numberOfEdges(), " edges");
+
+        // unpack communities in coarse graph onto fine graph
+        const std::vector<node>& nodeToMetaNode(coarsening.getFineToCoarseNodeMapping());
+
+        G->forNodes([&](node v) {
+            zeta[v] = zetaCoarse[nodeToMetaNode[v]];
+        });
+        zeta.setUpperBound(zetaCoarse.upperBound());
+
         // refinement phase
         if (refine) {
             DEBUG("refinement phase");
@@ -259,20 +275,19 @@ void PLM::run() {
             o = zeta.upperBound();
             volCommunity.clear();
             volCommunity.resize(o, 0.0);
-            zeta.parallelForEntries([&](node u, index C) { // set volume for all communities
+            zeta.forEntries([&](node u, index C) { 	// set volume for all communities
                 if (C != none) {
                     edgeweight volN = volNode[u];
-                    #pragma omp atomic
                     volCommunity[C] += volN;
                 }
             });
             // second move phase
-            timer.start();
-
+            if (measure_time) timer.start();
             movePhase();
-
-            timer.stop();
-            timing["refine"].push_back(timer.elapsedMilliseconds());
+            if (measure_time) {
+                timer.stop();
+                timing["refine"].push_back(timer.elapsedMilliseconds());
+            }
 
         }
     }
@@ -299,8 +314,8 @@ std::string PLM::toString() const {
     return stream.str();
 }
 
-std::pair<Graph, std::vector<node> > PLM::coarsen(const Graph& G, const Partition& zeta) {
-    ParallelPartitionCoarsening parCoarsening(G, zeta);
+std::pair<Graph, std::vector<node>> PLM::coarsen(const Graph &G, const Partition &zeta, bool parallel) {
+    ParallelPartitionCoarsening parCoarsening(G, zeta, parallel);
     parCoarsening.run();
     return {parCoarsening.getCoarseGraph(),parCoarsening.getFineToCoarseNodeMapping()};
 }

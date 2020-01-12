@@ -31,11 +31,13 @@ public:
      * @param[in] parallelCoarsening use parallel graph coarsening
      * @param[in] turbo faster but uses O(n) additional memory per thread
      * @param[in] recurse use recursive coarsening, see http://journals.aps.org/pre/abstract/10.1103/PhysRevE.89.049902 for some explanations (default: true)
+     * @param[in] measure_time Measure the running time of various phases. As timers have some overhead in particular for small graphs, this is disabled by default.
      *
      */
-    PLM(const Graph& G, bool refine=false, double gamma = 1.0, std::string par="balanced", count maxIter=32, bool turbo = true, bool recurse = true);
+    PLM(const Graph &G, bool refine = false, double gamma = 1.0, std::string par = "balanced", count maxIter = 32,
+        bool turbo = true, bool recurse = true, bool measure_time = false);
 
-    PLM(const Graph& G, const PLM& other);
+    PLM(const Graph &G, const PLM &other);
 
     /**
      * Get string representation.
@@ -49,9 +51,10 @@ public:
      */
     void run() override;
 
-    static std::pair<Graph, std::vector<node>> coarsen(const Graph& G, const Partition& zeta);
+    static std::pair<Graph, std::vector<node>> coarsen(const Graph &G, const Partition &zeta, bool parallel);
 
-    static Partition prolong(const Graph& Gcoarse, const Partition& zetaCoarse, const Graph& Gfine, std::vector<node> nodeToMetaNode);
+    static Partition
+    prolong(const Graph &Gcoarse, const Partition &zetaCoarse, const Graph &Gfine, std::vector<node> nodeToMetaNode);
 
     /**
      * Returns fine-grained running time measurements for algorithm engineering purposes.
@@ -66,7 +69,8 @@ private:
     count maxIter;
     bool turbo;
     bool recurse;
-    std::map<std::string, std::vector<count>> timing;  // fine-grained running time measurement
+    bool measure_time;
+    std::map<std::string, std::vector<count> > timing;     // fine-grained running time measurement
 };
 
 } /* namespace NetworKit */
