@@ -216,6 +216,18 @@ public:
      */
     void setUpperBound(index upper);
 
+    /**
+     * Returns all subsets. Indicies in the returned vector do not correspond to subset ids.
+     * @return The subsets of the cover.
+     */
+    std::vector<std::set<index>> getSubsets() const;
+
+    /**
+     * Add a subset of nodes.
+     * @param[in]	subset	a set of nodes
+     */
+    void addSubset(const std::set<index> &subset);
+
 
     /**
      * Iterate over all entries (node, subset ID of node) and execute callback function @a func (lambda closure).
