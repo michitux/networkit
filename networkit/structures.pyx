@@ -5,12 +5,26 @@ cdef class Cover:
 	def __cinit__(self, n=0):
 		if isinstance(n, Partition):
 			self._this = move(_Cover((<Partition>n)._this))
+		elif isinstance(n, Cover):
+			self._this = move(_Cover((<Cover>n)._this))
 		else:
 			self._this = move(_Cover(<count?>n))
 
 	cdef setThis(self, _Cover& other):
 		swap[_Cover](self._this, other)
 		return self
+
+	def __copy__(self):
+		"""
+		Generates a copy of the cover
+		"""
+		return Cover().setThis(_Cover(self._this))
+
+	def __deepcopy__(self):
+		"""
+		Generates a copy of the cover
+		"""
+		return Cover().setThis(_Cover(self._this))
 
 	def subsetsOf(self, e):
 		""" Get the ids of subsets in which the element `e` is contained.

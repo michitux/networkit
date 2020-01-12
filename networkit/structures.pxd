@@ -22,6 +22,7 @@ cdef extern from "<networkit/structures/Cover.hpp>":
 		_Cover() except +
 		_Cover(_Partition p) except +
 		_Cover(count n) except +
+		_Cover(_Cover c) except +
 		set[index] subsetsOf(index e) except +
 		index extend() except +
 		void remove(index e) except +
