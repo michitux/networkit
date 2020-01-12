@@ -47,7 +47,7 @@ public:
      * Returns the result of the run method or throws an error, if the algorithm hasn't run yet.
      * @return partition of the node set
      */
-    virtual Partition getPartition();
+    virtual const Partition &getPartition() const;
 
     /**
      * @return string representation of algorithm and parameters.
@@ -60,4 +60,5 @@ protected:
 };
 
 } /* namespace NetworKit */
+
 #endif // NETWORKIT_COMMUNITY_COMMUNITY_DETECTION_ALGORITHM_HPP_
