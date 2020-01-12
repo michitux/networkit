@@ -17,8 +17,9 @@ namespace NetworKit {
 
 PLP::PLP(const Graph& G, count theta, count maxIterations) : CommunityDetectionAlgorithm(G), updateThreshold(theta), maxIterations(maxIterations) {}
 
-PLP::PLP(const Graph &G, const Partition &baseClustering, count theta)
-    : CommunityDetectionAlgorithm(G, baseClustering), updateThreshold(theta) {}
+PLP::PLP(const Graph &G, const Partition &baseClustering, count theta, count maxIterations)
+    : CommunityDetectionAlgorithm(G, baseClustering), updateThreshold(theta),
+      maxIterations(maxIterations) {}
 
 void PLP::run() {
     if (hasRun) {
@@ -64,7 +65,7 @@ void PLP::run() {
     Aux::Timer runtime;
 
     // propagate labels
-    while ((nUpdated > this->updateThreshold)  && (nIterations < maxIterations)) { // as long as a label has changed... or maximum iterations reached
+    while ((nUpdated > this->updateThreshold)  && (nIterations < maxIterations)) { // as long as a label has changed or maximum iterations reached
         runtime.start();
         nIterations += 1;
         DEBUG("[BEGIN] LabelPropagation: iteration #" , nIterations);
@@ -72,7 +73,7 @@ void PLP::run() {
         // reset updated
         nUpdated = 0;
 
-        G->balancedParallelForNodes([&](node v){
+        auto updateNode = [&](node v, count &updateCount) {
             if ((activeNodes[v]) && (G->degree(v) > 0)) {
 
                 std::map<label, double> labelWeights; // neighborLabelCounts maps label -> frequency in the neighbors
@@ -84,14 +85,16 @@ void PLP::run() {
                 });
 
                 // get heaviest label
-                label heaviest = std::max_element(labelWeights.begin(),
-                                labelWeights.end(),
-                                [](const std::pair<label, edgeweight>& p1, const std::pair<label, edgeweight>& p2) {
-                                    return p1.second < p2.second;})->first;
+                label heaviest = std::max_element(
+                        labelWeights.begin(), labelWeights.end(),
+                        [](const std::pair<label, edgeweight> &p1,
+                           const std::pair<label, edgeweight> &p2) {
+                            return p1.second < p2.second;
+                        })->first;
 
                 if (result.subsetOf(v) != heaviest) { // UPDATE
                     result.moveToSubset(heaviest,v); //result[v] = heaviest;
-                    nUpdated += 1; // TODO: atomic update?
+                    updateCount += 1;
                     G->forNeighborsOf(v, [&](node u) {
                         activeNodes[u] = true;
                     });
@@ -102,7 +105,26 @@ void PLP::run() {
             } else {
                 // node is isolated
             }
-        });
+        };
+
+        if (n > (1u << 20u)) {
+#pragma omp parallel
+            {
+                count threadNodesUpdated = 0;
+#pragma omp for schedule(guided)
+                for (omp_index v = 0; v < static_cast<omp_index>(z); ++v) {
+                    if (G->hasNode(v)) {
+                        updateNode(v, threadNodesUpdated);
+                    }
+                }
+#pragma omp atomic
+                nUpdated += threadNodesUpdated;
+            }
+        } else {
+            G->forNodes([&](node v) {
+                updateNode(v, nUpdated);
+            });
+        }
 
         // for each while loop iteration...
 
