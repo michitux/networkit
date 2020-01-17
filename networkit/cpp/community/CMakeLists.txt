@@ -35,10 +35,16 @@ networkit_add_module(community
     SampledNodeStructuralRandMeasure.cpp
     StablePartitionNodes.cpp
 	LouvainMapEquation.cpp
+    cleanup/MergeCommunities.cpp
+    cleanup/SignificanceCommunityCleanUp.cpp
+    cleanup/SingleCommunityCleanUp.cpp
+    cleanup/StochasticDistributionCalculator.cpp
+    cleanup/SignificanceCalculator.cpp
     )
 
 networkit_module_link_modules(community
     auxiliary base coarsening components flow graph matching structures)
 
 add_subdirectory(test)
+add_subdirectory(cleanup/test)
 
