@@ -38,6 +38,7 @@
 #include <networkit/generators/ClusteredRandomGraphGenerator.hpp>
 #include <networkit/generators/ErdosRenyiGenerator.hpp>
 #include <networkit/community/CoverF1Similarity.hpp>
+#include <networkit/community/LPPotts.hpp>
 #include <networkit/community/OverlappingNMIDistance.hpp>
 
 #include <tlx/unused.hpp>
@@ -808,5 +809,34 @@ TEST_F(CommunityGTest, testOverlappingNMIDistance) {
         EXPECT_THROW(distance.getDissimilarity(G1, cover2, cover2), std::invalid_argument);
     }
 }
+
+
+TEST_F(CommunityGTest, testLPPottsSequential) {
+    count numClusters = 4;
+    ClusteredRandomGraphGenerator gen(100, numClusters, 0.7, 0.03);
+    Graph G = gen.generate();
+
+    LPPotts algo(G);
+    algo.run();
+    Partition partition = algo.getPartition();
+
+    EXPECT_LE(partition.numberOfSubsets(), numClusters + 1);
+    EXPECT_GE(partition.numberOfSubsets(), numClusters);
+}
+
+
+TEST_F(CommunityGTest, testLPPottsParallel) {
+    count numClusters = 4;
+    ClusteredRandomGraphGenerator gen(100, numClusters, 0.7, 0.03);
+    Graph G = gen.generate();
+
+    LPPotts algo(G, 0.3, none, 20, true);
+    algo.run();
+    Partition partition = algo.getPartition();
+
+    EXPECT_LE(partition.numberOfSubsets(), numClusters + 1);
+    EXPECT_GE(partition.numberOfSubsets(), numClusters);
+}
+
 
 } /* namespace NetworKit */
