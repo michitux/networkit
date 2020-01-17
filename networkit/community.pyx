@@ -5,8 +5,11 @@ from libc.stdint cimport uint64_t
 from libcpp.string cimport string
 from libcpp cimport bool as bool_t
 from libcpp.vector cimport vector
+from libcpp.unordered_map cimport unordered_map
 from libcpp.utility cimport pair
 from libcpp.map cimport map
+
+from cython.operator import dereference
 
 import os
 import math
@@ -575,6 +578,88 @@ cdef class LPPotts(CommunityDetector):
 			self._this = new _LPPotts(G._this, baseClustering._this, alpha, theta, maxIterations, para)
 		else:
 			self._this = new _LPPotts(G._this, alpha, theta, maxIterations, para)
+
+
+cdef extern from "<networkit/graph/Graph.hpp>":
+	cdef struct _WeightedEdge "NetworKit::WeightedEdge":
+		node u
+		node v
+		edgeweight weight
+
+
+cdef extern from "<networkit/community/EgoSplitting.hpp>":
+	cdef cppclass _EgoSplitting "NetworKit::EgoSplitting"(_Algorithm):
+		_EgoSplitting(_Graph G, bool_t parallelEgoNetEvaluation) except +
+		_EgoSplitting(_Graph G, bool_t parallelEgoNetEvaluation, _CommunityDetectionAlgorithm&) except +
+		_EgoSplitting(_Graph G, bool_t parallelEgoNetEvaluation, _CommunityDetectionAlgorithm&, _CommunityDetectionAlgorithm&) except +
+		_Cover getCover() except +
+		unordered_map[string, double] getTimings() except +
+		vector[unordered_map[node, index]] getEgoNetPartitions() except +
+		unordered_map[node, vector[_WeightedEdge]] getEgoNets() except +
+		void setParameters(map[string, string]) except +
+
+
+cdef class EgoSplitting(Algorithm):
+	"""
+	Constructor to the Ego-Splitting community detection algorithm.
+
+	Parameters
+	----------
+	G : networkit.Graph
+		The graph on which the algorithm has to run.
+	localClusteringAlgorithm: CommunityDetector
+		(optional) The local clustering algorithm.
+		If not specified, a default algorithm is used.
+	globalClusteringAlgorithm: CommunityDetector
+		(optional) The global clustering algorithm.
+		If not specified, the local clustering algorithm is used.
+	"""
+
+	cdef Graph _G
+
+	def __cinit__(self, Graph G not None, CommunityDetector localClusteringAlgorithm = None,
+			CommunityDetector globalClusteringAlgorithm = None):
+		self._G = G
+
+		if localClusteringAlgorithm is None:
+			self._this = new _EgoSplitting(G._this, True)
+		elif globalClusteringAlgorithm is None:
+			self._this = new _EgoSplitting(G._this, True,
+						       dereference(<_CommunityDetectionAlgorithm*>(localClusteringAlgorithm._this)))
+		else:
+			self._this = new _EgoSplitting(G._this, True,
+						       dereference(<_CommunityDetectionAlgorithm*>(localClusteringAlgorithm._this)),
+						       dereference(<_CommunityDetectionAlgorithm*>(globalClusteringAlgorithm._this)))
+
+	"""
+	Get the result of the algorithm.
+	"""
+	def getCover(self):
+		return Cover().setThis((<_EgoSplitting*>(self._this)).getCover())
+
+	"""
+	Get the timings.
+	"""
+	def getTimings(self):
+		return (<_EgoSplitting*>(self._this)).getTimings()
+
+	"""
+	Get the partitions of the EgoNets.
+	"""
+	def getEgoNetPartitions(self):
+		return (<_EgoSplitting*>(self._this)).getEgoNetPartitions()
+
+	"""
+	Get the EgoNet graphs.
+	"""
+	def getEgoNets(self):
+		return (<_EgoSplitting*>(self._this)).getEgoNets()
+
+	"""
+	Set parameters of the algorithm.
+	"""
+	def setParameters(self, parameters):
+		(<_EgoSplitting*>(self._this)).setParameters(parameters)
 
 
 cdef class DissimilarityMeasure:
