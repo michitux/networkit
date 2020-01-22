@@ -28,5 +28,26 @@ class Test_CommunityDetection(unittest.TestCase):
 		hierarchy = community.CutClustering.getClusterHierarchy(jazz)
 		self.assertEqual(3, len(hierarchy))
 
+	def test_EgoSplitting(self):
+		lfrGraph = readGraph("input/lfr_small.graph", Format.METIS)
+
+		egoSplitting = community.EgoSplitting(lfrGraph)
+		egoSplitting.run()
+		cover = egoSplitting.getCover()
+		self.assertGreater(cover.numberOfSubsets(), 5)
+		for size in cover.subsetSizes():
+			self.assertGreater(size, 4)
+			self.assertLess(size, 40)
+
+		plmFactory = community.PLMFactory(True, 1.0, "none randomized")
+		louvainFactory = community.LouvainMapEquationFactory(True, 16, "RelaxMap")
+		egoSplitting = community.EgoSplitting(lfrGraph, plmFactory, louvainFactory)
+		egoSplitting.run()
+		cover = egoSplitting.getCover()
+		self.assertGreater(cover.numberOfSubsets(), 5)
+		for size in cover.subsetSizes():
+			self.assertGreater(size, 4)
+			self.assertLess(size, 40)
+
 if __name__ == "__main__":
 	unittest.main()
