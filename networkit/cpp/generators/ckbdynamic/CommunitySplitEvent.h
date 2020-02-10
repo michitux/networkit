@@ -15,14 +15,13 @@ namespace NetworKit {
 		 */
 		class CommunitySplitEvent : public CommunityChangeEvent {
 		public:
-			CommunitySplitEvent(CommunityPtr community, count targetSizeA, double targetEdgeProbabilityA, count targetSizeB, double targetEdgeProbabilityB, count numSteps, CKBDynamicImpl& generator);
+			CommunitySplitEvent(CommunityPtr community, count targetSizeA, count targetSizeB, count numSteps, CKBDynamicImpl& generator);
 			virtual void nextStep() override;
 			virtual void notifyNodeRemovedFromCommunity(node u, CommunityPtr com) override;
 			virtual bool canRemoveNode() const override;
 		private:
 			std::array<Aux::SamplingSet<node>, 2> nodesToRemove;
                         const std::array<count, 2> targetSize;
-                        const std::array<double, 2> targetEdgeProbability;
                         const std::array<CommunityPtr, 2> communities;
 		};
 	}

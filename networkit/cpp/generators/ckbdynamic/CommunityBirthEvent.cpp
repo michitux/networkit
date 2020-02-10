@@ -4,33 +4,34 @@
 namespace NetworKit {
 	namespace CKBDynamicImpl {
 
-	CommunityBirthEvent::CommunityBirthEvent(count coreSize, count targetSize, double edgeProbability, count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps), coreSize(coreSize), targetSize(targetSize), community(new Community(edgeProbability, generator)) {
+	CommunityBirthEvent::CommunityBirthEvent(count coreSize, count targetSize, count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps), coreSize(coreSize), targetSize(targetSize), community(new Community(generator)) {
 		community->setCurrentEvent(this);
 	}
 
 	CommunityBirthEvent::CommunityBirthEvent(count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps)	{
-		double edgeProbability;
-		std::tie(targetSize, edgeProbability) = generator.communitySizeSampler->drawCommunity();
-		coreSize = std::max<count>(0.1 * targetSize, generator.communitySizeSampler->getMinSize());
-		community = CommunityPtr(new Community(edgeProbability, generator));
+		targetSize = generator.communitySizeSampler->drawCommunitySize();
+		coreSize = generator.communitySizeSampler->getMinSize();
+		community = CommunityPtr(new Community(generator));
 		community->setCurrentEvent(this);
 	}
 
 	void CommunityBirthEvent::nextStep() {
-		count nextSize = targetSize / (numSteps - currentStep);
-
-		// Ensure that after every step the community has at least coreSize nodes,
-		// even if nodes have been deleted in the meantime.
-		if (nextSize < coreSize) {
+		count nextSize;
+		if (currentStep + 1 == numSteps) {
+			nextSize = targetSize;
+		} else if (currentStep == 0) {
 			nextSize = coreSize;
-		}
+		} else {
+			nextSize = community->getDesiredNumberOfNodes() +
+				std::ceil(static_cast<double>(targetSize - community->getDesiredNumberOfNodes()) / (numSteps - currentStep));
+			assert(nextSize <= targetSize);
+                }
 
 		community->setDesiredNumberOfNodes(nextSize);
-		// If we did not get enough nodes to make the community larger than the minimum size
-		// let the community die.
+
 		++currentStep;
 
-		if (currentStep == numSteps) {
+		if (currentStep == numSteps || nextSize == targetSize) {
 			active = false;
 			community->setCurrentEvent(nullptr);
 		}

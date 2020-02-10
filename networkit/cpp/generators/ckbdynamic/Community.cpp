@@ -33,8 +33,13 @@ namespace NetworKit {
 		}
 
 
-		Community::Community(double edgeProbability, CKBDynamicImpl& generator) : id(generator.nextCommunityId()), desiredSize(0), edgeProbability(edgeProbability), storeNonEdges(edgeProbability > 0.6), generator(generator), currentEvent(nullptr) {
+		Community::Community(CKBDynamicImpl& generator) : id(generator.nextCommunityId()), desiredSize(0), edgeProbability(0), storeNonEdges(edgeProbability > 0.6), generator(generator), currentEvent(nullptr) {
 			generator.addCommunity(CommunityPtr(this));
+		}
+
+		void Community::setDesiredNumberOfNodes(count size) {
+			desiredSize = size;
+			changeEdgeProbability(generator.communitySizeSampler->getCommunityDensity(size));
 		}
 
 		void Community::verifyInvariants() const {
@@ -128,6 +133,8 @@ namespace NetworKit {
 		void Community::addNode(node u) {
 			assert(!nodes.contains(u)); // assert for gdb in gtest which catches exceptions
 			if (nodes.contains(u)) throw std::runtime_error("Node already in community!");
+			// The global community has desired size 0
+			assert(desiredSize == 0 || nodes.size() < desiredSize);
 			nodes.insert(u);
 
 			if (storeNonEdges) {

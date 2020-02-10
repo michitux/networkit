@@ -5,8 +5,8 @@
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
-		CommunityMergeEvent::CommunityMergeEvent(CommunityPtr communityA, CommunityPtr communityB, count targetSize, double targetEdgeProbability, count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps), communities({communityA, communityB}), targetSize(targetSize), targetEdgeProbability(targetEdgeProbability), communitiesMerged(false) {
-			targetEdgeProbabilityPerCommunity = 1 - std::sqrt(1 - targetEdgeProbability);
+		CommunityMergeEvent::CommunityMergeEvent(CommunityPtr communityA, CommunityPtr communityB, count targetSize, count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps), communities({communityA, communityB}), targetSize(targetSize), communitiesMerged(false) {
+			//targetEdgeProbabilityPerCommunity = 1 - std::sqrt(1 - targetEdgeProbability);
 
 			for (count c = 0; c < 2; ++c) {
 				communities[c]->setCurrentEvent(this);
@@ -29,8 +29,8 @@ namespace NetworKit {
 			const count estimatedMergedSize = communities[0]->getNumberOfNodes() + nodesToAddTo[0].size();
 			assert(communitiesMerged || estimatedMergedSize == communities[1]->getNumberOfNodes() + nodesToAddTo[1].size());
 
-			const count totalNodesToAdd = estimatedOverlap > targetSize ? 0 : (targetSize - estimatedOverlap) / (numSteps - currentStep);
-			const count totalNodesToRemove = estimatedMergedSize < targetSize ? 0 : (estimatedMergedSize - targetSize) / (numSteps - currentStep);
+			const count totalNodesToAdd = estimatedOverlap > targetSize ? 0 : std::ceil(static_cast<double>(targetSize - estimatedOverlap) / (numSteps - currentStep));
+			const count totalNodesToRemove = estimatedMergedSize < targetSize ? 0 : std::ceil(static_cast<double>(estimatedMergedSize - targetSize) / (numSteps - currentStep));
 
 
 			auto nonOverlappingNodes = [&]() -> count {
@@ -39,16 +39,11 @@ namespace NetworKit {
 
 			count nodesRemoved = 0;
 
-			// Reset the desired number of nodes to the actual number of nodes.
-			// If any change shall happen, it will be requested below.
-			communities[0]->setDesiredNumberOfNodes(communities[0]->getNumberOfNodes());
-			if (!communitiesMerged) {
-				communities[1]->setDesiredNumberOfNodes(communities[1]->getNumberOfNodes());
-			}
-
+			// First: remove nodes that are not in the overlap if nodes need to be removed
 			if (nonOverlappingNodes() > 0 && totalNodesToRemove > 0) {
 				std::array<count, 2> nodesToRemove {nodesToAddTo[0].size(), nodesToAddTo[1].size()};
 				if (nodesToRemove[0] + nodesToRemove[1] > totalNodesToRemove) {
+					// Distribute nodes to remove proportionally to the non-overlapping parts
 					nodesToRemove[0] = nodesToAddTo[0].size() * totalNodesToRemove / nonOverlappingNodes();
 					nodesToRemove[1] = totalNodesToRemove - nodesToRemove[0];
 
@@ -71,15 +66,15 @@ namespace NetworKit {
 						communities[1-c]->removeNode(u);
 						++nodesRemoved;
 					}
-
-					communities[1-c]->setDesiredNumberOfNodes(communities[1-c]->getNumberOfNodes());
 				}
 			}
 
+			// Merge communities if we have no nodes in the overlap left
 			if (nonOverlappingNodes() == 0) {
 				mergeCommunities();
 			}
 
+			// If we still need to remove nodes, we are now after the merge.
 			if (nodesRemoved < totalNodesToRemove) {
 				assert(nonOverlappingNodes() == 0);
 				for (; nodesRemoved < totalNodesToRemove; ++nodesRemoved) {
@@ -87,97 +82,122 @@ namespace NetworKit {
 					// communities[1] doesn't exist anymore
 					communities[0]->removeRandomNode();
 				}
-
-				communities[0]->setDesiredNumberOfNodes(communities[0]->getNumberOfNodes());
 			}
 
-
-			if (communitiesMerged) {
-				adaptProbability(communities[0], targetEdgeProbability);
-			} else {
-				for (count c = 0; c < 2; ++c) {
-					// first adapt the probability so new
-					// nodes get directly the right amount
-					// of neighbors
-					adaptProbability(communities[c], targetEdgeProbabilityPerCommunity);
-				}
-			}
-
-			count nodesAdded = 0;
 
 			// At minimum, we need to add enough nodes such that both communities reach the minimum size.
 			const count minSize = generator.communitySizeSampler->getMinSize();
-			std::array<count, 2> minNodesToAdd {0,0};
-			for (count c = 0; c < 2; ++c) {
-				if (communities[c]->getNumberOfNodes() < minSize) {
-					minNodesToAdd[c] = minSize - communities[c]->getNumberOfNodes();
-				}
-				if (communitiesMerged) break;
-			}
 
-			assert(communitiesMerged || communities[0]->getNumberOfNodes() + nodesToAddTo[0].size() == communities[1]->getNumberOfNodes() + nodesToAddTo[1].size());
+			if (communitiesMerged) {
+				assert(nonOverlappingNodes() == 0);
 
-			if (nonOverlappingNodes() > 0 && (totalNodesToAdd > 0 || minNodesToAdd[0] + minNodesToAdd[1] > 0)) {
-				std::array<count, 2> numNodesToAdd {nodesToAddTo[0].size(), nodesToAddTo[1].size()};
+				communities[0]->setDesiredNumberOfNodes(std::max(minSize, communities[0]->getNumberOfNodes() + totalNodesToAdd));
+			} else {
+				assert(communities[0]->getNumberOfNodes() + nodesToAddTo[0].size() == communities[1]->getNumberOfNodes() + nodesToAddTo[1].size());
 
-				// If we have more non-overlapping nodes than nodes to be added, select some.
-				// However, select only adding all non-overlapping nodes achieves the minimum size.
-				if (numNodesToAdd[0] + numNodesToAdd[1] > totalNodesToAdd && communities[0]->getNumberOfNodes() + nodesToAddTo[0].size() > minSize) {
-					numNodesToAdd[0] = numNodesToAdd[0] * totalNodesToAdd / nonOverlappingNodes();
-					numNodesToAdd[1] = totalNodesToAdd - numNodesToAdd[0];
-
-					// Always round the other way if the previous allocation is infeasible.
-					// Apply probabilitic rounding if there is enough possibility for change.
-					if (numNodesToAdd[1] > nodesToAddTo[1].size() || (nodesToAddTo[0].size() > numNodesToAdd[0] && numNodesToAdd[1] > 0 && Aux::Random::real() < nodesToAddTo[0].size() *  totalNodesToAdd *  1.0 / nonOverlappingNodes() - numNodesToAdd[0])) {
-						++numNodesToAdd[0];
-						--numNodesToAdd[1];
+				// Check if we need to fully merge the communities to achieve the minimum size or the desired growth of the overlap
+				if (communities[0]->getNumberOfNodes() + nodesToAddTo[0].size() <= minSize || totalNodesToAdd >= nodesToAddTo[0].size() + nodesToAddTo[1].size()) {
+					// Add all remaining non-overlapping nodes and perform merge immediately, might need to further grow the community.
+					count sizeAfterStep = communities[0]->getNumberOfNodes() + nodesToAddTo[0].size();
+					if (totalNodesToAdd > nodesToAddTo[0].size() + nodesToAddTo[1].size()) {
+						sizeAfterStep += (totalNodesToAdd - (nodesToAddTo[0].size() + nodesToAddTo[1].size()));
 					}
 
-					// Ensure that if possible, we are adding at least the minimum amount of nodes required to reach the minimum community size.
+					if (sizeAfterStep < minSize) {
+						sizeAfterStep = minSize;
+					}
+
+					assert(sizeAfterStep <= targetSize);
+
+					communities[0]->setDesiredNumberOfNodes(sizeAfterStep);
+
+					while (!nodesToAddTo[0].empty()) {
+						const node u = nodesToAddTo[0].at(0);
+
+						assert(communities[1]->hasNode(u));
+						communities[0]->addNode(u);
+						nodesToAddTo[0].erase(u);
+					}
+
+					// Discard the second community, there is no need to add those nodes to the second community.
+					// The first community will simply replace it.
+					nodesToAddTo[1].clear();
+
+					mergeCommunities();
+				} else {
+					// Adding nodes from nodesToAddTo will be enough, no merge will be performed and no additional nodes will be needed
+
+					std::array<count, 2> numNodesToAdd {0, 0};
+					// First step: ensure that we add enough nodes to achieve the minimum size
 					for (count c = 0; c < 2; ++c) {
-						if (numNodesToAdd[c] < minNodesToAdd[c]) {
-							numNodesToAdd[c] = minNodesToAdd[c];
-							numNodesToAdd[1-c] = std::max(totalNodesToAdd > numNodesToAdd[c] ? totalNodesToAdd - numNodesToAdd[c] : 0, minNodesToAdd[1 - c]);
+						if (communities[c]->getNumberOfNodes() < minSize) {
+							numNodesToAdd[c] = minSize - communities[c]->getNumberOfNodes();
 						}
 					}
-					assert(numNodesToAdd[0] + numNodesToAdd[1] >= totalNodesToAdd);
-					assert(numNodesToAdd[0] <= nodesToAddTo[0].size());
-					assert(numNodesToAdd[1] <= nodesToAddTo[1].size());
-				}
 
-				for (count c = 0; c < 2; ++c) {
-					for (count i = 0; i < numNodesToAdd[c]; ++i) {
-						const node u = nodesToAddTo[c].at(Aux::Random::index(nodesToAddTo[c].size()));
+					// Second step: add more nodes if we wanted to add more
+					if (numNodesToAdd[0] + numNodesToAdd[1] < totalNodesToAdd) {
+						// How many nodes we need to add additionally
+						count additionalNodes = totalNodesToAdd - numNodesToAdd[0] - numNodesToAdd[1];
+						// How many nodes are available
+						std::array<count, 2> availableNodes {
+							nodesToAddTo[0].size() - numNodesToAdd[0],
+							nodesToAddTo[1].size() - numNodesToAdd[1]
+						};
+						count allAvailableNodes = availableNodes[0] + availableNodes[1];
+						assert(additionalNodes <= allAvailableNodes);
 
-						assert(communities[1-c]->hasNode(u));
-						communities[c]->addNode(u);
-						nodesToAddTo[c].erase(u);
-						++nodesAdded;
+						// What fraction of available nodes we should add
+						double fractionToAdd = additionalNodes * 1.0 / allAvailableNodes;
+
+						// Get this fraction, but round down
+						std::array<count, 2> additionalNodesPerCommunity {
+							// Use integer arithmetic to ensure that there are no rounding errors
+							availableNodes[0] * additionalNodes / allAvailableNodes,
+							availableNodes[1] * additionalNodes / allAvailableNodes
+						};
+
+						// There might be one more node missing, add it
+						if (additionalNodesPerCommunity[0] + additionalNodesPerCommunity[1] < additionalNodes) {
+							// probabilistic rounding with the fraction to add
+							if (Aux::Random::real() < availableNodes[0] * fractionToAdd - additionalNodesPerCommunity[0]) {
+								++additionalNodesPerCommunity[0];
+							} else {
+								++additionalNodesPerCommunity[1];
+							}
+						}
+
+						assert(additionalNodes == additionalNodesPerCommunity[0] + additionalNodesPerCommunity[1]);
+
+						numNodesToAdd[0] += additionalNodesPerCommunity[0];
+						numNodesToAdd[1] += additionalNodesPerCommunity[1];
 					}
 
-					communities[c]->setDesiredNumberOfNodes(communities[c]->getNumberOfNodes());
+					// Third step: add nodes to the community
+					for (count c = 0; c < 2; ++c) {
+						assert(numNodesToAdd[c] <= nodesToAddTo[c].size());
+						// Adjust the size and edge probability before adding nodes
+						communities[c]->setDesiredNumberOfNodes(communities[c]->getNumberOfNodes() + numNodesToAdd[c]);
+
+						// Actually add as many nodes as desired to increase the overlap
+						for (count i = 0; i < numNodesToAdd[c]; ++i) {
+							const node u = nodesToAddTo[c].at(Aux::Random::index(nodesToAddTo[c].size()));
+
+							assert(communities[1-c]->hasNode(u));
+							communities[c]->addNode(u);
+							nodesToAddTo[c].erase(u);
+						}
+					}
 				}
-			}
+			} // if (communitiesMerge)
 
-			if (nodesAdded < totalNodesToAdd || communities[0]->getNumberOfNodes() < minSize) {
-				// Assert the overlap is empty now
-				if (nonOverlappingNodes() > 0) throw std::logic_error("There are nodes not in the overlap but we did not add them even though we should");
-
-				mergeCommunities();
-
-				count numNodesToAdd = totalNodesToAdd - nodesAdded;
-				if (communities[0]->getNumberOfNodes() + numNodesToAdd < minSize) {
-					numNodesToAdd = minSize - communities[0]->getNumberOfNodes();
-				}
-
-				communities[0]->setDesiredNumberOfNodes(communities[0]->getNumberOfNodes() + numNodesToAdd);
-			}
 
 			++currentStep;
 			if (currentStep == numSteps) {
 				mergeCommunities();
 
-				communities[0]->changeEdgeProbability(targetEdgeProbability);
+				assert(communities[0]->getDesiredNumberOfNodes() == targetSize);
+				//communities[0]->changeEdgeProbability(targetEdgeProbability);
 				communities[0]->setCurrentEvent(nullptr);
 				active = false;
 			}
@@ -187,16 +207,11 @@ namespace NetworKit {
 			if (communitiesMerged) return;
 
 			communities[1]->setCurrentEvent(nullptr);
+			while (communities[1]->getNumberOfNodes() > 0) {
+				communities[1]->removeRandomNode();
+			}
 
-			const count oldNodes = communities[0]->getNumberOfNodes();
-			tlx::unused(oldNodes);
-			communities[0]->combineWith(*communities[1]);
 			generator.removeCommunity(communities[1]);
-			assert(communities[0]->getNumberOfNodes() == oldNodes);
-
-			// Set the edge probability to the probability that should match the combined number of edges
-			double probNonEdge = 1.0 - communities[0]->getEdgeProbability();
-			communities[0]->changeEdgeProbability(1.0 - probNonEdge*probNonEdge);
 
 			communitiesMerged = true;
 		}

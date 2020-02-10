@@ -13,8 +13,10 @@ namespace NetworKit {
 			// Ensure that in the last step exactly coreSize nodes are removed.
 			// If there are less than coreSize nodes remaining due to additional node
 			// deletions let the community die earlier.
-			if (currentStep < numSteps - 1 && community->getNumberOfNodes() >= coreSize) {
-				numNodesToRemove = (community->getNumberOfNodes() - coreSize) / (numSteps - 1 - currentStep);
+			if (currentStep < numSteps - 1 && community->getNumberOfNodes() > coreSize) {
+				numNodesToRemove = std::ceil(static_cast<double>(community->getNumberOfNodes() - coreSize) / (numSteps - 1 - currentStep));
+				assert(community->getNumberOfNodes() >= coreSize + numNodesToRemove);
+				assert(numNodesToRemove >= 1);
 			} else {
 				numNodesToRemove = community->getNumberOfNodes();
 			}
@@ -27,7 +29,7 @@ namespace NetworKit {
 
 			++currentStep;
 
-			if (currentStep == numSteps) {
+			if (currentStep == numSteps || community->getNumberOfNodes() == 0) {
 				active = false;
 				community->setCurrentEvent(nullptr);
 				generator.removeCommunity(community);

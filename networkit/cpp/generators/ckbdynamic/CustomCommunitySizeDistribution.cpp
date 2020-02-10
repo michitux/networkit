@@ -59,8 +59,12 @@ namespace NetworKit {
 			if (sequence.empty()) throw std::runtime_error("Error, no communities found in reference.");
 		}
 
-		std::pair<count, double> CustomCommunitySizeDistribution::drawCommunity() {
-			return Aux::Random::choice(sequence);
+		count CustomCommunitySizeDistribution::drawCommunitySize() {
+			return Aux::Random::choice(sequence).first;
+		}
+
+		double CustomCommunitySizeDistribution::getCommunityDensity(count /*size*/) {
+			throw std::runtime_error("Not implemented");
 		}
 
 		double CustomCommunitySizeDistribution::getEpsilon() {

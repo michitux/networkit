@@ -82,6 +82,7 @@ namespace NetworKit {
 		}
 
 		void CKBDynamicImpl::removeCommunity(CommunityPtr com) {
+			assert(com->getNumberOfNodes() == 0);
 			availableCommunities.erase(com);
 			communities.erase(com);
 		}
@@ -167,7 +168,8 @@ namespace NetworKit {
 			Aux::SignalHandler handler;
 
 			// initialization
-			globalCommunity = CommunityPtr(new Community(epsilon, *this));
+			globalCommunity = CommunityPtr(new Community(*this));
+			globalCommunity->changeEdgeProbability(epsilon);
 			communities.erase(globalCommunity);
 			availableCommunities.erase(globalCommunity);
 			currentTimeStep = 0;
@@ -182,11 +184,9 @@ namespace NetworKit {
 
 			while (sumOfDesiredMembers < sumOfDesiredMemberships) {
 				handler.assureRunning();
-				count communitySize;
-				double edgeProbability;
-				std::tie(communitySize, edgeProbability) = communitySizeSampler->drawCommunity();
+				count communitySize = communitySizeSampler->drawCommunitySize();;
 
-				CommunityPtr com(new Community(edgeProbability, *this));
+				CommunityPtr com(new Community(*this));
 				com->setDesiredNumberOfNodes(communitySize);
 				sumOfDesiredMembers += communitySize;
 			}
@@ -208,17 +208,26 @@ namespace NetworKit {
 				INFO("Timestep ", currentTimeStep, " generating ", numCommunityEvents, " community events and ", numNodeEvents, " node events");
 
 				for (count i = 0; i < numCommunityEvents; ++i) {
+					{ // adjust event probabilities
+						const double x = sumOfDesiredMemberships * 1.0 / sumOfDesiredMembers;
+						splitProbability = birthProbability = 0.5 * x / (1 + x);
+						mergeProbability = deathProbability = 0.5 - birthProbability;
+					}
 					handler.assureRunning();
 					count numSteps = sampleNumSteps();
 					double r = Aux::Random::real();
 					if (r < birthProbability) {
 						// generate new community
-						currentEvents.emplace_back(new CommunityBirthEvent(numSteps, *this));
+						count coreSize = communitySizeSampler->getMinSize();
+						count targetSize = communitySizeSampler->drawCommunitySize();
+						sumOfDesiredMembers += targetSize;
+						currentEvents.emplace_back(new CommunityBirthEvent(coreSize, targetSize, numSteps, *this));
 					} else if (r < birthProbability + deathProbability) {
 						// let a community die
 						if (availableCommunities.size() > 0) {
 							CommunityPtr com = availableCommunities.at(Aux::Random::index(availableCommunities.size()));
-							count coreSize = std::max<count>(0.1 * com->getNumberOfNodes(), communitySizeSampler->getMinSize());
+							sumOfDesiredMembers -= com->getDesiredNumberOfNodes();
+							count coreSize = communitySizeSampler->getMinSize();
 							currentEvents.emplace_back(new CommunityDeathEvent(com, coreSize, numSteps, *this));
 							assert(!com->isAvailable());
 						} else {
@@ -228,9 +237,12 @@ namespace NetworKit {
 						// Split a community
 						if (availableCommunities.size() > 0) {
 							CommunityPtr com = availableCommunities.at(Aux::Random::index(availableCommunities.size()));
-							auto comSizeProbA = communitySizeSampler->drawCommunity();
-							auto comSizeProbB = communitySizeSampler->drawCommunity();
-							currentEvents.emplace_back(new CommunitySplitEvent(com, comSizeProbA.first, comSizeProbA.second, comSizeProbB.first, comSizeProbB.second, numSteps, *this));
+							sumOfDesiredMembers -= com->getDesiredNumberOfNodes();
+							count comSizeA = communitySizeSampler->drawCommunitySize();
+							sumOfDesiredMembers += comSizeA;
+							count comSizeB = communitySizeSampler->drawCommunitySize();
+							sumOfDesiredMembers += comSizeB;
+							currentEvents.emplace_back(new CommunitySplitEvent(com, comSizeA, comSizeB, numSteps, *this));
 							assert(!com->isAvailable());
 						} else {
 							WARN("No community available for splitting.");
@@ -245,12 +257,13 @@ namespace NetworKit {
 							}
 
 							CommunityPtr comA = availableCommunities.at(ia);
+							sumOfDesiredMembers -= comA->getDesiredNumberOfNodes();
 							CommunityPtr comB = availableCommunities.at(ib);
+							sumOfDesiredMembers -= comB->getDesiredNumberOfNodes();
 
-							count targetSize;
-							double targetEdgeProbability;
-							std::tie(targetSize, targetEdgeProbability) = communitySizeSampler->drawCommunity();
-							currentEvents.emplace_back(new CommunityMergeEvent(comA, comB, targetSize, targetEdgeProbability, numSteps, *this));
+							count targetSize = communitySizeSampler->drawCommunitySize();
+							sumOfDesiredMembers += targetSize;
+							currentEvents.emplace_back(new CommunityMergeEvent(comA, comB, targetSize, numSteps, *this));
 							assert(!comA->isAvailable());
 							assert(!comB->isAvailable());
 						} else {
@@ -302,10 +315,7 @@ namespace NetworKit {
 
 				// adjust event probabilities
 				{
-					const double x = sumOfDesiredMemberships * 1.0 / currentCommunityMemberships;
-					birthProbability = 0.5 * x / (1 + x);
-					deathProbability = 0.5 - birthProbability;
-					INFO("Current memberships: ", currentCommunityMemberships, " desired: ", sumOfDesiredMemberships, " number of communities: ", communities.size(), " available: ", availableCommunities.size(), " active events ", currentEvents.size());
+					INFO("Current memberships: ", currentCommunityMemberships, " desired: ", sumOfDesiredMemberships, ", desired members after events: ", sumOfDesiredMembers," number of communities: ", communities.size(), " available: ", availableCommunities.size(), " active events ", currentEvents.size());
 				}
 			}
 
@@ -321,6 +331,7 @@ namespace NetworKit {
 
 			for (CommunityPtr com : communities) {
 				const count desired = com->getDesiredNumberOfNodes();
+				assert(desired >= communitySizeSampler->getMinSize());
 				const count actual = com->getNumberOfNodes();
 				assert(actual <= desired);
 
@@ -616,6 +627,15 @@ namespace NetworKit {
 				}
 				assert(nodeCommunities[u].size() <= desiredMemberships[u] || overAssignment > 0);
 			}
+
+			#ifndef NDEBUG
+			for (CommunityPtr com : communities) {
+				const count desired = com->getDesiredNumberOfNodes();
+				assert(desired >= communitySizeSampler->getMinSize());
+				const count actual = com->getNumberOfNodes();
+				assert(actual == desired);
+			}
+			#endif
 		}
 	}
 }

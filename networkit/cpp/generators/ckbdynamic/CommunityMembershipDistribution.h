@@ -7,6 +7,7 @@ namespace NetworKit {
 	namespace CKBDynamicImpl {
 		class CommunityMembershipDistribution {
 		public:
+			virtual ~CommunityMembershipDistribution() = default;
 			virtual count drawMemberships() = 0;
 		};
 	}

@@ -25,7 +25,7 @@ namespace NetworKit {
 			 */
 			Community(const Community& o);
 
-			Community(double edgeProbability, CKBDynamicImpl& generator);
+			Community(CKBDynamicImpl& generator);
 
 			/**
 			 * Remove the given node @a u from the community.
@@ -86,7 +86,14 @@ namespace NetworKit {
 
 			count getDesiredNumberOfNodes() const { return desiredSize; };
 
-			void setDesiredNumberOfNodes(count size) { desiredSize = size; };
+			/**
+			 * Set the desired number of nodes.
+			 *
+			 * This automatically also adjusts the edge probability using the community size sampler.
+			 *
+			 * @param size The desired size
+			 */
+			void setDesiredNumberOfNodes(count size);
 
 			count getNumberOfEdges() const { return edges.size(); };
 

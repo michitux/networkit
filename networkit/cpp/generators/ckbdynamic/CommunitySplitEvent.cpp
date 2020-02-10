@@ -4,7 +4,7 @@
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
-		CommunitySplitEvent::CommunitySplitEvent(CommunityPtr community, count targetSizeA, double targetEdgeProbabilityA, count targetSizeB, double targetEdgeProbabilityB, count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps), targetSize({targetSizeA, targetSizeB}), targetEdgeProbability({targetEdgeProbabilityA, targetEdgeProbabilityB}), communities({community, CommunityPtr(new Community(*community))}) {
+		CommunitySplitEvent::CommunitySplitEvent(CommunityPtr community, count targetSizeA, count targetSizeB, count numSteps, CKBDynamicImpl& generator) : CommunityChangeEvent(generator, numSteps), targetSize({targetSizeA, targetSizeB}), communities({community, CommunityPtr(new Community(*community))}) {
 			std::vector<node> nodes;
 			nodes.reserve(communities[0]->getNumberOfNodes());
 			for (node u : communities[0]->getNodes()) {
@@ -12,6 +12,7 @@ namespace NetworKit {
 			}
 
 			std::shuffle(nodes.begin(), nodes.end(), Aux::Random::getURNG());
+
 
 			while (targetSizeA + targetSizeB < nodes.size()) {
 				// sample a random set of nodes to remove from both
@@ -26,9 +27,12 @@ namespace NetworKit {
 			const count combinedTargetSize = targetSizeA + targetSizeB;
 			assert(combinedTargetSize >= nodes.size());
 			double fractionA = targetSizeA * 1.0 / combinedTargetSize;
-			std::array<count, 2> numNodesToRemove {targetSizeB * nodes.size() / combinedTargetSize, 0};
+			double fractionB = 1.0 - fractionA;
+			std::array<count, 2> numNodesToRemove;
+			numNodesToRemove[0] = fractionB * nodes.size();
 			numNodesToRemove[1] = nodes.size() - numNodesToRemove[0];
 
+			// We rounded a double - check that we did not round in the wrong direction.
 			if (nodes.size() - numNodesToRemove[0] > targetSizeA) {
 				numNodesToRemove[0] = nodes.size() - targetSizeA;
 				numNodesToRemove[1] = nodes.size() - numNodesToRemove[0];
@@ -67,11 +71,10 @@ namespace NetworKit {
 			assert(communities[1]->getNumberOfNodes() - nodesToRemove[1].size() <= targetSize[1]);
 
 			for (count com = 0; com < 2; ++com) {
-				if (communities[com]->getNumberOfNodes() == 0) continue;
-
+				assert(communities[com]->getNumberOfNodes() >= nodesToRemove[com].size());
 				assert(communities[com]->getNumberOfNodes() - nodesToRemove[com].size() <= targetSize[com]);
 
-				const count numNodesToRemove = nodesToRemove[com].size() / (numSteps - currentStep);
+				const count numNodesToRemove = std::ceil(static_cast<double>(nodesToRemove[com].size()) / (numSteps - currentStep));
 				for (count i = 0; i < numNodesToRemove; ++i) {
 					const node u = nodesToRemove[com].at(Aux::Random::index(nodesToRemove[com].size()));
 					nodesToRemove[com].erase(u);
@@ -80,13 +83,11 @@ namespace NetworKit {
 					communities[com]->removeNode(u);
 				}
 
-				adaptProbability(communities[com], targetEdgeProbability[com]);
-
 				count numNodesToAdd = 0;
 
 				// Add nodes to achieve target size, and at least the minimum size in the current step
 				if (targetSize[com] > (communities[com]->getNumberOfNodes() - nodesToRemove[com].size())) {
-					numNodesToAdd = (targetSize[com] + nodesToRemove[com].size() - communities[com]->getNumberOfNodes()) / (numSteps - currentStep);
+					numNodesToAdd = std::ceil(static_cast<double>(targetSize[com] + nodesToRemove[com].size() - communities[com]->getNumberOfNodes()) / (numSteps - currentStep));
 					if (communities[com]->getNumberOfNodes() + numNodesToAdd < generator.communitySizeSampler->getMinSize()) {
 						numNodesToAdd = generator.communitySizeSampler->getMinSize() - communities[com]->getNumberOfNodes();
 					}
@@ -99,6 +100,7 @@ namespace NetworKit {
 			if (currentStep == numSteps) {
 				active = false;
 				for (count com = 0; com < 2; ++com) {
+					assert(communities[com]->getDesiredNumberOfNodes() == targetSize[com]);
 					communities[com]->setCurrentEvent(nullptr);
 				}
 			}

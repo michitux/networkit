@@ -13,11 +13,11 @@ namespace NetworKit {
 			double alpha;
 			double densityGamma;
 
-			double getProbability(count size) const;
 		public:
 			PowerlawCommunitySizeDistribution(count minSize, count maxSize, double gamma, double alpha, double densityGamma);
 
-			virtual std::pair<count, double> drawCommunity() override;
+			virtual count drawCommunitySize() override;
+			virtual double getCommunityDensity(count size) override;
 		};
 	}
 }

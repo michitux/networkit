@@ -11,7 +11,8 @@ namespace NetworKit {
 		public:
 			CustomCommunitySizeDistribution(const Graph &G, const Cover &C);
 
-			virtual std::pair<count, double> drawCommunity() override;
+			virtual count drawCommunitySize() override;
+			virtual double getCommunityDensity(count size) override;
 			double getEpsilon();
 		private:
 			std::vector<std::pair<count, double>> sequence;

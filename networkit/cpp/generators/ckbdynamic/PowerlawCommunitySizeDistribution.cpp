@@ -8,16 +8,14 @@ namespace NetworKit {
 			sequence.run();
 		}
 
-		double PowerlawCommunitySizeDistribution::getProbability(count size) const {
+		double PowerlawCommunitySizeDistribution::getCommunityDensity(count size) {
 			double prob = alpha / std::pow(size, densityGamma);
 			if (prob > 1 || size <= 2) prob = 1;
 			return prob;
 		}
 
-		std::pair<count, double> PowerlawCommunitySizeDistribution::drawCommunity() {
-			count size = sequence.getDegree();
-			double probability = getProbability(size);
-			return std::make_pair(size, probability);
+		count PowerlawCommunitySizeDistribution::drawCommunitySize() {
+			return sequence.getDegree();
 		}
 	}
 

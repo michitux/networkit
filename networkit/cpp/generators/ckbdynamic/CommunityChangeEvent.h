@@ -10,13 +10,13 @@ namespace NetworKit {
 		class CommunityChangeEvent {
 		public:
 			CommunityChangeEvent(CKBDynamicImpl& generator, count numSteps);
+			virtual ~CommunityChangeEvent() = default;
 			virtual void nextStep() = 0;
 			virtual void notifyNodeAddedToCommunity(node, CommunityPtr);
 			virtual void notifyNodeRemovedFromCommunity(node, CommunityPtr);
 			bool isActive() { return active; };
 			virtual bool canRemoveNode() const;
 		protected:
-			void adaptProbability(CommunityPtr com, double targetProb);
 			bool active;
 			count numSteps;
 			count currentStep;

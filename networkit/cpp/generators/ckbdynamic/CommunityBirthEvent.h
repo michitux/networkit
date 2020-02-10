@@ -13,7 +13,7 @@ namespace NetworKit {
 		 */
 		class CommunityBirthEvent : public CommunityChangeEvent {
 		public:
-			CommunityBirthEvent(count coreSize, count targetSize, double edgeProbability, count numSteps, CKBDynamicImpl& generator);
+			CommunityBirthEvent(count coreSize, count targetSize, count numSteps, CKBDynamicImpl& generator);
 			CommunityBirthEvent(count numSteps, CKBDynamicImpl& generator);
 			virtual void nextStep() override;
 		private:

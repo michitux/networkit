@@ -8,7 +8,9 @@ namespace NetworKit {
 		class CommunitySizeDistribution {
 		public:
 			CommunitySizeDistribution(count minSize, count maxSize) : minSize(minSize), maxSize(maxSize) {};
-			virtual std::pair<count, double> drawCommunity() = 0;
+			virtual ~CommunitySizeDistribution() = default;
+			virtual count drawCommunitySize() = 0;
+			virtual double getCommunityDensity(count size) = 0;
 			count getMinSize() const { return minSize; };
 			count getMaxSize() const { return maxSize; };
 		protected:
