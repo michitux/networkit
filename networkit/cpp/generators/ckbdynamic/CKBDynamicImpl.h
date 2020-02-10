@@ -49,7 +49,7 @@ namespace NetworKit {
 
 			Aux::SamplingSet<CommunityPtr> availableCommunities;
 			Aux::SamplingSet<CommunityPtr> communities;
-			std::vector<std::unordered_set<CommunityPtr>> nodeCommunities;
+			std::vector<Aux::SamplingSet<CommunityPtr>> nodeCommunities;
 			CommunityPtr globalCommunity;
 			count maxCommunityId;
 
