@@ -51,7 +51,7 @@ namespace NetworKit {
 			std::vector<index> deathTime(birthTime.size(), none);
 
 			std::unordered_set<std::pair<node, node>, NodePairHash> freshlyAddedEdges;
-			std::unordered_set<std::pair<index, node>, NodePairHash> freshlyJoinedCommunities;
+			std::unordered_map<std::pair<index, node>, count, NodePairHash> freshlyJoinedCommunities;
 
 			std::vector<std::pair<node, node>> edgesAdded, edgesRemoved;
 			for (index timestep = 0; timestep < initialEvents.size(); ++timestep) {
@@ -138,20 +138,29 @@ namespace NetworKit {
 				freshlyAddedEdges.clear();
 
 				for (std::pair<node, index> nodeCom : initialEvents[timestep].nodeJoinsCommunity) {
-					freshlyJoinedCommunities.insert(nodeCom);
+					// Nodes might be added several times to the same community.
+					// A possible reason is that during a split event, first the community is duplicated and thus a node joins it.
+					// Then, it is removed from the community to remove overlap.
+					// Later, it is added again because more nodes shall be added to the community.
+					++freshlyJoinedCommunities[nodeCom];
 				}
 
 				for (std::pair<node, index> nodeCom : initialEvents[timestep].nodeLeavesCommunity) {
 					auto eit = freshlyJoinedCommunities.find(nodeCom);
 					if (eit != freshlyJoinedCommunities.end()) {
-						freshlyJoinedCommunities.erase(eit);
+						if (eit->second > 1) {
+							eit->second--;
+						} else {
+							freshlyJoinedCommunities.erase(eit);
+						}
 					} else {
 						communityEvents.emplace_back(CommunityEvent::NODE_LEAVES_COMMUNITY, nodeCom.first, nodeCom.second);
 					}
 				}
 
 				for (auto it : freshlyJoinedCommunities) {
-					communityEvents.emplace_back(CommunityEvent::NODE_JOINS_COMMUNITY, it.first, it.second);
+					assert(it.second == 1);
+					communityEvents.emplace_back(CommunityEvent::NODE_JOINS_COMMUNITY, it.first.first, it.first.second);
 				}
 
 				freshlyJoinedCommunities.clear();
