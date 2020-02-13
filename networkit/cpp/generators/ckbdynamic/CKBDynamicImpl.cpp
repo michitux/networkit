@@ -495,6 +495,7 @@ namespace NetworKit {
 							count communitiesToFind = numInitialCommunitiesToAssign[lu] - freshAssignments[lu].size();
 							index last_empty = communitiesByDesiredMembers.size();
 							for (index i = 0; i < communitiesByDesiredMembers.size() && communitiesToFind > 0; ++i) {
+								// Iterate from back to front
 								const index ci = communitiesByDesiredMembers.size() - i - 1;
 								const CommunityPtr &com = communitiesByDesiredMembers[ci].first;
 								count &missing = communitiesByDesiredMembers[ci].second;
@@ -509,12 +510,16 @@ namespace NetworKit {
 									}
 								}
 
+								// Store the last community that is full
 								if (missing == 0) {
 									last_empty = ci;
 								}
 							}
 
+							// If we found a full community, eliminate any full communities to ensure we do not iterate over them again and again
+							// Note that this only iterates over communities that were already touched in the previous loop
 							if (last_empty < communitiesByDesiredMembers.size()) {
+								// Shift everything to the front
 								index wi = last_empty;
 								for (index ri = last_empty; ri < communitiesByDesiredMembers.size(); ++ri) {
 									if (communitiesByDesiredMembers[ri].second > 0) {
@@ -523,6 +528,7 @@ namespace NetworKit {
 									}
 								}
 
+								// Remove the remaining entries
 								while (communitiesByDesiredMembers.size() > wi) {
 									communitiesByDesiredMembers.pop_back();
 								}
