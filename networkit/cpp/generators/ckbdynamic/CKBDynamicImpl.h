@@ -38,7 +38,6 @@ namespace NetworKit {
 			void eraseNode();
 
 			index nextCommunityId();
-			count sampleNumSteps() const;
 
 			bool hasNode(node u) const { return nodesAlive.contains(u); };
 
@@ -66,6 +65,7 @@ namespace NetworKit {
 			double perturbationProbability;
 			double epsilon;
 			double edgeSharpness;
+			count tEffect;
 			count numTimesteps;
 			count currentCommunityMemberships;
 			std::vector<std::unique_ptr<CommunityChangeEvent>> currentEvents;

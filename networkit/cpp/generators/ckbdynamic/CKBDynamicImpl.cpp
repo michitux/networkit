@@ -106,6 +106,7 @@ namespace NetworKit {
 			perturbationProbability(params.perturbationProbability),
 			epsilon(params.epsilon),
 			edgeSharpness(params.edgeSharpness),
+			tEffect(params.tEffect),
 			numTimesteps(params.numTimesteps),
 			currentCommunityMemberships(0) {
 
@@ -156,11 +157,6 @@ namespace NetworKit {
 			globalCommunity->removeNode(u);
 			eventStream.removeNode(currentTimeStep, u);
 		}
-
-		count CKBDynamicImpl::sampleNumSteps() const {
-			return Aux::Random::integer(5, 15);
-		}
-
 
 		void CKBDynamicImpl::run() {
 			if (hasRun) throw std::runtime_error("Error, run has already been called");
@@ -214,21 +210,20 @@ namespace NetworKit {
 						mergeProbability = deathProbability = 0.5 - birthProbability;
 					}
 					handler.assureRunning();
-					count numSteps = sampleNumSteps();
 					double r = Aux::Random::real();
 					if (r < birthProbability) {
 						// generate new community
 						count coreSize = communitySizeSampler->getMinSize();
 						count targetSize = communitySizeSampler->drawCommunitySize();
 						sumOfDesiredMembers += targetSize;
-						currentEvents.emplace_back(new CommunityBirthEvent(coreSize, targetSize, numSteps, *this));
+						currentEvents.emplace_back(new CommunityBirthEvent(coreSize, targetSize, tEffect, *this));
 					} else if (r < birthProbability + deathProbability) {
 						// let a community die
 						if (availableCommunities.size() > 0) {
 							CommunityPtr com = availableCommunities.at(Aux::Random::index(availableCommunities.size()));
 							sumOfDesiredMembers -= com->getDesiredNumberOfNodes();
 							count coreSize = communitySizeSampler->getMinSize();
-							currentEvents.emplace_back(new CommunityDeathEvent(com, coreSize, numSteps, *this));
+							currentEvents.emplace_back(new CommunityDeathEvent(com, coreSize, tEffect, *this));
 							assert(!com->isAvailable());
 						} else {
 							WARN("No community available for death event.");
@@ -242,7 +237,7 @@ namespace NetworKit {
 							sumOfDesiredMembers += comSizeA;
 							count comSizeB = communitySizeSampler->drawCommunitySize();
 							sumOfDesiredMembers += comSizeB;
-							currentEvents.emplace_back(new CommunitySplitEvent(com, comSizeA, comSizeB, numSteps, *this));
+							currentEvents.emplace_back(new CommunitySplitEvent(com, comSizeA, comSizeB, tEffect, *this));
 							assert(!com->isAvailable());
 						} else {
 							WARN("No community available for splitting.");
@@ -263,7 +258,7 @@ namespace NetworKit {
 
 							count targetSize = communitySizeSampler->drawCommunitySize();
 							sumOfDesiredMembers += targetSize;
-							currentEvents.emplace_back(new CommunityMergeEvent(comA, comB, targetSize, numSteps, *this));
+							currentEvents.emplace_back(new CommunityMergeEvent(comA, comB, targetSize, tEffect, *this));
 							assert(!comA->isAvailable());
 							assert(!comB->isAvailable());
 						} else {

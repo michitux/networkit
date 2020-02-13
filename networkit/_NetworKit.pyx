@@ -2992,17 +2992,17 @@ cdef class LFRGenerator(Algorithm):
 
 cdef extern from "cpp/generators/CKBDynamic.h":
 	cdef cppclass _CKBDynamic "NetworKit::CKBDynamic"(_Algorithm):
-		_CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, double edgeSharpness, count numTimesteps) except +
-		_CKBDynamic(count n, _Graph G, _Cover C, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double edgeSharpness, count numTimesteps) except +
+		_CKBDynamic(count n, count minCommunitySize, count maxCommunitySize, double communitySizeExponent, count minCommunityMembership, count maxCommunityMembership, double communityMembershipExponent, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double intraCommunityEdgeProbability, double intraCommunityEdgeExponent, double epsilon, double edgeSharpness, count tEffect, count numTimesteps) except +
+		_CKBDynamic(count n, _Graph G, _Cover C, double communityEventProbability, double nodeEventProbability, double perturbationProbability, double edgeSharpness, count tEffect, count numTimesteps) except +
 		vector[_GraphEvent] getGraphEvents() nogil except +
 		vector[_CommunityEvent] getCommunityEvents() nogil except +
 
 cdef class CKBDynamic(Algorithm):
 	def __cinit__(self, count n, **args):
 		if 'G' in args:
-			self._this = new _CKBDynamic(n, (<Graph?>args['G'])._this, (<Cover?>args['C'])._this, args['communityEventProbability'], args['nodeEventProbability'], args['perturbationProbability'], args['edgeSharpness'], args['numTimeSteps'])
+			self._this = new _CKBDynamic(n, (<Graph?>args['G'])._this, (<Cover?>args['C'])._this, args['communityEventProbability'], args['nodeEventProbability'], args['perturbationProbability'], args['edgeSharpness'], args['tEffect'], args['numTimeSteps'])
 		else:
-			self._this = new _CKBDynamic(n, args['minCommunitySize'], args['maxCommunitySize'], args['communitySizeExponent'], args['minCommunityMembership'], args['maxCommunityMembership'], args['communityMembershipExponent'], args['communityEventProbability'], args['nodeEventProbability'], args['perturbationProbability'], args['intraCommunityEdgeProbability'], args['intraCommunityEdgeExponent'], args['epsilon'], args['edgeSharpness'], args['numTimesteps'])
+			self._this = new _CKBDynamic(n, args['minCommunitySize'], args['maxCommunitySize'], args['communitySizeExponent'], args['minCommunityMembership'], args['maxCommunityMembership'], args['communityMembershipExponent'], args['communityEventProbability'], args['nodeEventProbability'], args['perturbationProbability'], args['intraCommunityEdgeProbability'], args['intraCommunityEdgeExponent'], args['epsilon'], args['edgeSharpness'], args['tEffect'], args['numTimesteps'])
 
 	def getGraphEvents(self):
 		cdef _GraphEvent ev

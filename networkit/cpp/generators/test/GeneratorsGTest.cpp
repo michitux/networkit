@@ -1120,13 +1120,14 @@ TEST_F(GeneratorsGTest, testMocnikGeneratorBasic) {
 
 TEST_F(GeneratorsGTest, testCKBDynamic) {
 	Aux::Random::setSeed(41, false);
-	CKBDynamic gen(1000, 10, 100, -2, 1, 10, -2, 0.05, 0.001, 0.01, 2, 0.5, 0.001, 0.5, 1000);
+	CKBDynamic gen(1000, 10, 100, -2, 1, 10, -2, 0.05, 0.001, 0.01, 2, 0.5, 0.001, 0.5, 10, 1000);
 	gen.run();
 }
 
 TEST_F(GeneratorsGTest, benchCKBDynamic) {
 	Aux::Random::setSeed(42, false);
-	CKBDynamic gen(10000, 10, 100, -1, 1, 10, -1, 0.01, 0.001, 0.01, 2, 0.5, 0.001, 0.5, 1000);
+	count n = 10000;
+	CKBDynamic gen(n, 10, n/10, -2.5, 1, n/10, -2.5, 0.01, 0.001, 0.01, 2, 0.5, 2.0/n, 0.8, 10, 1000);
 	gen.run();
 }
 
