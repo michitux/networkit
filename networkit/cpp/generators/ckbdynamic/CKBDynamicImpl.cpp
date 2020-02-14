@@ -110,6 +110,11 @@ namespace NetworKit {
 				membershipDistribution.reset(new PowerlawCommunityMembershipDistribution(params.minCommunityMembership, params.maxCommunityMembership, params.communityMembershipExponent));
 			}
 
+			double expectedNumberOfCommunities = membershipDistribution->getAverageMemberships() * n / communitySizeSampler->getAverageSize();
+			if (expectedNumberOfCommunities < membershipDistribution->getMaximumMemberships()) {
+				throw std::runtime_error("Error: Graph impossible to realize, in expectation, there will be " + std::to_string(expectedNumberOfCommunities) + " communities but there may be a node that wants to be part of " + std::to_string(membershipDistribution->getMaximumMemberships()) + " communities.");
+			}
+
 		}
 
 		std::vector<GraphEvent> CKBDynamicImpl::getGraphEvents() {

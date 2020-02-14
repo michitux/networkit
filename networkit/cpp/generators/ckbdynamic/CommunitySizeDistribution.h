@@ -12,9 +12,11 @@ namespace NetworKit {
 			virtual count drawCommunitySize() = 0;
 			virtual double getCommunityDensity(count size) = 0;
 			count getMinSize() const { return minSize; };
+			double getAverageSize() const { return avgSize; };
 			count getMaxSize() const { return maxSize; };
 		protected:
 			count minSize;
+			double avgSize;
 			count maxSize;
 		};
 	}

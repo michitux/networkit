@@ -40,9 +40,12 @@ namespace NetworKit {
 
 			epsilon = globalEdges * 2.0 / (G.numberOfNodes() * (G.numberOfNodes() - 1));
 
+			count sum = 0;
+
 			sequence.reserve(communityNodesEdges.size());
 			for (auto it : communityNodesEdges) {
 				const count size = it.second.first;
+				sum += size;
 				const count edges = it.second.second;
 				const double density = edges * 2.0 / (size * (size - 1));
 				sequence.emplace_back(size, density);
@@ -57,6 +60,8 @@ namespace NetworKit {
 			}
 
 			if (sequence.empty()) throw std::runtime_error("Error, no communities found in reference.");
+
+			avgSize = sum * 1.0 / sequence.size();
 		}
 
 		count CustomCommunitySizeDistribution::drawCommunitySize() {
