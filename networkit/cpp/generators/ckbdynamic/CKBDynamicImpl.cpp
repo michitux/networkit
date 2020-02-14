@@ -12,16 +12,6 @@
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
-		namespace {
-			/**
-			 * Returns number of steps you need to wait until the next success (edge) occurs.
-			 */
-			count get_next_edge_distance(const double log_cp) {
-				return static_cast<count>(1 + floor(log(1.0 - Aux::Random::probability()) / log_cp));
-			}
-
-		}
-
 		void CKBDynamicImpl::addEdge(node u, node v, bool nodeJoined) {
 			auto e = Community::canonicalEdge(u, v);
 			index ts = currentTimeStep;
