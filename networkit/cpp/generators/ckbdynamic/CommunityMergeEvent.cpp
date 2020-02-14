@@ -217,6 +217,7 @@ namespace NetworKit {
 		}
 
 		void CommunityMergeEvent::notifyNodeRemovedFromCommunity(node u, CommunityPtr com) {
+			tlx::unused(com);
 			assert(com == communities[0] || com == communities[1]);
 
 			for (count c = 0; c < 2; ++c) {
@@ -225,6 +226,8 @@ namespace NetworKit {
 		}
 
 		void CommunityMergeEvent::notifyNodeAddedToCommunity(node u, CommunityPtr com) {
+			tlx::unused(u);
+			tlx::unused(com);
 			if (!communitiesMerged) {
 				if (com == communities[0]) {
 					assert(nodesToAddTo[0].contains(u));
