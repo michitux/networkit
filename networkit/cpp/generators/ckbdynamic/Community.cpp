@@ -16,7 +16,7 @@ namespace NetworKit {
 
 		}
 
-		Community::Community(const Community& o) : id(o.generator.nextCommunityId()), desiredSize(o.desiredSize), edges(o.edges), nonEdges(o.nonEdges), nodes(o.nodes), neighbors(o.neighbors), edgeProbability(o.edgeProbability), storeNonEdges(o.storeNonEdges), generator(o.generator), currentEvent(o.currentEvent) {
+		Community::Community(const Community& o) : tlx::ReferenceCounter(), id(o.generator.nextCommunityId()), desiredSize(o.desiredSize), edges(o.edges), nonEdges(o.nonEdges), nodes(o.nodes), neighbors(o.neighbors), edgeProbability(o.edgeProbability), storeNonEdges(o.storeNonEdges), generator(o.generator), currentEvent(o.currentEvent) {
 
 			for (auto e : edges) {
 				generator.addEdge(e.first, e.second, false);
@@ -43,6 +43,7 @@ namespace NetworKit {
 		}
 
 		void Community::verifyInvariants() const {
+			#ifndef NDEBUG
 			if (storeNonEdges) {
 				for (auto e : edges) {
 					assert(canonicalEdge(e.first, e.second) == e);
@@ -59,6 +60,7 @@ namespace NetworKit {
 
 				assert(nonEdges.size() + edges.size() == getMaximumNumberOfEdges());
 			}
+			#endif
 		}
 
 		void Community::removeEdge(node u, node v, bool nodeLeft) {
