@@ -120,6 +120,15 @@ else()
 			"Please run `git submodule update --init` to fetch the submodule.")
 endif()
 
+# Use robin_map as a CMake submodule
+if(EXISTS "${PROJECT_SOURCE_DIR}/extlibs/robin_map/CMakeLists.txt")
+	add_subdirectory(extlibs/robin_map)
+else()
+	message(FATAL_ERROR
+			"Missing robin_map library in extlibs/robin_map "
+			"Please run `git submodule update --init` to fetch the submodule.")
+endif()
+
 ################################################################################
 #include symlink
 if(NETWORKIT_INCLUDESYMLINK)
@@ -149,7 +158,7 @@ if(NETWORKIT_BUILD_CORE AND NETWORKIT_MONOLITH)
 			LIBRARY DESTINATION .
 			ARCHIVE DESTINATION .)
 
-	target_link_libraries(networkit PRIVATE tlx)
+	target_link_libraries(networkit PRIVATE tlx tsl::robin_map)
 endif()
 
 if(NETWORKIT_PYTHON)
@@ -164,9 +173,9 @@ if(NETWORKIT_PYTHON)
 		if(NOT EXTERNAL_NETWORKIT_CORE)
 			message(FATAL_ERROR "Core build is disabled but no external core library was found.")
 		endif()
-		target_link_libraries(_NetworKit PRIVATE ${EXTERNAL_NETWORKIT_CORE} tlx)
+		target_link_libraries(_NetworKit PRIVATE ${EXTERNAL_NETWORKIT_CORE} tlx tsl::robin_map)
 	else()
-		target_link_libraries(_NetworKit PRIVATE networkit tlx)
+		target_link_libraries(_NetworKit PRIVATE networkit tlx tsl::robin_map)
 	endif()
 
 	set_target_properties(_NetworKit PROPERTIES
@@ -209,7 +218,7 @@ function(networkit_add_module modname)
 			COMPILE_FLAGS "${NETWORKIT_CXX_FLAGS}"
 			LINK_FLAGS "${NETWORKIT_LINK_FLAGS}")
 
-		target_link_libraries(${MODULE_TARGET} PRIVATE tlx)
+		target_link_libraries(${MODULE_TARGET} PRIVATE tlx tsl::robin_map)
 
 		# All tests added to this module will will also become a dependency
 		# of networkit_tests_MODNAME. This target hence allows to build all
@@ -296,6 +305,7 @@ if (NETWORKIT_BUILD_TESTS)
 				gtest
 				networkit
 				tlx
+				tsl::robin_map
 		)
 
 		set_target_properties(networkit_tests PROPERTIES
@@ -351,6 +361,7 @@ function(networkit_add_extra IS_TEST MOD NAME)
 				PRIVATE
 					networkit_${MOD}
 					tlx
+					tsl::robin_map
 					)
 			set_target_properties(${TARGET_NAME} PROPERTIES
 				CXX_STANDARD ${NETWORKIT_CXX_STANDARD}

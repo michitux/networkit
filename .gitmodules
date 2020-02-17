@@ -4,3 +4,6 @@
 [submodule "extlibs/tlx"]
 	path = extlibs/tlx
 	url = https://github.com/tlx/tlx
+[submodule "extlibs/robin_map"]
+	path = extlibs/robin_map
+	url = https://github.com/Tessil/robin-map.git

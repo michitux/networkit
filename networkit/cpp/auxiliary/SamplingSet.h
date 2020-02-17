@@ -2,13 +2,13 @@
 #define SAMPLING_SET_H_
 
 #include <vector>
-#include <unordered_map>
+#include <tsl/robin_map.h>
 
 namespace Aux {
 	template <class Key, class Hash = std::hash<Key>>
 	class SamplingSet {
 	private:
-		std::unordered_map<Key, size_t, Hash> positions;
+		tsl::robin_map<Key, size_t, Hash> positions;
 		std::vector<Key> elements;
 
 	public:

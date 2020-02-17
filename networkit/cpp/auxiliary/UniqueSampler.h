@@ -4,7 +4,7 @@
 #include "../Globals.h"
 #include <random>
 #include "Random.h"
-#include <unordered_map>
+#include <tsl/robin_map.h>
 
 namespace Aux {
 	using NetworKit::count;
@@ -17,7 +17,7 @@ namespace Aux {
 		private:
 			std::uniform_int_distribution<count> dist;
 			count max, i;
-			std::unordered_map<count, count> replace;
+			tsl::robin_map<count, count> replace;
 		};
 
 }

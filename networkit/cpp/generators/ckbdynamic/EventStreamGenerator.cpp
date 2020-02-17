@@ -1,7 +1,8 @@
 #include "EventStreamGenerator.h"
 #include "NodePairHash.h"
-#include <unordered_map>
 #include "Community.h"
+#include <tsl/robin_map.h>
+#include <tsl/robin_set.h>
 
 
 namespace NetworKit {
@@ -47,11 +48,11 @@ namespace NetworKit {
 		}
 
 		void EventStreamGenerator::run() {
-			std::vector<std::unordered_map<node, count>> neighbors(birthTime.size());
+			std::vector<tsl::robin_map<node, count>> neighbors(birthTime.size());
 			std::vector<index> deathTime(birthTime.size(), none);
 
-			std::unordered_set<std::pair<node, node>, NodePairHash> freshlyAddedEdges;
-			std::unordered_map<std::pair<index, node>, count, NodePairHash> freshlyJoinedCommunities;
+			tsl::robin_set<std::pair<node, node>, NodePairHash> freshlyAddedEdges;
+			tsl::robin_map<std::pair<index, node>, count, NodePairHash> freshlyJoinedCommunities;
 
 			std::vector<std::pair<node, node>> edgesAdded, edgesRemoved;
 			for (index timestep = 0; timestep < initialEvents.size(); ++timestep) {
@@ -67,10 +68,10 @@ namespace NetworKit {
 							neighbors[e.second].emplace(e.first, 1);
 							freshlyAddedEdges.insert(e);
 						} else {
-							++(it->second);
+							++(it.value());
 							it = neighbors[e.second].find(e.first);
 							assert(it != neighbors[e.second].end());
-							++(it->second);
+							++(it.value());
 						}
 					}
 				}
@@ -83,7 +84,7 @@ namespace NetworKit {
 					} else {
 						auto it = neighbors[e.first].find(e.second);
 						assert(it != neighbors[e.first].end());
-						--(it->second);
+						--(it.value());
 
 						if (it->second == 0) {
 							neighbors[e.first].erase(it);
@@ -97,7 +98,7 @@ namespace NetworKit {
 
 						it = neighbors[e.second].find(e.first);
 						assert(it != neighbors[e.second].end());
-						--(it->second);
+						--(it.value());
 
 						if (it->second == 0) {
 							assert(neighbors[e.first].find(e.second) == neighbors[e.first].end());
@@ -149,7 +150,7 @@ namespace NetworKit {
 					auto eit = freshlyJoinedCommunities.find(nodeCom);
 					if (eit != freshlyJoinedCommunities.end()) {
 						if (eit->second > 1) {
-							eit->second--;
+							eit.value()--;
 						} else {
 							freshlyJoinedCommunities.erase(eit);
 						}

@@ -6,6 +6,7 @@
 #include "../../Globals.h"
 #include "../../auxiliary/SamplingSet.h"
 #include "NodePairHash.h"
+#include <tsl/robin_map.h>
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
@@ -129,7 +130,7 @@ namespace NetworKit {
 			// only used if edgeProbability > 0.5.
 			Aux::SamplingSet<std::pair<node, node>, NodePairHash> nonEdges;
 			Aux::SamplingSet<node> nodes;
-			std::unordered_map<node, Aux::SamplingSet<node>> neighbors;
+			tsl::robin_map<node, Aux::SamplingSet<node>> neighbors;
 			double edgeProbability;
 			bool storeNonEdges;
 			CKBDynamicImpl& generator;
