@@ -568,6 +568,7 @@ namespace NetworKit {
 
 			// third step: randomize community assignments of nodesParticipating, balance assignments if there were over-assignments.
 
+			std::vector<CommunityPtr> communitiesToShuffle;
 			for (count round = 0; round < 100; ++round) {
 				std::shuffle(nodesParticipating.begin(), nodesParticipating.end(), Aux::Random::getURNG());
 
@@ -575,7 +576,7 @@ namespace NetworKit {
 					const std::array<node, 2> ln {nodesParticipating[i], nodesParticipating[i+1]};
 					const std::array<node, 2> uv {nodesByDesiredMemberships[ln[0]], nodesByDesiredMemberships[ln[1]]};
 
-					std::vector<CommunityPtr> communitiesToShuffle;
+					communitiesToShuffle.clear();
 					for (count j = 0; j < 2; ++j) {
 						for (const CommunityPtr& com : freshAssignments[ln[j]]) {
 							if (!freshAssignments[ln[1-j]].contains(com) && !com->hasNode(uv[1-j])) {
@@ -585,7 +586,7 @@ namespace NetworKit {
 						}
 					}
 
-					if (communitiesToShuffle.size() > 0) {
+					if (!communitiesToShuffle.empty()) {
 						std::shuffle(communitiesToShuffle.begin(), communitiesToShuffle.end(), Aux::Random::getURNG());
 
 						// Calculate the percentage of the desired memberships we would get if we assigned the community
