@@ -18,17 +18,13 @@ namespace Aux {
 		const_iterator end() const { return elements.cend(); }
 
 		size_t insert(const Key& e) {
-			if (contains(e)) return 0;
+			bool inserted = positions.try_emplace(e, elements.size()).second;
 
-			elements.push_back(e);
-			try {
-				positions[e] = elements.size() - 1;
-			} catch (...) {
-				elements.pop_back();
-				throw;
+			if (inserted) {
+				elements.push_back(e);
 			}
 
-			return 1;
+			return inserted;
 		}
 
 		size_t erase(const Key& e) {
