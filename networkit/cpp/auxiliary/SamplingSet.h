@@ -61,6 +61,11 @@ namespace Aux {
 			positions.clear();
 			elements.clear();
 		}
+
+		void reserve(size_t n) {
+			positions.reserve(n);
+			elements.reserve(n);
+		}
 	};
 }
 

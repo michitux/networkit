@@ -49,13 +49,15 @@ namespace NetworKit {
 
 		void EventStreamGenerator::run() {
 			std::vector<tsl::robin_map<node, count>> neighbors(birthTime.size());
+			for (auto &it : neighbors) {
+				it.min_load_factor(0.05);
+			}
 			std::vector<index> deathTime(birthTime.size(), none);
 
-			tsl::robin_set<std::pair<node, node>, NodePairHash> freshlyAddedEdges;
-			tsl::robin_map<std::pair<index, node>, count, NodePairHash> freshlyJoinedCommunities;
-
-			std::vector<std::pair<node, node>> edgesAdded, edgesRemoved;
 			for (index timestep = 0; timestep < initialEvents.size(); ++timestep) {
+				tsl::robin_set<std::pair<node, node>, NodePairHash> freshlyAddedEdges;
+				freshlyAddedEdges.reserve(initialEvents[timestep].edgesAdded.size());
+
 				for (std::pair<node, node> e : initialEvents[timestep].edgesAdded) {
 					index maxBirth = std::max(birthTime[e.first], birthTime[e.second]);
 					if (maxBirth > timestep) {
@@ -136,7 +138,8 @@ namespace NetworKit {
 					graphEvents.emplace_back(GraphEvent::EDGE_ADDITION, it.first, it.second);
 				}
 
-				freshlyAddedEdges.clear();
+				tsl::robin_map<std::pair<index, node>, count, NodePairHash> freshlyJoinedCommunities;
+				freshlyJoinedCommunities.reserve(initialEvents[timestep].nodeJoinsCommunity.size());
 
 				for (std::pair<node, index> nodeCom : initialEvents[timestep].nodeJoinsCommunity) {
 					// Nodes might be added several times to the same community.
@@ -163,8 +166,6 @@ namespace NetworKit {
 					assert(it.second == 1);
 					communityEvents.emplace_back(CommunityEvent::NODE_JOINS_COMMUNITY, it.first.first, it.first.second);
 				}
-
-				freshlyJoinedCommunities.clear();
 
 				graphEvents.emplace_back(GraphEvent::TIME_STEP);
 				communityEvents.emplace_back(CommunityEvent::TIME_STEP);

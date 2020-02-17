@@ -34,6 +34,7 @@ namespace NetworKit {
 
 
 		Community::Community(CKBDynamicImpl& generator) : id(generator.nextCommunityId()), desiredSize(0), edgeProbability(0), storeNonEdges(edgeProbability > 0.6), generator(generator), currentEvent(nullptr) {
+			neighbors.min_load_factor(0.05);
 			generator.addCommunity(CommunityPtr(this));
 		}
 
@@ -151,7 +152,8 @@ namespace NetworKit {
 				verifyInvariants();
 			}
 
-			neighbors.try_emplace(u);
+			auto nu = neighbors.try_emplace(u).first;
+			nu.value().min_load_factor(0.05);
 			const double log_cp = std::log(1.0 - edgeProbability);
 
 			for (node next = get_next_edge_distance(log_cp) - 1; next < nodes.size(); next += get_next_edge_distance(log_cp)) {
@@ -299,7 +301,7 @@ namespace NetworKit {
 				nonEdges.clear();
 				storeNonEdges = false;
 			} else if (prob > 0.6 && !storeNonEdges) {
-
+				nonEdges.reserve(getMaximumNumberOfEdges() - edges.size());
 				for (index i = 0; i < nodes.size(); ++i) {
 					const node u = nodes.at(i);
 					for (index j = i + 1; j < nodes.size(); ++j) {
