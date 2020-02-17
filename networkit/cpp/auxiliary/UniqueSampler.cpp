@@ -16,7 +16,9 @@ namespace Aux {
 		if (iit == replace.end()) {
 			replace[r] = i;
 		} else {
-			replace[r] = iit->second;
+			// Inserts invalidate all iterators - cache value to avoid invalid read
+			count v = iit->second;
+			replace[r] = v;
 		}
 
 		++i;
