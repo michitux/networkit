@@ -17,7 +17,7 @@ namespace Aux {
 		const_iterator begin() const { return elements.cbegin(); }
 		const_iterator end() const { return elements.cend(); }
 
-		size_t insert(Key e) {
+		size_t insert(const Key& e) {
 			if (contains(e)) return 0;
 
 			elements.push_back(e);
@@ -31,7 +31,7 @@ namespace Aux {
 			return 1;
 		}
 
-		size_t erase(Key e) {
+		size_t erase(const Key& e) {
 			auto it = positions.find(e);
 			if (it == positions.end()) return 0;
 
@@ -45,7 +45,7 @@ namespace Aux {
 			return 1;
 		}
 
-		bool contains(Key e) const {
+		bool contains(const Key& e) const {
 			return (positions.find(e) != positions.end());
 		}
 
