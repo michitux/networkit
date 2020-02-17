@@ -7,6 +7,7 @@
 #include "../../auxiliary/SamplingSet.h"
 #include "NodePairHash.h"
 #include <tsl/robin_map.h>
+#include <tsl/robin_set.h>
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
@@ -112,7 +113,7 @@ namespace NetworKit {
 
 			bool canRemoveNode() const;
 		private:
-			void removeEdge(node u, node v, bool nodeLeft);
+			void removeEdge(node u, node v, bool nodeLeft, bool noEraseUNeighbors = false);
 			void addEdge(node u, node v, bool nodeJoined);
 
 			void removeRandomEdges(count k);
@@ -130,7 +131,7 @@ namespace NetworKit {
 			// only used if edgeProbability > 0.5.
 			Aux::SamplingSet<std::pair<node, node>, NodePairHash> nonEdges;
 			Aux::SamplingSet<node> nodes;
-			tsl::robin_map<node, Aux::SamplingSet<node>> neighbors;
+			tsl::robin_map<node, tsl::robin_set<node>> neighbors;
 			double edgeProbability;
 			bool storeNonEdges;
 			CKBDynamicImpl& generator;

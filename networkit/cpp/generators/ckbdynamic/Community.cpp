@@ -63,14 +63,16 @@ namespace NetworKit {
 			#endif
 		}
 
-		void Community::removeEdge(node u, node v, bool nodeLeft) {
+		void Community::removeEdge(node u, node v, bool nodeLeft, bool noEraseUNeighbors) {
 			edges.erase(canonicalEdge(u, v));
 			if (storeNonEdges) {
 				nonEdges.insert(canonicalEdge(u, v));
 				verifyInvariants();
 			}
 			neighbors[v].erase(u);
-			neighbors[u].erase(v);
+			if (!noEraseUNeighbors) {
+				neighbors[u].erase(v);
+			}
 
 			generator.removeEdge(u, v, nodeLeft);
 		}
@@ -102,9 +104,8 @@ namespace NetworKit {
 			assert(nodes.contains(u)); // assert for gdb in gtest which catches exceptions
 			if (!nodes.contains(u)) throw std::runtime_error("Node not in community!");
 
-			while (neighbors[u].size()) {
-				const node v = neighbors[u].at(0);
-				removeEdge(u, v, true);
+			for (node v : neighbors[u]) {
+				removeEdge(u, v, true, true);
 			}
 
 			neighbors.erase(u);
@@ -150,7 +151,7 @@ namespace NetworKit {
 				verifyInvariants();
 			}
 
-			neighbors.insert(std::make_pair(u, Aux::SamplingSet<node>()));
+			neighbors.try_emplace(u);
 			const double log_cp = std::log(1.0 - edgeProbability);
 
 			for (node next = get_next_edge_distance(log_cp) - 1; next < nodes.size(); next += get_next_edge_distance(log_cp)) {
