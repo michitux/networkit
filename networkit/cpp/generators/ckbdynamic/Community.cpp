@@ -1,7 +1,6 @@
 
 #include "Community.h"
 #include "CKBDynamicImpl.h"
-#include "../../auxiliary/UniqueSampler.h"
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
@@ -215,43 +214,20 @@ namespace NetworKit {
 				numEdgesToAdd = numNonEdges;
 			}
 
-			std::vector<std::pair<node, node>> edgesToRemove, edgesToAdd;
+			edges.random_sample(numEdgesToRemove);
 
-			{
-				Aux::UniqueSampler edgeSampler(edges.size());
-				for (count i = 0; i < numEdgesToRemove; ++i) {
-					auto e = edges.at(edgeSampler.draw());
-					edgesToRemove.push_back(e);
-				}
+			assert(edges.size() + numEdgesToAdd == getMaximumNumberOfEdges() || std::max(numEdgesToAdd, numEdgesToRemove) == edgesToPerturb);
+
+			addRandomEdges(numEdgesToAdd);
+
+			// remove non-edges if we will remove a lot of edges
+			if (storeNonEdges && edges.size() - numEdgesToRemove < 0.25 * getMaximumNumberOfEdges()) {
+				nonEdges.clear();
+				storeNonEdges = false;
 			}
 
-			if (storeNonEdges) {
-				Aux::UniqueSampler edgeSampler(nonEdges.size());
-				for (count i = 0; i < numEdgesToAdd; ++i) {
-					auto e = nonEdges.at(edgeSampler.draw());
-					edgesToAdd.push_back(e);
-				}
-			} else {
-				Aux::UniqueSampler edgeSampler(getMaximumNumberOfEdges());
-				while (edgesToAdd.size() < numEdgesToAdd) {
-					count edgeIndex = edgeSampler.draw();
-					auto e = edgeFromIndex(edgeIndex);
-
-					if (!edges.contains(e)) {
-						edgesToAdd.push_back(e);
-					}
-				}
-			}
-
-			assert(edgesToAdd.size() == numEdgesToAdd);
-			assert(edgesToRemove.size() == numEdgesToRemove);
-			assert(edges.size() + edgesToAdd.size() == getMaximumNumberOfEdges() || std::max(numEdgesToAdd, numEdgesToRemove) == edgesToPerturb);
-
-			for (auto e : edgesToAdd) {
-				addEdge(e.first, e.second, false);
-			}
-
-			for (auto e : edgesToRemove) {
+			for (size_t i = numEdgesToRemove; i > 0; --i) {
+				auto e = edges.at(i - 1);
 				removeEdge(e.first, e.second, false);
 			}
 
@@ -260,6 +236,11 @@ namespace NetworKit {
 
 		void Community::removeRandomEdges(count k) {
 			assert(k <= edges.size());
+
+			if (storeNonEdges && edges.size() - k < 0.25 * getMaximumNumberOfEdges()) {
+				nonEdges.clear();
+				storeNonEdges = false;
+			}
 
 			for (count i = 0; i < k; ++i) {
 				auto e = edges.at(generator.drawIndex(edges.size()));
@@ -271,6 +252,24 @@ namespace NetworKit {
 			const count numEdgesWanted = edges.size() + k;
 			assert(numEdgesWanted <= getMaximumNumberOfEdges());
 
+			if (!storeNonEdges && numEdgesWanted >= 0.75 * getMaximumNumberOfEdges()) {
+				nonEdges.reserve(getMaximumNumberOfEdges() - edges.size());
+				for (index i = 0; i < nodes.size(); ++i) {
+					const node u = nodes.at(i);
+					for (index j = i + 1; j < nodes.size(); ++j) {
+						const node v = nodes.at(j);
+
+						const auto e = canonicalEdge(u, v);
+						if (!edges.contains(e)) {
+							nonEdges.insert(e);
+						}
+					}
+				}
+
+				verifyInvariants();
+
+				storeNonEdges = true;
+			}
 
 			if (storeNonEdges) {
 				assert(k <= nonEdges.size());
@@ -297,28 +296,6 @@ namespace NetworKit {
 
 		void Community::changeEdgeProbability(double prob) {
 			if (prob > 1) prob = 1;
-
-			if (prob < 0.4 && storeNonEdges) {
-				nonEdges.clear();
-				storeNonEdges = false;
-			} else if (prob > 0.6 && !storeNonEdges) {
-				nonEdges.reserve(getMaximumNumberOfEdges() - edges.size());
-				for (index i = 0; i < nodes.size(); ++i) {
-					const node u = nodes.at(i);
-					for (index j = i + 1; j < nodes.size(); ++j) {
-						const node v = nodes.at(j);
-
-						const auto e = canonicalEdge(u, v);
-						if (!edges.contains(e)) {
-							nonEdges.insert(e);
-						}
-					}
-				}
-
-				verifyInvariants();
-
-				storeNonEdges = true;
-			}
 
 			edgeProbability = prob;
 
