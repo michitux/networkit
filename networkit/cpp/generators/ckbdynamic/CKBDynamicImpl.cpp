@@ -324,6 +324,12 @@ namespace NetworKit {
 				}
 			}
 
+			availableCommunities.clear();
+			communities.clear();
+			nodeCommunities.clear();
+			globalCommunity = nullptr;
+			currentEvents.clear();
+
 			eventStream.run();
 
 			hasRun = true;
