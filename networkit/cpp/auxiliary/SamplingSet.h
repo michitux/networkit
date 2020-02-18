@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <tsl/robin_map.h>
+#include "Random.h"
 
 namespace Aux {
 	template <class Key, class Hash = std::hash<Key>>
@@ -68,6 +69,42 @@ namespace Aux {
 		void reserve(size_t n) {
 			positions.reserve(n);
 			elements.reserve(n);
+		}
+
+		/**
+		 * Selects a random sample of @a k elements that are then stored at positions 0..k-1.
+		 *
+		 * @param k The number of samples
+		 */
+		void random_sample(size_t k) {
+			auto &urng = Aux::Random::getURNG();
+			std::uniform_int_distribution<size_t> dist;
+			using p_t = std::uniform_int_distribution<size_t>::param_type;
+			const size_t n = elements.size();
+
+			assert(k <= n);
+
+			auto swap_items = [&](size_t i, size_t j) {
+				if (i != j) {
+					std::swap(elements[i], elements[j]);
+					positions[elements[i]] = i;
+					positions[elements[j]] = j;
+				}
+			};
+
+			if (k <= n/2 || k < 2) {
+				for (size_t i = 0; i < k; ++i) {
+					p_t p(i, n - 1);
+					size_t j = dist(urng, p);
+					swap_items(i, j);
+				}
+			} else {
+				for (size_t i = n - 1; i >= k; --i) {
+					p_t p(0, i);
+					size_t j = dist(urng, p);
+					swap_items(i, j);
+				}
+			}
 		}
 	};
 }
