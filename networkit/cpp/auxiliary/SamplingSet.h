@@ -32,10 +32,13 @@ namespace Aux {
 			if (it == positions.end()) return 0;
 
 			size_t pos = it->second;
-			elements[pos] = elements.back();
-			elements.pop_back();
-			positions[elements[pos]] = pos;
 
+			if (pos != elements.size() - 1) {
+				elements[pos] = elements.back();
+				positions[elements[pos]] = pos;
+			}
+
+			elements.pop_back();
 			positions.erase(it);
 
 			return 1;
