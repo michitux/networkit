@@ -1,8 +1,7 @@
 #include "EventStreamGenerator.h"
 #include "NodePairHash.h"
 #include "Community.h"
-#include <tsl/robin_map.h>
-#include <tsl/robin_set.h>
+#include <robin_hood.h>
 
 
 namespace NetworKit {
@@ -48,14 +47,14 @@ namespace NetworKit {
 		}
 
 		void EventStreamGenerator::run() {
-			std::vector<tsl::robin_map<node, count>> neighbors(birthTime.size());
-			for (auto &it : neighbors) {
-				it.min_load_factor(0.05);
-			}
+			std::vector<robin_hood::unordered_flat_map<node, count>> neighbors(birthTime.size());
+			//for (auto &it : neighbors) {
+			//	it.min_load_factor(0.05);
+			//}
 			std::vector<index> deathTime(birthTime.size(), none);
 
 			for (index timestep = 0; timestep < initialEvents.size(); ++timestep) {
-				tsl::robin_set<std::pair<node, node>, NodePairHash> freshlyAddedEdges;
+				robin_hood::unordered_flat_set<std::pair<node, node>, NodePairHash> freshlyAddedEdges;
 				freshlyAddedEdges.reserve(initialEvents[timestep].edgesAdded.size());
 
 				for (std::pair<node, node> e : initialEvents[timestep].edgesAdded) {
@@ -70,10 +69,10 @@ namespace NetworKit {
 							neighbors[e.second].emplace(e.first, 1);
 							freshlyAddedEdges.insert(e);
 						} else {
-							++(it.value());
+							++it->second;
 							it = neighbors[e.second].find(e.first);
 							assert(it != neighbors[e.second].end());
-							++(it.value());
+							++it->second;
 						}
 					}
 				}
@@ -86,7 +85,7 @@ namespace NetworKit {
 					} else {
 						auto it = neighbors[e.first].find(e.second);
 						assert(it != neighbors[e.first].end());
-						--(it.value());
+						--it->second;
 
 						if (it->second == 0) {
 							neighbors[e.first].erase(it);
@@ -100,7 +99,7 @@ namespace NetworKit {
 
 						it = neighbors[e.second].find(e.first);
 						assert(it != neighbors[e.second].end());
-						--(it.value());
+						--it->second;
 
 						if (it->second == 0) {
 							assert(neighbors[e.first].find(e.second) == neighbors[e.first].end());
@@ -125,6 +124,7 @@ namespace NetworKit {
 					}
 
 					neighbors[u].clear();
+					neighbors[u].reserve(0);
 					deathTime[u] = timestep;
 
 					graphEvents.emplace_back(GraphEvent::NODE_REMOVAL, u);
@@ -138,7 +138,7 @@ namespace NetworKit {
 					graphEvents.emplace_back(GraphEvent::EDGE_ADDITION, it.first, it.second);
 				}
 
-				tsl::robin_map<std::pair<index, node>, count, NodePairHash> freshlyJoinedCommunities;
+				robin_hood::unordered_flat_map<std::pair<index, node>, count, NodePairHash> freshlyJoinedCommunities;
 				freshlyJoinedCommunities.reserve(initialEvents[timestep].nodeJoinsCommunity.size());
 
 				for (std::pair<node, index> nodeCom : initialEvents[timestep].nodeJoinsCommunity) {
@@ -153,7 +153,7 @@ namespace NetworKit {
 					auto eit = freshlyJoinedCommunities.find(nodeCom);
 					if (eit != freshlyJoinedCommunities.end()) {
 						if (eit->second > 1) {
-							eit.value()--;
+							--eit->second;
 						} else {
 							freshlyJoinedCommunities.erase(eit);
 						}

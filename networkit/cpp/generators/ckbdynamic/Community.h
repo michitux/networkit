@@ -6,8 +6,7 @@
 #include "../../Globals.h"
 #include "../../auxiliary/SamplingSet.h"
 #include "NodePairHash.h"
-#include <tsl/robin_map.h>
-#include <tsl/robin_set.h>
+#include <robin_hood.h>
 
 namespace NetworKit {
 	namespace CKBDynamicImpl {
@@ -131,7 +130,7 @@ namespace NetworKit {
 			// only used if edgeProbability > 0.5.
 			Aux::SamplingSet<std::pair<node, node>, NodePairHash> nonEdges;
 			Aux::SamplingSet<node> nodes;
-			tsl::robin_map<node, tsl::robin_set<node>> neighbors;
+			robin_hood::unordered_node_map<node, robin_hood::unordered_flat_set<node>> neighbors;
 			double edgeProbability;
 			bool storeNonEdges;
 			CKBDynamicImpl& generator;
@@ -142,14 +141,11 @@ namespace NetworKit {
 	}
 }
 
-namespace std {
-	// inspired by https://stackoverflow.com/questions/20953390/what-is-the-fastest-hash-function-for-pointers
+namespace robin_hood {
 	template <>
 	struct hash<NetworKit::CKBDynamicImpl::CommunityPtr> {
 		std::size_t operator()(const NetworKit::CKBDynamicImpl::CommunityPtr& k) const {
-			using std::size_t;
-			static const size_t shift = tlx::integer_log2_floor(1 + sizeof(NetworKit::CKBDynamicImpl::Community));
-			return reinterpret_cast<size_t>(k.get()) >> shift;
+			return hash<size_t>()(reinterpret_cast<size_t>(k.get()));
 		};
 	};
 }

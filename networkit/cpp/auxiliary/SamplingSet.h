@@ -2,24 +2,26 @@
 #define SAMPLING_SET_H_
 
 #include <vector>
-#include <tsl/robin_map.h>
+#include <robin_hood.h>
 #include "Random.h"
 
 namespace Aux {
-	template <class Key, class Hash = std::hash<Key>>
+	template <class Key, class Hash = robin_hood::hash<Key>>
 	class SamplingSet {
 	private:
-		tsl::robin_map<Key, size_t, Hash> positions;
+		robin_hood::unordered_flat_map<Key, size_t, Hash> positions;
 		std::vector<Key> elements;
 
 	public:
+		//SamplingSet() { positions.min_load_factor(0.05f); }
+
 		using const_iterator = typename std::vector<Key>::const_iterator;
 
 		const_iterator begin() const { return elements.cbegin(); }
 		const_iterator end() const { return elements.cend(); }
 
 		size_t insert(const Key& e) {
-			bool inserted = positions.try_emplace(e, elements.size()).second;
+			bool inserted = positions.insert({e, elements.size()}).second;
 
 			if (inserted) {
 				elements.push_back(e);

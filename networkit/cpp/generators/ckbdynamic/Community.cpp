@@ -33,7 +33,7 @@ namespace NetworKit {
 
 
 		Community::Community(CKBDynamicImpl& generator) : id(generator.nextCommunityId()), desiredSize(0), edgeProbability(0), storeNonEdges(edgeProbability > 0.6), generator(generator), currentEvent(nullptr) {
-			neighbors.min_load_factor(0.05);
+			//neighbors.min_load_factor(0.05);
 			generator.addCommunity(CommunityPtr(this));
 		}
 
@@ -151,8 +151,9 @@ namespace NetworKit {
 				verifyInvariants();
 			}
 
-			auto nu = neighbors.try_emplace(u).first;
-			nu.value().min_load_factor(0.05);
+			neighbors.insert({u, robin_hood::unordered_flat_set<node>()});
+			//auto nu = neighbors.try_emplace(u).first;
+			//nu.value().min_load_factor(0.05);
 			const double log_cp = std::log(1.0 - edgeProbability);
 
 			for (node next = get_next_edge_distance(log_cp, generator) - 1; next < nodes.size(); next += get_next_edge_distance(log_cp, generator)) {
