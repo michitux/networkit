@@ -10,8 +10,8 @@ namespace NetworKit {
 			/**
 			 * Returns number of steps you need to wait until the next success (edge) occurs.
 			 */
-			count get_next_edge_distance(const double log_cp) {
-				return static_cast<count>(1 + floor(log(1.0 - Aux::Random::probability()) / log_cp));
+			count get_next_edge_distance(const double log_cp, CKBDynamicImpl& generator) {
+				return static_cast<count>(1 + floor(log(1.0 - generator.drawProbability()) / log_cp));
 			}
 
 		}
@@ -129,7 +129,7 @@ namespace NetworKit {
 			assert(nodes.size() > 0); // assert for gdb in gtest which catches exceptions
 			if (nodes.size() == 0) throw std::runtime_error("Error, no nodes in community!");
 
-			const node u = nodes.at(Aux::Random::index(nodes.size()));
+			const node u = nodes.at(generator.drawIndex(nodes.size()));
 			removeNode(u);
 			return u;
 		}
@@ -156,7 +156,7 @@ namespace NetworKit {
 			nu.value().min_load_factor(0.05);
 			const double log_cp = std::log(1.0 - edgeProbability);
 
-			for (node next = get_next_edge_distance(log_cp) - 1; next < nodes.size(); next += get_next_edge_distance(log_cp)) {
+			for (node next = get_next_edge_distance(log_cp, generator) - 1; next < nodes.size(); next += get_next_edge_distance(log_cp, generator)) {
 				const node v = nodes.at(next);
 				if (u != v) {
 					addEdge(u, nodes.at(next), true);
@@ -170,8 +170,7 @@ namespace NetworKit {
 		}
 
 		count Community::drawDesiredNumberOfEdges(double prob) const {
-			std::binomial_distribution<count> distr(getMaximumNumberOfEdges(), prob);
-			return distr(Aux::Random::getURNG());
+			return generator.drawBinomial(getMaximumNumberOfEdges(), prob);
 		}
 
 		void Community::perturbEdges(double prob) {
@@ -179,9 +178,7 @@ namespace NetworKit {
 			assert(prob >= 0);
 
 			const count desiredNumberOfEdges = drawDesiredNumberOfEdges(edgeProbability);
-			std::binomial_distribution<count> distr(edges.size(), prob);
-			const count edgesToPerturb = distr(Aux::Random::getURNG());
-
+			const count edgesToPerturb = generator.drawBinomial(edges.size(), prob);
 
 			count numEdgesToAdd = 0, numEdgesToRemove = 0;
 
@@ -265,29 +262,33 @@ namespace NetworKit {
 			assert(k <= edges.size());
 
 			for (count i = 0; i < k; ++i) {
-				auto e = edges.at(Aux::Random::index(edges.size()));
+				auto e = edges.at(generator.drawIndex(edges.size()));
 				removeEdge(e.first, e.second, false);
 			}
 		}
 
 		void Community::addRandomEdges(count k) {
-			assert(edges.size() + k <= getMaximumNumberOfEdges());
+			const count numEdgesWanted = edges.size() + k;
+			assert(numEdgesWanted <= getMaximumNumberOfEdges());
+
 
 			if (storeNonEdges) {
 				assert(k <= nonEdges.size());
 				verifyInvariants();
 
 				for (count i = 0; i < k; ++i) {
-					auto e = nonEdges.at(Aux::Random::index(nonEdges.size()));
+					auto e = nonEdges.at(generator.drawIndex(nonEdges.size()));
 					addEdge(e.first, e.second, false);
 				}
 			} else {
-				const count numEdgesWanted = edges.size() + k;
+				const count n = nodes.size();
 
 				while (edges.size() < numEdgesWanted) {
-					node u = nodes.at(Aux::Random::index(nodes.size()));
-					node v = nodes.at(Aux::Random::index(nodes.size()));
-					if (u != v && !edges.contains(canonicalEdge(u, v))) {
+					node u = nodes.at(generator.drawIndex(n));
+					node v = nodes.at(generator.drawIndex(1, n));
+					if (u == v) v = nodes.at(0);
+					assert(u != v);
+					if (!edges.contains(canonicalEdge(u, v))) {
 						addEdge(u, v, false);
 					}
 				}

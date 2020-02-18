@@ -17,8 +17,7 @@ namespace NetworKit {
 			index ts = currentTimeStep;
 
 			if (edgeSharpness < 1 && nodeJoined && currentTimeStep > 0) {
-				std::geometric_distribution<count> geom(edgeSharpness);
-				count offset = geom(Aux::Random::getURNG());
+				count offset = edge_sharpness_distribution(urng);
 				if (offset < ts) {
 					ts -= offset;
 				} else {
@@ -34,8 +33,7 @@ namespace NetworKit {
 			index ts = currentTimeStep;
 
 			if (edgeSharpness < 1 && nodeLeft && currentTimeStep > 0) {
-				std::geometric_distribution<count> geom(edgeSharpness);
-				count offset = geom(Aux::Random::getURNG());
+				count offset = edge_sharpness_distribution(urng);
 				if (offset + ts < numTimesteps) {
 					ts += offset;
 				} else {
@@ -83,9 +81,30 @@ namespace NetworKit {
 			return result;
 		}
 
+		index CKBDynamicImpl::drawIndex(index a, index b) {
+			std::uniform_int_distribution<index>::param_type p(a, b - 1);
+			return uniform_distribution(urng, p);
+		}
+
+		index CKBDynamicImpl::drawIndex(index b) {
+			return drawIndex(0, b);
+		}
+
+		double CKBDynamicImpl::drawBinomial(count numTrials, double probability) {
+			std::binomial_distribution<count>::param_type p(numTrials, probability);
+			return binomial_distribution(urng, p);
+		}
+
+		double CKBDynamicImpl::drawProbability() {
+			return random_probability_distribution(urng);
+		}
+
 		CKBDynamicImpl::CKBDynamicImpl(const CKBDynamic::param_type &params) :
+			urng(Aux::Random::integer()),
 			communitySizeSampler(nullptr),
 			membershipDistribution(nullptr),
+			random_probability_distribution(0, 1),
+			edge_sharpness_distribution(params.edgeSharpness),
 			maxCommunityId(0),
 			sumOfDesiredMemberships(0),
 			currentTimeStep(0),
@@ -138,7 +157,7 @@ namespace NetworKit {
 		}
 
 		void CKBDynamicImpl::eraseNode() {
-			node u = nodesAlive.at(Aux::Random::index(nodesAlive.size()));
+			node u = nodesAlive.at(drawIndex(nodesAlive.size()));
 			sumOfDesiredMemberships -= desiredMemberships[u];
 			desiredMemberships[u] = 0;
 
@@ -184,17 +203,14 @@ namespace NetworKit {
 
 			assignNodesToCommunities();
 
-			std::binomial_distribution<count> numEventDistribution;
 			double deathProbability = 0.25, birthProbability = 0.25, splitProbability = 0.25, mergeProbability = 0.25;
 			tlx::unused(mergeProbability);
 
 			for (currentTimeStep = 1; currentTimeStep <= numTimesteps; ++currentTimeStep) {
 				handler.assureRunning();
-				numEventDistribution.param(std::binomial_distribution<count>::param_type(communities.size(), communityEventProbability));
-				const count numCommunityEvents = numEventDistribution(Aux::Random::getURNG());
+				const count numCommunityEvents = drawBinomial(communities.size(), communityEventProbability);
 
-				numEventDistribution.param(std::binomial_distribution<count>::param_type(nodesAlive.size(), nodeEventProbability));
-				const count numNodeEvents = numEventDistribution(Aux::Random::getURNG());
+				const count numNodeEvents = drawBinomial(communities.size(), nodeEventProbability);
 
 				INFO("Timestep ", currentTimeStep, " generating ", numCommunityEvents, " community events and ", numNodeEvents, " node events");
 
@@ -205,7 +221,7 @@ namespace NetworKit {
 						mergeProbability = deathProbability = 0.5 - birthProbability;
 					}
 					handler.assureRunning();
-					double r = Aux::Random::real();
+					double r = drawProbability();
 					if (r < birthProbability) {
 						// generate new community
 						count coreSize = communitySizeSampler->getMinSize();
@@ -215,7 +231,7 @@ namespace NetworKit {
 					} else if (r < birthProbability + deathProbability) {
 						// let a community die
 						if (availableCommunities.size() > 0) {
-							CommunityPtr com = availableCommunities.at(Aux::Random::index(availableCommunities.size()));
+							CommunityPtr com = availableCommunities.at(drawIndex(availableCommunities.size()));
 							sumOfDesiredMembers -= com->getDesiredNumberOfNodes();
 							count coreSize = communitySizeSampler->getMinSize();
 							currentEvents.emplace_back(new CommunityDeathEvent(com, coreSize, tEffect, *this));
@@ -226,7 +242,7 @@ namespace NetworKit {
 					} else if (r < birthProbability + deathProbability + splitProbability) {
 						// Split a community
 						if (availableCommunities.size() > 0) {
-							CommunityPtr com = availableCommunities.at(Aux::Random::index(availableCommunities.size()));
+							CommunityPtr com = availableCommunities.at(drawIndex(availableCommunities.size()));
 							sumOfDesiredMembers -= com->getDesiredNumberOfNodes();
 							count comSizeA = communitySizeSampler->drawCommunitySize();
 							sumOfDesiredMembers += comSizeA;
@@ -240,8 +256,8 @@ namespace NetworKit {
 					} else {
 						// merge two communities
 						if (availableCommunities.size() > 1) {
-							index ia = Aux::Random::integer(availableCommunities.size() - 1);
-							index ib = Aux::Random::integer(1, availableCommunities.size() - 1);
+							index ia = drawIndex(availableCommunities.size());
+							index ib = drawIndex(1, availableCommunities.size());
 							if (ia == ib) {
 								ib = 0;
 							}
@@ -268,8 +284,7 @@ namespace NetworKit {
 
 				// First generate all death events, then all birth events.
 				// This ensures that no node that is born in this time step dies again in this time step.
-				numEventDistribution.param(std::binomial_distribution<count>::param_type(numNodeEvents, nodeBirthProbability));
-				const count nodesBorn = numEventDistribution(Aux::Random::getURNG());
+				const count nodesBorn = drawBinomial(numNodeEvents, nodeBirthProbability);
 
 				for (count j = 0; j < (numNodeEvents - nodesBorn); ++j) {
 					eraseNode();
@@ -369,7 +384,7 @@ namespace NetworKit {
 						}
 
 						while (ac.size() > numTooMany) {
-							const index i = Aux::Random::index(ac.size());
+							const index i = drawIndex(ac.size());
 							std::swap(ac[i], ac.back());
 							ac.pop_back();
 						}
@@ -382,7 +397,7 @@ namespace NetworKit {
 					}
 				}
 
-				std::shuffle(nodesWithAdditionalMemberships.begin(), nodesWithAdditionalMemberships.end(), Aux::Random::getURNG());
+				std::shuffle(nodesWithAdditionalMemberships.begin(), nodesWithAdditionalMemberships.end(), urng);
 
 				while (!nodesWithAdditionalMemberships.empty() && totalMissingMembers < totalMissingMemberships) {
 					const std::pair<node, CommunityPtr> u_com = nodesWithAdditionalMemberships.back();
@@ -549,7 +564,7 @@ namespace NetworKit {
 					// Desired memberships with over assignment
 					double fdwo = desiredMemberships[u] * (1.0 + overAssignment);
 					count dwo = desiredMemberships[u] * (1.0 + overAssignment);
-					if (Aux::Random::real() < fdwo - dwo) {
+					if (drawProbability() < fdwo - dwo) {
 						++dwo;
 					}
 
@@ -579,7 +594,7 @@ namespace NetworKit {
 
 			std::vector<CommunityPtr> communitiesToShuffle;
 			for (count round = 0; round < 100; ++round) {
-				std::shuffle(nodesParticipating.begin(), nodesParticipating.end(), Aux::Random::getURNG());
+				std::shuffle(nodesParticipating.begin(), nodesParticipating.end(), urng);
 
 				for (count i = 0; i + 1 < nodesParticipating.size(); i += 2) {
 					const std::array<node, 2> ln {nodesParticipating[i], nodesParticipating[i+1]};
@@ -596,7 +611,7 @@ namespace NetworKit {
 					}
 
 					if (!communitiesToShuffle.empty()) {
-						std::shuffle(communitiesToShuffle.begin(), communitiesToShuffle.end(), Aux::Random::getURNG());
+						std::shuffle(communitiesToShuffle.begin(), communitiesToShuffle.end(), urng);
 
 						// Calculate the percentage of the desired memberships we would get if we assigned the community
 						// to the first/second node.

@@ -41,9 +41,32 @@ namespace NetworKit {
 
 			bool hasNode(node u) const { return nodesAlive.contains(u); };
 
+			/**
+			 * Draw random value in the range [0, b)
+			 */
+			index drawIndex(index b);
+			/**
+			 * Draw random value in the range [a, b)
+			 */
+			index drawIndex(index a, index b);
+
+			/**
+			 * Draw random value from a binomial distribution.
+			 */
+			double drawBinomial(count numTrials, double probability);
+
+			double drawProbability();
+
+
+			std::mt19937_64 urng;
 			std::unique_ptr<CommunitySizeDistribution> communitySizeSampler;
 		private:
 			std::unique_ptr<CommunityMembershipDistribution> membershipDistribution;
+			std::binomial_distribution<count> binomial_distribution;
+			std::uniform_int_distribution<count> uniform_distribution;
+			std::uniform_real_distribution<double> random_probability_distribution;
+			std::geometric_distribution<count> edge_sharpness_distribution;
+
 			void assignNodesToCommunities();
 
 			Aux::SamplingSet<CommunityPtr> availableCommunities;
