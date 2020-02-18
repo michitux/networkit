@@ -568,6 +568,15 @@ namespace NetworKit {
 
 			// third step: randomize community assignments of nodesParticipating, balance assignments if there were over-assignments.
 
+			{
+				// Remove nodes that participate, but did not get any communities assigned and also do not want any communities
+				auto new_end = std::remove_if(nodesParticipating.begin(), nodesParticipating.end(), [&](node lu) {
+					node u = nodesByDesiredMemberships[lu];
+					return freshAssignments[lu].empty() && nodeCommunities[u].size() >= desiredMemberships[u];
+				});
+				nodesParticipating.erase(new_end, nodesParticipating.end());
+			}
+
 			std::vector<CommunityPtr> communitiesToShuffle;
 			for (count round = 0; round < 100; ++round) {
 				std::shuffle(nodesParticipating.begin(), nodesParticipating.end(), Aux::Random::getURNG());
