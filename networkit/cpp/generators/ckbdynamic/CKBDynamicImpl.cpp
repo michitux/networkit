@@ -623,6 +623,8 @@ namespace NetworKit {
 			const size_t numFreshAssignments = freshAssignments.size();
 			assert(numFreshAssignments == totalMissingMembers);
 
+			count additionalMembershipsUsed = 0;
+
 			for (count round = 0; round < 10 * (totalMissingMembers + nodesWantingAdditionalMemberships.size()); ++round) {
 				assert(numFreshAssignments == freshAssignments.size());
 				std::array<node, 2> ln;
@@ -700,6 +702,8 @@ namespace NetworKit {
 								++additionalMembersWanted[ln[0]];
 								nodesWantingAdditionalMemberships[secondIndex - numFreshAssignments] = ln[0];
 							}
+
+							++additionalMembershipsUsed;
 						}
 					}
 				} else {
@@ -755,7 +759,7 @@ namespace NetworKit {
 				}
 			}
 			timer.stop();
-			INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms for shuffling ", freshAssignments.size(), " assignments and trying to find ", nodesWantingAdditionalMemberships.size(), " additional assignments.");
+			INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms for shuffling ", freshAssignments.size(), " assignments and trying to find ", nodesWantingAdditionalMemberships.size(), " additional assignments, used them ", additionalMembershipsUsed, "times.");
 
 			timer.start();
 			// fourth step: Actually assign nodes to communities, thereby eliminating any remaining duplicates.
