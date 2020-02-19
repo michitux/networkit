@@ -177,14 +177,24 @@ namespace NetworKit {
 			assert(prob <= 1);
 			assert(prob >= 0);
 
-			const count desiredNumberOfEdges = drawDesiredNumberOfEdges(edgeProbability);
+			// Edges have probability 1 - nothing to perturb
+			if (edgeProbability == 1.0) return;
+
 			const count edgesToPerturb = generator.drawBinomial(edges.size(), prob);
+			if (edgesToPerturb == 0) return;
+
+			const count desiredNumberOfEdges = drawDesiredNumberOfEdges(edgeProbability);
+			const count numEdges = edges.size();
+			const count numNonEdges = getMaximumNumberOfEdges() - numEdges;
+
+			// Community is clique and shall remain clique - nothing to perturb
+			if (desiredNumberOfEdges == numEdges && numNonEdges == 0) return;
 
 			count numEdgesToAdd = 0, numEdgesToRemove = 0;
 
-			if (desiredNumberOfEdges >= edges.size()) {
+			if (desiredNumberOfEdges >= numEdges) {
 				numEdgesToAdd = edgesToPerturb;
-				const count additionalEdgesDesired = desiredNumberOfEdges - edges.size();
+				const count additionalEdgesDesired = desiredNumberOfEdges - numEdges;
 				if (additionalEdgesDesired < edgesToPerturb) {
 					numEdgesToRemove = edgesToPerturb - additionalEdgesDesired;
 				}
@@ -193,7 +203,7 @@ namespace NetworKit {
 			} else {
 				assert(edges.size() > desiredNumberOfEdges);
 				numEdgesToRemove = edgesToPerturb;
-				const count edgesToLoose = edges.size() - desiredNumberOfEdges;
+				const count edgesToLoose = numEdges - desiredNumberOfEdges;
 				if (edgesToLoose < edgesToPerturb) {
 					numEdgesToAdd = edgesToPerturb - edgesToLoose;
 				}
@@ -201,11 +211,8 @@ namespace NetworKit {
 				assert(edges.size() + numEdgesToAdd - numEdgesToRemove >= desiredNumberOfEdges);
 			}
 
-			if (edgesToPerturb > 0) {
-				assert(std::max(numEdgesToRemove, numEdgesToAdd) == edgesToPerturb);
-			}
+			assert(std::max(numEdgesToRemove, numEdgesToAdd) == edgesToPerturb);
 
-			const count numNonEdges = getMaximumNumberOfEdges() - edges.size();
 			if (numEdgesToAdd > numNonEdges) {
 				// As the desired number of edges can never be larger than
 				// getMaximumNumberOfEdges() the following condition holds.
