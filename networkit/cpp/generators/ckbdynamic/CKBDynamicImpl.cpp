@@ -523,15 +523,16 @@ namespace NetworKit {
 								--stillMissingMembers;
 								--communitiesToFind;
 								++freshAssignmentsPerNode[lu];
-								if (communitiesToFind == 0) {
-									break;
-								}
 							}
 						}
 
 						// Store the last community that is full
 						if (missing == 0) {
 							last_empty = ci;
+						}
+
+						if (communitiesToFind == 0) {
+							break;
 						}
 					}
 
