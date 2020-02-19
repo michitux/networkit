@@ -59,7 +59,7 @@ namespace Aux {
 			return elements.empty();
 		}
 
-		Key at(size_t pos) const {
+		const Key& at(size_t pos) const {
 			return elements[pos];
 		}
 
@@ -86,14 +86,6 @@ namespace Aux {
 
 			assert(k <= n);
 
-			auto swap_items = [&](size_t i, size_t j) {
-				if (i != j) {
-					std::swap(elements[i], elements[j]);
-					positions[elements[i]] = i;
-					positions[elements[j]] = j;
-				}
-			};
-
 			if (k <= n/2 || k < 2) {
 				for (size_t i = 0; i < k; ++i) {
 					p_t p(i, n - 1);
@@ -106,6 +98,27 @@ namespace Aux {
 					size_t j = dist(urng, p);
 					swap_items(i, j);
 				}
+			}
+		}
+
+		/**
+		 * Sample a random item out of the items i..size()-1 that is then stored at position i.
+		 *
+		 * @param i The position at which the item shall be stored.
+		 * @return The sampled item at position i.
+		 */
+		const Key& sample_item(size_t i) {
+			size_t j = Aux::Random::integer(i, elements.size() - 1);
+			swap_items(i, j);
+			return elements[i];
+		}
+	private:
+		void swap_items(size_t i, size_t j) {
+			if (i != j) {
+				using std::swap;
+				swap(elements[i], elements[j]);
+				positions[elements[i]] = i;
+				positions[elements[j]] = j;
 			}
 		}
 	};

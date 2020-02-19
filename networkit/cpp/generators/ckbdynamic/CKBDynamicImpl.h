@@ -72,6 +72,7 @@ namespace NetworKit {
 			Aux::SamplingSet<CommunityPtr> availableCommunities;
 			Aux::SamplingSet<CommunityPtr> communities;
 			std::vector<Aux::SamplingSet<CommunityPtr>> nodeCommunities;
+			Aux::SamplingSet<node> nodesWithOverassignments;
 			CommunityPtr globalCommunity;
 			count maxCommunityId;
 

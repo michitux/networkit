@@ -47,6 +47,9 @@ namespace NetworKit {
 
 		void CKBDynamicImpl::addNodeToCommunity(node u, CommunityPtr com) {
 			if (com != globalCommunity) {
+				if (desiredMemberships[u] == nodeCommunities[u].size()) {
+					nodesWithOverassignments.insert(u);
+				}
 				nodeCommunities[u].insert(com);
 				eventStream.nodeJoinsCommunity(currentTimeStep, u, com->getId());
 				++currentCommunityMemberships;
@@ -56,6 +59,9 @@ namespace NetworKit {
 		void CKBDynamicImpl::removeNodeFromCommunity(node u, CommunityPtr com) {
 			if (com != globalCommunity) {
 				nodeCommunities[u].erase(com);
+				if (desiredMemberships[u] == nodeCommunities[u].size()) {
+					nodesWithOverassignments.erase(u);
+				}
 				eventStream.nodeLeavesCommunity(currentTimeStep, u, com->getId());
 				--currentCommunityMemberships;
 			}
@@ -384,46 +390,40 @@ namespace NetworKit {
 			// robust for random node exchanges.
 			if (totalMissingMembers < totalMissingMemberships) {
 				timer.start();
-				std::vector<std::pair<node, CommunityPtr>> nodesWithAdditionalMemberships;
-				std::vector<CommunityPtr> ac;
-				for (node u : nodesAlive) {
-					if (desiredMemberships[u] < nodeCommunities[u].size()) {
-						// FIXME: we could directly sample candidates here
-						// and also directly collect only as many as necessary
-						count numTooMany = nodeCommunities[u].size() - desiredMemberships[u];
-						for (const CommunityPtr &com : nodeCommunities[u]) {
-							if (com->canRemoveNode()) {
-								ac.push_back(com);
+				for (size_t i = 0; i < nodesWithOverassignments.size() && totalMissingMembers < totalMissingMemberships;) {
+					node u = nodesWithOverassignments.sample_item(i);
+
+					assert(nodeCommunities[u].size() > desiredMemberships[u]);
+
+					bool reducedToDesired = false;
+					for (size_t ci = 0; ci < nodeCommunities[u].size() && totalMissingMembers < totalMissingMemberships;) {
+						const CommunityPtr &com = nodeCommunities[u].sample_item(ci);
+						if (com->canRemoveNode()) {
+							// If this community had been missing members before, it is already in our list
+							if (com->getDesiredNumberOfNodes() <= com->getNumberOfNodes()) {
+								communitiesWithMissingMembers.push_back(com);
 							}
-						}
 
-						while (ac.size() > numTooMany) {
-							const index i = drawIndex(ac.size());
-							std::swap(ac[i], ac.back());
-							ac.pop_back();
-						}
+							com->removeNode(u);
+							++totalMissingMembers;
 
-						for (CommunityPtr com : ac) {
-							nodesWithAdditionalMemberships.emplace_back(u, com);
+							if (nodeCommunities[u].size() == desiredMemberships[u]) {
+								reducedToDesired = true;
+								break;
+							}
+						} else {
+							// only increment if we did not remove this community
+							// if we removed this community, the item at position ci has been replaced
+							// and we can sample again at position ci
+							++ci;
 						}
-
-						ac.clear();
 					}
-				}
 
-				std::shuffle(nodesWithAdditionalMemberships.begin(), nodesWithAdditionalMemberships.end(), urng);
-
-				while (!nodesWithAdditionalMemberships.empty() && totalMissingMembers < totalMissingMemberships) {
-					const std::pair<node, CommunityPtr> u_com = nodesWithAdditionalMemberships.back();
-					nodesWithAdditionalMemberships.pop_back();
-
-					bool alreadyListed = (u_com.second->getDesiredNumberOfNodes() > u_com.second->getNumberOfNodes());
-
-					u_com.second->removeNode(u_com.first);
-					++totalMissingMembers;
-
-					if (!alreadyListed) {
-						communitiesWithMissingMembers.push_back(u_com.second);
+					if (!reducedToDesired) {
+						// only increment if we did not remove all overassignments
+						// if we removed all overassignments, the node has been removed from nodesWithOverAssignments
+						// and we can sample again at position i
+						++i;
 					}
 				}
 				timer.stop();
