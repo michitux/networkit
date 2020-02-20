@@ -155,8 +155,12 @@ namespace NetworKit {
 
 		void CKBDynamicImpl::generateNode() {
 			node u = desiredMemberships.size();
-			desiredMemberships.push_back(membershipDistribution->drawMemberships());
-			sumOfDesiredMemberships += desiredMemberships.back();
+			count m = membershipDistribution->drawMemberships();
+			desiredMemberships.push_back(m);
+			for (count i = 0; i < m; ++i) {
+				nodeMemberships.push_back(u);
+			}
+			sumOfDesiredMemberships += m;
 			nodesAlive.insert(u);
 			nodeCommunities.emplace_back();
 			globalCommunity->addNode(u);
@@ -345,6 +349,9 @@ namespace NetworKit {
 		void CKBDynamicImpl::assignNodesToCommunities() {
 			count totalMissingMembers = 0;
 
+
+			// Step 1: determine set of nodes wanting communities and communities wanting nodes
+
 			Aux::Timer timer;
 			timer.start();
 			std::vector<CommunityPtr> communitiesWithMissingMembers;
@@ -365,20 +372,29 @@ namespace NetworKit {
 
 			count totalMissingMemberships = 0;
 
+			struct NodeMembership {
+				count desired;
+				count toAssign;
+			};
+
+			robin_hood::unordered_flat_map<node, NodeMembership> nodesWithMissingCommunities;
+
 			for (node u : nodesAlive) {
 				const count desired = desiredMemberships[u];
 				const count actual = nodeCommunities[u].size();
 
 				if (desired > actual) {
-					totalMissingMemberships += desired - actual;
+					count toAssign = desired - actual;
+					totalMissingMemberships += toAssign;
+					nodesWithMissingCommunities.insert({u, NodeMembership{desired, toAssign}});
 				}
 			}
+
 			timer.stop();
 			INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms to collect initial candidates, ", totalMissingMembers, " members to be found, ", totalMissingMemberships, " memberships wanted");
 
-			// If totalMissingMemberships > totalMissingMembers, a) find nodes that have too many memberships and remove those nodes from some of them and b) create empty communities of size 1 that are removed afterwards.
-			// If totalMissingMembers > totalMissingMemberships, find nodes to which we can assign additional memberships, i.e., nodes that are not much over their allocated memberships.
-
+			// Step 2: under-assignment: if nodes want more members than communities want members
+			// Step 2a: try removing nodes from communities to compensate mismatch, i.e., let communities want more members
 			// If we have more node slots free than
 			// communities that are missing some members,
 			// try to find nodes that got additional
@@ -430,6 +446,65 @@ namespace NetworKit {
 				INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms to remove additional nodes from communities, now wanting ", totalMissingMembers, " members");
 			}
 
+			// Step 2b: if this did not succeed:
+			/* Get a vector with all nodes wanting assignments in the respective multiplicity.
+			   Sample from this vector totalMissingMembers nodes using fisher-yates-shuffle.
+			   However, first ensure that every node has at least one member and otherwise include them in the sample.
+			   If this sample is still too big -> ? - orphans? let nodes die? force-remove some nodes with more than one member?
+			*/
+			std::vector<node> nodesThatWantCommunities;
+			if (totalMissingMembers < totalMissingMemberships) {
+				timer.start();
+				nodesThatWantCommunities.reserve(totalMissingMemberships);
+
+				// FIXME: this depends on hash map iteration order!!!
+				for (auto it : nodesWithMissingCommunities) {
+					count wanted = it.second.toAssign;
+					if (wanted == it.second.desired) {
+						--wanted;
+					}
+
+					for (index i = 0; i < wanted; ++i) {
+						nodesThatWantCommunities.push_back(it.first);
+					}
+				}
+
+				const count membershipsToRemove = totalMissingMemberships - totalMissingMembers;
+				while (nodesThatWantCommunities.size() > membershipsToRemove) {
+					index i = drawIndex(nodesThatWantCommunities.size());
+					nodesThatWantCommunities[i] = nodesThatWantCommunities.back();
+					nodesThatWantCommunities.pop_back();
+				}
+
+				for (node u : nodesThatWantCommunities) {
+					--nodesWithMissingCommunities[u].toAssign;
+				}
+				timer.stop();
+				INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms to exclude ", nodesThatWantCommunities.size(), " memberships from assignment.");
+			}
+
+			// Step 3: over-assignment: sample from all nodes/memberships to get additional nodes until the numbers match
+			if (totalMissingMembers > totalMissingMemberships) {
+				timer.start();
+				for (size_t i = totalMissingMemberships; i < totalMissingMembers; ++i) {
+					size_t j = drawIndex(nodeMemberships.size());
+					node u = nodeMemberships[j];
+					// lazy deletion
+					while (!nodesAlive.contains(u)) {
+						nodeMemberships[j] = nodeMemberships.back();
+						nodeMemberships.pop_back();
+						j = drawIndex(nodeMemberships.size());
+						u = nodeMemberships[j];
+					}
+
+					auto itSuccess = nodesWithMissingCommunities.insert({u, NodeMembership{desiredMemberships[u], 1}});
+					if (!itSuccess.second) {
+						++itSuccess.first->second.toAssign;
+					}
+				}
+				timer.stop();
+				INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms to sample ", totalMissingMembers - totalMissingMemberships, " additional assignments.");
+			}
 
 			timer.start();
 			std::vector<std::pair<CommunityPtr, count>> communitiesByDesiredMembers;
@@ -465,13 +540,13 @@ namespace NetworKit {
 			}
 
 
-			std::vector<node> nodesByDesiredMemberships(nodesAlive.size(), none);
+			std::vector<node> nodesByDesiredMemberships(nodesWithMissingCommunities.size(), none);
 
 			{
 				std::vector<count> nodesPerDesired;
 
-				for (node u : nodesAlive) {
-					const count desired = desiredMemberships[u];
+				for (auto it : nodesWithMissingCommunities) {
+					const count desired = it.second.desired;
 					if (nodesPerDesired.size() <= desired) {
 						nodesPerDesired.resize(desired + 1);
 					}
@@ -486,43 +561,45 @@ namespace NetworKit {
 					sum += temp;
 				}
 
-				for (node u : nodesAlive) {
-					const count desired = desiredMemberships[u];
-					nodesByDesiredMemberships[nodesPerDesired[desired]] = u;
+				for (auto it : nodesWithMissingCommunities) {
+					const count desired = it.second.desired;
+					nodesByDesiredMemberships[nodesPerDesired[desired]] = it.first;
 					++nodesPerDesired[desired];
 				}
 			}
 			timer.stop();
 			INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms to sort nodes and communities");
 
-
+			// Step 4: greedy assignment
 			timer.start();
-			std::vector<count> additionalMembersWanted(nodesByDesiredMemberships.size(), 0);
+			//std::vector<count> additionalMembersWanted(nodesByDesiredMemberships.size(), 0);
 			count stillMissingMembers = totalMissingMembers;
 
 			// first step: assign only nodes that actually want members
 			Aux::SamplingSet<std::pair<node, Community*>, NodeCommunityHash> freshAssignments;
-			freshAssignments.reserve(totalMissingMembers);
+			// Reserve enough memory - we temporarily add additional items during switching
+			freshAssignments.reserve(totalMissingMembers + 2);
 
-			// How many communities shall be assigned in the greedy assignment step.
-			std::vector<count> freshAssignmentsPerNode(nodesByDesiredMemberships.size(), 0);
+			robin_hood::unordered_flat_map<node, count> freshAssignmentsPerNode;
 			std::vector<node> nodesWantingAdditionalMemberships;
 
 			auto greedilyAssignNode =
-				[&](node lu, node u, count numMembers, bool overAssignment) {
+				[&](node u, count numMembers, bool overAssignment) {
 					index last_empty = communitiesByDesiredMembers.size();
 					count communitiesToFind = numMembers;
+					count &numFreshAssignmentsOfU = freshAssignmentsPerNode[u];
+
 					for (index i = 0; i < communitiesByDesiredMembers.size() && communitiesToFind > 0; ++i) {
 						// Iterate from back to front
 						const index ci = communitiesByDesiredMembers.size() - i - 1;
 						const CommunityPtr &com = communitiesByDesiredMembers[ci].first;
 						count &missing = communitiesByDesiredMembers[ci].second;
 						if (missing > 0 && !com->hasNode(u)) {
-							if (freshAssignments.insert({lu, com.get()}) == 1) {
+							if (freshAssignments.insert({u, com.get()}) == 1) {
 								--missing;
 								--stillMissingMembers;
 								--communitiesToFind;
-								++freshAssignmentsPerNode[lu];
+								++numFreshAssignmentsOfU;
 							}
 						}
 
@@ -555,71 +632,68 @@ namespace NetworKit {
 
 					}
 
-					if (!overAssignment) {
-						additionalMembersWanted[lu] = communitiesToFind;
+					if (!overAssignment && communitiesToFind > 0) {
+						// we did over-assignment!
+						if (totalMissingMembers > totalMissingMemberships) {
+							// but this node nevertheless got less than it wanted
+							if (nodeCommunities[u].size() + numFreshAssignmentsOfU < desiredMemberships[u]) {
+								communitiesToFind = std::min(communitiesToFind, desiredMemberships[u] - nodeCommunities[u].size() - numFreshAssignmentsOfU);
+							} else {
+								// ignore the rest, we sample new over-assignments below that hopefully match better
+								communitiesToFind = 0;
+							}
+						}
+						// limit to actually wanted members in case we did use over-assignment
+						// additionalMembersWanted[lu] = communitiesToFind;
 						for (; communitiesToFind > 0; --communitiesToFind) {
-							nodesWantingAdditionalMemberships.push_back(lu);
+							nodesWantingAdditionalMemberships.push_back(u);
 						}
 					}
 
-					assert(freshAssignmentsPerNode[lu] + nodeCommunities[u].size() <= desiredMemberships[u] || overAssignment);
+					assert(freshAssignmentsPerNode[u] + nodeCommunities[u].size() <= desiredMemberships[u] || totalMissingMembers > totalMissingMemberships);
 				};
 
 
-			count nodesAssigned = 0;
-			for (node lu = 0; lu < nodesByDesiredMemberships.size(); ++lu) {
-				const node u = nodesByDesiredMemberships[lu];
-				if (desiredMemberships[u] > nodeCommunities[u].size()) {
-					++nodesAssigned;
-					greedilyAssignNode(lu, u, desiredMemberships[u] - nodeCommunities[u].size(), false);
-				}
+			for (node u : nodesByDesiredMemberships) {
+				greedilyAssignNode(u, nodesWithMissingCommunities[u].toAssign, false);
 			}
 
 			timer.stop();
-			INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms for first greedy assignment of ", nodesAssigned, " nodes to ", communitiesWithMissingMembers.size(), " communities, still missing ", stillMissingMembers, " members in ", communitiesByDesiredMembers.size(), " communities.");
+			INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms for first greedy assignment of ", nodesByDesiredMemberships.size(), " nodes to ", communitiesWithMissingMembers.size(), " communities, still missing ", stillMissingMembers, " members in ", communitiesByDesiredMembers.size(), " communities.");
 
 
 			// second step: if communities still want nodes, find out how many memberships are missing and add additional nodes to nodesParticipating.
-			timer.start();
-			count numRounds = 0;
-			double overAssignment = 0;
+			if (stillMissingMembers > 0) { // avoid log message and timer when not needed
+				timer.start();
+				count numRounds = 0;
+				while (stillMissingMembers > 0) {
+					++numRounds;
+					// Step 5: if greedy assignment did not succeed, get and try additional memberships one by one:
+					// if we had under-assignment, from the list of nodes whose memberships were not satisfied
+					if (!nodesThatWantCommunities.empty()) {
+						index j = drawIndex(nodesThatWantCommunities.size());
+						node u = nodesThatWantCommunities[j];
+						nodesThatWantCommunities[j] = nodesThatWantCommunities.back();
+						nodesThatWantCommunities.pop_back();
 
-			count numNodesOverAssigned = 0;
-			while (stillMissingMembers > 0) {
-				++numRounds;
-				overAssignment += std::max(0.01, stillMissingMembers * 1.0 / sumOfDesiredMemberships);
+						// These are actual assignments we could have sampled, so they may be added to nodesWantingAdditionalMemberships
+						greedilyAssignNode(u, 1, false);
+					} else {
+					// if we had over-assignment, from the list of all nodes
+						index j = drawIndex(nodeMemberships.size());
+						node u = nodeMemberships[j];
 
-				for (node lu = 0; lu < nodesByDesiredMemberships.size(); ++lu) {
-					const node u = nodesByDesiredMemberships[lu];
-
-					// If lu wants additional members this means we couldn't assign it to any community that still wants members
-					// So it doesn't make sense to try this node again.
-					if (additionalMembersWanted[lu] > 0) continue;
-
-					// Desired memberships with over assignment
-					double fdwo = desiredMemberships[u] * (1.0 + overAssignment);
-					count dwo = desiredMemberships[u] * (1.0 + overAssignment);
-					if (drawProbability() < fdwo - dwo) {
-						++dwo;
+						greedilyAssignNode(u, 1, true);
 					}
-
-					if (dwo > nodeCommunities[u].size() + freshAssignmentsPerNode[lu]) {
-						++numNodesOverAssigned;
-						greedilyAssignNode(lu, u, dwo - nodeCommunities[u].size() - freshAssignmentsPerNode[lu], true);
-					}
-
-					if (stillMissingMembers == 0) break;
 				}
+				timer.stop();
+				INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms for over-assignment greedy assignment in ", numRounds, " rounds.");
 			}
-			timer.stop();
-			INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms for over-assignment greedy assignment in ", numRounds, " rounds, tried assigning ", numNodesOverAssigned, " nodes.");
 
 
-			// third step: randomize community assignments of nodesParticipating, balance assignments
-
+			// third step: randomize community assignments
 			timer.start();
 
-			std::vector<CommunityPtr> communitiesToShuffle;
 			const size_t numFreshAssignments = freshAssignments.size();
 			assert(numFreshAssignments == totalMissingMembers);
 
@@ -627,135 +701,101 @@ namespace NetworKit {
 
 			for (count round = 0; round < 10 * (totalMissingMembers + nodesWantingAdditionalMemberships.size()); ++round) {
 				assert(numFreshAssignments == freshAssignments.size());
-				std::array<node, 2> ln;
+				std::array<node, 2> uv;
 				std::array<Community*, 2> com {nullptr, nullptr};
 
 				// draw the first node/community pair from freshAssignments so we get a community
-				std::tie(ln[0], com[0]) = freshAssignments.at(drawIndex(numFreshAssignments));
+				std::tie(uv[0], com[0]) = freshAssignments.at(drawIndex(numFreshAssignments));
 
 				// FIXME: adjust sampling to avoid sampling same index twice
 
 				// draw the second pair possibly with a node that is not yet part of any community but wants one
 				// lazy deletion in nodesWantingAdditionalMemberships
 				index secondIndex = drawIndex(numFreshAssignments + nodesWantingAdditionalMemberships.size());
-				while (true) {
-					if (secondIndex < numFreshAssignments) {
-						std::tie(ln[1], com[1]) = freshAssignments.at(secondIndex);
-						break;
-					} else {
-						ln[1] = nodesWantingAdditionalMemberships[secondIndex - numFreshAssignments];
-						if (additionalMembersWanted[ln[1]] == 0) {
-							// oops, this node does not want any more members - delete it and draw again
-							nodesWantingAdditionalMemberships[secondIndex - numFreshAssignments] = nodesWantingAdditionalMemberships.back();
-							nodesWantingAdditionalMemberships.pop_back();
-						} else {
-							break;
-						}
-					}
-					secondIndex = drawIndex(numFreshAssignments + nodesWantingAdditionalMemberships.size());
+				if (secondIndex < numFreshAssignments) {
+					std::tie(uv[1], com[1]) = freshAssignments.at(secondIndex);
+				} else {
+					uv[1] = nodesWantingAdditionalMemberships[secondIndex - numFreshAssignments];
 				}
 
 				// Check if we got the same node or community twice
-				if (ln[0] == ln[1] || com[0] == com[1]) continue;
-
-				// Check which kind of swap we want to perform
-				std::array<node, 2> uv {
-					nodesByDesiredMemberships[ln[0]],
-					nodesByDesiredMemberships[ln[1]]
-				};
-
-				// Calculate the percentage of the desired memberships we would get if we assigned the community
-				// to the first/second node.
-				std::array<count, 2> assignments;
-				std::array<count, 2> desired;
-				std::array<double, 2> invertedDesired;
-				std::array<double, 2> currentOverAssignment;
-
-				for (index j = 0; j < 2; ++j) {
-					assignments[j] = freshAssignmentsPerNode[ln[j]] + nodeCommunities[uv[j]].size();
-					desired[j] = desiredMemberships[uv[j]];
-					invertedDesired[j] = 1.0 / desired[j];
-					currentOverAssignment[j] = assignments[j] * invertedDesired[j];
-				}
-
-				assert(assignments[0] > 0);
+				if (uv[0] == uv[1] || com[0] == com[1]) continue;
 
 				if (com[1] == nullptr) {
-					assert(currentOverAssignment[1] < 1);
-
+					// TODO: do something useful
 					// try replace node 1 by node 0 if the situation is better for 1 after it loses the community
-					if (currentOverAssignment[0] - invertedDesired[0] >= currentOverAssignment[1]) {
+					//if (currentOverAssignment[0] - invertedDesired[0] >= currentOverAssignment[1]) {
 						if (com[0]->hasNode(uv[1])) continue;
 
-						if (freshAssignments.insert({ln[1], com[0]})) {
-							freshAssignments.erase({ln[0], com[0]});
+						if (freshAssignments.insert({uv[1], com[0]})) {
+							freshAssignments.erase({uv[0], com[0]});
 							// update assignment counters
-							--freshAssignmentsPerNode[ln[0]];
-							++freshAssignmentsPerNode[ln[1]];
-							--additionalMembersWanted[ln[1]];
+							--freshAssignmentsPerNode[uv[0]];
+							++freshAssignmentsPerNode[uv[1]];
+							//--additionalMembersWanted[uv[1]];
 
 							// if node 0 already has enough members, remove node 1 from nodesWantingAdditionalMembers
-							if (desired[0] + 1 <= assignments[0]) {
-								nodesWantingAdditionalMemberships[secondIndex - numFreshAssignments] = nodesWantingAdditionalMemberships.back();
-								nodesWantingAdditionalMemberships.pop_back();
-							} else { // else add node 0 in place of node 1
-								++additionalMembersWanted[ln[0]];
-								nodesWantingAdditionalMemberships[secondIndex - numFreshAssignments] = ln[0];
-							}
+							//if (desired[0] + 1 <= assignments[0]) {
+							//nodesWantingAdditionalMemberships[secondIndex - numFreshAssignments] = nodesWantingAdditionalMemberships.back();
+							//nodesWantingAdditionalMemberships.pop_back();
+							//} else { // else add node 0 in place of node 1
+								//++additionalMembersWanted[ln[0]];
+							nodesWantingAdditionalMemberships[secondIndex - numFreshAssignments] = uv[0];
+							//}
 
 							++additionalMembershipsUsed;
 						}
-					}
+					//}
 				} else {
-					assert(assignments[1] > 0);
-					auto replaceNode = [&](index oldNode) -> bool {
-						const index targetCom = oldNode;
-						const node newNode = 1 - oldNode;
-						if (com[targetCom]->hasNode(uv[newNode])) return false;
-
-						if (freshAssignments.insert({ln[newNode], com[targetCom]})) {
-							freshAssignments.erase({ln[oldNode], com[targetCom]});
-							// update assignment counters
-							--freshAssignmentsPerNode[ln[oldNode]];
-							++freshAssignmentsPerNode[ln[newNode]];
-
-							if (additionalMembersWanted[ln[newNode]] > 0) {
-								--additionalMembersWanted[ln[newNode]];
-								// We do not know where it is, the deletion happens lazyly once it reaches 0
-							}
-
-							// If the old node has not enough communities anymore, put it into nodesWantingAdditionalMembers
-							if (assignments[oldNode] - 1 < desired[oldNode]) {
-								++additionalMembersWanted[ln[oldNode]];
-								nodesWantingAdditionalMemberships.push_back(ln[oldNode]);
-							}
-						} else {
-							return false;
-						}
-
-						return true;
-					};
+					//assert(assignments[1] > 0);
+					//					auto replaceNode = [&](index oldNode) -> bool {
+					//						const index targetCom = oldNode;
+					//						const node newNode = 1 - oldNode;
+					//						if (com[targetCom]->hasNode(uv[newNode])) return false;
+					//
+					//						if (freshAssignments.insert({ln[newNode], com[targetCom]})) {
+					//							freshAssignments.erase({ln[oldNode], com[targetCom]});
+					//							// update assignment counters
+					//							--freshAssignmentsPerNode[ln[oldNode]];
+					//							++freshAssignmentsPerNode[ln[newNode]];
+					//
+					//							if (additionalMembersWanted[ln[newNode]] > 0) {
+					//								--additionalMembersWanted[ln[newNode]];
+					//								// We do not know where it is, the deletion happens lazyly once it reaches 0
+					//							}
+					//
+					//							// If the old node has not enough communities anymore, put it into nodesWantingAdditionalMembers
+					//							if (assignments[oldNode] - 1 < desired[oldNode]) {
+					//								++additionalMembersWanted[ln[oldNode]];
+					//								nodesWantingAdditionalMemberships.push_back(ln[oldNode]);
+					//							}
+					//						} else {
+					//							return false;
+					//						}
+					//
+					//						return true;
+					//					};
 
 					// We have three options now: 1) assign node 0 to com[1] instead of node 1, 2) assign node 1 to com[0] instead of node 0, 3) switch both nodes,
 					// If node 0 has less communities than desired and in its current status has a smaller fraction of desired members than node 1 will have after removing it from com[1]
 					// Or if node 0 has enough communities but with the additional community it has still a smaller overassignment than node 1 currently has
 					// we move node 0 to com[1] instead of node 1
-					if ((assignments[0] < desired[0] && currentOverAssignment[0] < currentOverAssignment[1] - invertedDesired[1])
-					    || (assignments[0] >= desired[0] && currentOverAssignment[0] + invertedDesired[0] < currentOverAssignment[1])) {
-						if (!replaceNode(1)) continue;
-					} else if ((assignments[1] < desired[1] && currentOverAssignment[1] < currentOverAssignment[0] - invertedDesired[0])
-					    || (assignments[1] >= desired[1] && currentOverAssignment[1] + invertedDesired[1] < currentOverAssignment[0])) {
-						if (!replaceNode(0)) continue;
-					} else {
+					//					if ((assignments[0] < desired[0] && currentOverAssignment[0] < currentOverAssignment[1] - invertedDesired[1])
+					//					    || (assignments[0] >= desired[0] && currentOverAssignment[0] + invertedDesired[0] < currentOverAssignment[1])) {
+					//						if (!replaceNode(1)) continue;
+					//					} else if ((assignments[1] < desired[1] && currentOverAssignment[1] < currentOverAssignment[0] - invertedDesired[0])
+					//					    || (assignments[1] >= desired[1] && currentOverAssignment[1] + invertedDesired[1] < currentOverAssignment[0])) {
+					//						if (!replaceNode(0)) continue;
+					//					} else {
 						// swap both communities
 						if (com[0]->hasNode(uv[1]) || com[1]->hasNode(uv[0])) continue;
-						if (freshAssignments.contains({ln[0], com[1]})) continue;
-						if (freshAssignments.insert({ln[1], com[0]})) {
-							freshAssignments.erase({ln[0], com[0]});
-							freshAssignments.erase({ln[1], com[1]});
-							freshAssignments.insert({ln[0], com[1]});
+						if (freshAssignments.contains({uv[0], com[1]})) continue;
+						if (freshAssignments.insert({uv[1], com[0]})) {
+							freshAssignments.erase({uv[0], com[0]});
+							freshAssignments.erase({uv[1], com[1]});
+							freshAssignments.insert({uv[0], com[1]});
 						}
-					}
+					//}
 				}
 			}
 			timer.stop();
@@ -764,9 +804,9 @@ namespace NetworKit {
 			timer.start();
 			// fourth step: Actually assign nodes to communities, thereby eliminating any remaining duplicates.
 			for (auto it : freshAssignments) {
-				node u = nodesByDesiredMemberships[it.first];
+				const node u = it.first;
 				it.second->addNode(u);
-				assert(overAssignment > 0 || nodeCommunities[u].size() <= desiredMemberships[u]);
+				assert(totalMissingMembers > totalMissingMemberships || nodeCommunities[u].size() <= desiredMemberships[u]);
 			}
 			timer.stop();
 			INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms to assign ", freshAssignments.size(), " nodes to communities");
