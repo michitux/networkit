@@ -53,11 +53,17 @@ namespace NetworKit {
 				nodeCommunities[u].insert(com);
 				eventStream.nodeJoinsCommunity(currentTimeStep, u, com->getId());
 				++currentCommunityMemberships;
+				if (desiredMemberships[u] == nodeCommunities[u].size()) {
+					nodesWantingAssignments.erase(u);
+				}
 			}
 		}
 
 		void CKBDynamicImpl::removeNodeFromCommunity(node u, CommunityPtr com) {
 			if (com != globalCommunity) {
+				if (desiredMemberships[u] == nodeCommunities[u].size()) {
+					nodesWantingAssignments.insert(u);
+				}
 				nodeCommunities[u].erase(com);
 				if (desiredMemberships[u] == nodeCommunities[u].size()) {
 					nodesWithOverassignments.erase(u);
@@ -164,6 +170,9 @@ namespace NetworKit {
 			nodesAlive.insert(u);
 			nodeCommunities.emplace_back();
 			globalCommunity->addNode(u);
+			if (m > 0) {
+				nodesWantingAssignments.insert(u);
+			}
 			eventStream.addNode(currentTimeStep, u);
 		}
 
@@ -180,6 +189,7 @@ namespace NetworKit {
 			assert(nodesAlive.contains(u));
 			nodesAlive.erase(u);
 			globalCommunity->removeNode(u);
+			nodesWantingAssignments.erase(u);
 			eventStream.removeNode(currentTimeStep, u);
 		}
 
@@ -379,15 +389,15 @@ namespace NetworKit {
 
 			robin_hood::unordered_flat_map<node, NodeMembership> nodesWithMissingCommunities;
 
-			for (node u : nodesAlive) {
+			for (node u : nodesWantingAssignments) {
 				const count desired = desiredMemberships[u];
 				const count actual = nodeCommunities[u].size();
 
-				if (desired > actual) {
-					count toAssign = desired - actual;
-					totalMissingMemberships += toAssign;
-					nodesWithMissingCommunities.insert({u, NodeMembership{desired, toAssign}});
-				}
+				assert(desired > actual);
+
+				count toAssign = desired - actual;
+				totalMissingMemberships += toAssign;
+				nodesWithMissingCommunities.insert({u, NodeMembership{desired, toAssign}});
 			}
 
 			timer.stop();
