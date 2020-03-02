@@ -56,6 +56,11 @@ namespace NetworKit {
 				if (desiredMemberships[u] == nodeCommunities[u].size()) {
 					nodesWantingAssignments.erase(u);
 				}
+				if (com->getNumberOfNodes() == com->getDesiredNumberOfNodes()) {
+					communitiesWantingMembers.erase(com);
+				}
+
+				assert(communitiesWantingMembers.contains(com) == (com->getNumberOfNodes() < com->getDesiredNumberOfNodes()));
 			}
 		}
 
@@ -64,12 +69,17 @@ namespace NetworKit {
 				if (desiredMemberships[u] == nodeCommunities[u].size()) {
 					nodesWantingAssignments.insert(u);
 				}
+				// The node has already been removed from the community
+				if (com->getNumberOfNodes() + 1 == com->getDesiredNumberOfNodes()) {
+					communitiesWantingMembers.insert(com);
+				}
 				nodeCommunities[u].erase(com);
 				if (desiredMemberships[u] == nodeCommunities[u].size()) {
 					nodesWithOverassignments.erase(u);
 				}
 				eventStream.nodeLeavesCommunity(currentTimeStep, u, com->getId());
 				--currentCommunityMemberships;
+				assert(communitiesWantingMembers.contains(com) == (com->getNumberOfNodes() < com->getDesiredNumberOfNodes()));
 			}
 		}
 
@@ -80,12 +90,27 @@ namespace NetworKit {
 				availableCommunities.erase(com);
 			}
 			communities.insert(com);
+			// The global community is not an issue here as it will always have 0 desired members
+			if (com->getNumberOfNodes() < com->getDesiredNumberOfNodes()) {
+				communitiesWantingMembers.insert(com);
+			}
 		}
 
 		void CKBDynamicImpl::removeCommunity(CommunityPtr com) {
 			assert(com->getNumberOfNodes() == 0);
 			availableCommunities.erase(com);
 			communities.erase(com);
+			communitiesWantingMembers.erase(com);
+		}
+
+		void CKBDynamicImpl::desiredSizeChanged(CommunityPtr com) {
+			assert(com != globalCommunity);
+
+			if (com->getNumberOfNodes() < com->getDesiredNumberOfNodes()) {
+				communitiesWantingMembers.insert(com);
+			} else {
+				communitiesWantingMembers.erase(com);
+			}
 		}
 
 		index CKBDynamicImpl::nextCommunityId() {
@@ -364,18 +389,14 @@ namespace NetworKit {
 
 			Aux::Timer timer;
 			timer.start();
-			std::vector<CommunityPtr> communitiesWithMissingMembers;
 
-			for (const CommunityPtr& com : communities) {
+			for (const CommunityPtr& com : communitiesWantingMembers) {
 				const count desired = com->getDesiredNumberOfNodes();
 				assert(desired >= communitySizeSampler->getMinSize());
 				const count actual = com->getNumberOfNodes();
-				assert(actual <= desired);
+				assert(actual < desired);
 
-				if (actual < desired) {
-					communitiesWithMissingMembers.push_back(com);
-					totalMissingMembers += desired - actual;
-				}
+				totalMissingMembers += desired - actual;
 			}
 
 			if (totalMissingMembers == 0) return;
@@ -435,11 +456,6 @@ namespace NetworKit {
 					for (size_t ci = 0; ci < nodeCommunities[u].size() && totalMissingMembers < totalMissingMemberships;) {
 						const CommunityPtr &com = nodeCommunities[u].sample_item(ci);
 						if (com->canRemoveNode()) {
-							// If this community had been missing members before, it is already in our list
-							if (com->getDesiredNumberOfNodes() <= com->getNumberOfNodes()) {
-								communitiesWithMissingMembers.push_back(com);
-							}
-
 							com->removeNode(u);
 							++totalMissingMembers;
 
@@ -542,7 +558,7 @@ namespace NetworKit {
 				// Start of each bucket, i.e., range of communities with that many members
 				std::vector<count> bucketStart;
 
-				CommunityPQ(const std::vector<CommunityPtr> &coms) {
+				CommunityPQ(const Aux::SamplingSet<CommunityPtr> &coms) {
 					if (coms.empty()) return;
 
 					for (const CommunityPtr &com : coms) {
@@ -633,7 +649,7 @@ namespace NetworKit {
 				}
 			};
 
-			CommunityPQ communitiesByDesiredMembers(communitiesWithMissingMembers);
+			CommunityPQ communitiesByDesiredMembers(communitiesWantingMembers);
 
 
 			std::vector<node> nodesByDesiredMemberships(nodesWithMissingCommunities.size(), none);
@@ -699,7 +715,7 @@ namespace NetworKit {
 			}
 
 			timer.stop();
-			INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms for first greedy assignment of ", nodesByDesiredMemberships.size(), " nodes to ", communitiesWithMissingMembers.size(), " communities, still missing ", stillMissingMembers, " members in ", communitiesByDesiredMembers.size(), " communities.");
+			INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms for first greedy assignment of ", nodesByDesiredMemberships.size(), " nodes to ", communitiesWantingMembers.size(), " communities, still missing ", stillMissingMembers, " members in ", communitiesByDesiredMembers.size(), " communities.");
 
 
 			// second step: if communities still want nodes, find out how many memberships are missing and add additional nodes to nodesParticipating.

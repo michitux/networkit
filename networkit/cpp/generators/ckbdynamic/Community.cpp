@@ -38,8 +38,10 @@ namespace NetworKit {
 		}
 
 		void Community::setDesiredNumberOfNodes(count size) {
+			assert(size >= getNumberOfNodes());
 			desiredSize = size;
 			changeEdgeProbability(generator.communitySizeSampler->getCommunityDensity(size));
+			generator.desiredSizeChanged(CommunityPtr(this));
 		}
 
 		void Community::verifyInvariants() const {

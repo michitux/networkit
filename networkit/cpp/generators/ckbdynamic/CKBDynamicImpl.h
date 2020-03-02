@@ -33,6 +33,7 @@ namespace NetworKit {
 			void removeNodeFromCommunity(node u, CommunityPtr com);
 			void addCommunity(CommunityPtr com);
 			void removeCommunity(CommunityPtr com);
+			void desiredSizeChanged(CommunityPtr com);
 
 			void generateNode();
 			void eraseNode();
@@ -77,6 +78,7 @@ namespace NetworKit {
 			std::vector<Aux::SamplingSet<CommunityPtr>> nodeCommunities;
 			Aux::SamplingSet<node> nodesWithOverassignments;
 			Aux::SamplingSet<node> nodesWantingAssignments;
+			Aux::SamplingSet<CommunityPtr> communitiesWantingMembers;
 			std::vector<node> nodeMemberships;
 			CommunityPtr globalCommunity;
 			count maxCommunityId;
