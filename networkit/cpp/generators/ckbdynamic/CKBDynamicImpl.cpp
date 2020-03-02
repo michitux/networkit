@@ -393,12 +393,22 @@ namespace NetworKit {
 				const count desired = desiredMemberships[u];
 				const count actual = nodeCommunities[u].size();
 
+				assert(nodesAlive.contains(u));
 				assert(desired > actual);
 
 				count toAssign = desired - actual;
 				totalMissingMemberships += toAssign;
 				nodesWithMissingCommunities.insert({u, NodeMembership{desired, toAssign}});
 			}
+
+#ifndef NDEBUG
+			for (node u : nodesAlive) {
+				const count desired = desiredMemberships[u];
+				const count actual = nodeCommunities[u].size();
+
+				assert(nodesWithMissingCommunities.contains(u) == (desired > actual));
+			}
+#endif
 
 			timer.stop();
 			INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms to collect initial candidates, ", totalMissingMembers, " members to be found, ", totalMissingMemberships, " memberships wanted");
