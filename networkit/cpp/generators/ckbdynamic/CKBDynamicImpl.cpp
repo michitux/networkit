@@ -585,6 +585,14 @@ namespace NetworKit {
 					return communitiesByDesiredMembers[i];
 				}
 
+				/**
+				 * Decrement the counter of item at position @a pos
+				 *
+				 * The item is removed if the counter reaches 0.
+				 * This may influence the order of elements at positions >= @a pos.
+				 *
+				 * @param pos The position of the item
+				 */
 				void decrementAt(size_t pos) {
 					const count desired = communitiesByDesiredMembers[pos].second;
 					assert(desired > 0);

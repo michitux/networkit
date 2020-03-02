@@ -42,11 +42,11 @@ namespace NetworKit {
 			bool hasNode(node u) const { return nodesAlive.contains(u); };
 
 			/**
-			 * Draw random value in the range [0, b)
+			 * Draw random integer in the range [0, b)
 			 */
 			index drawIndex(index b);
 			/**
-			 * Draw random value in the range [a, b)
+			 * Draw random integer in the range [a, b)
 			 */
 			index drawIndex(index a, index b);
 
@@ -55,6 +55,9 @@ namespace NetworKit {
 			 */
 			double drawBinomial(count numTrials, double probability);
 
+			/**
+			 * Draw a random value in the interval [0, 1).
+			 */
 			double drawProbability();
 
 
