@@ -2,7 +2,6 @@
 #define CKBDYNAMIC_COMMUNITY_H_
 
 #include <tlx/counting_ptr.hpp>
-#include <tlx/math/integer_log2.hpp>
 #include "../../Globals.h"
 #include "../../auxiliary/SamplingSet.h"
 #include "NodePairHash.h"
