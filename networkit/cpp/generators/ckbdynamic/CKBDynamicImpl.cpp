@@ -483,8 +483,11 @@ namespace NetworKit {
 				INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms to exclude ", nodesThatWantCommunities.size(), " memberships from assignment.");
 			}
 
+			bool overAssigned = false;
+
 			// Step 3: over-assignment: sample from all nodes/memberships to get additional nodes until the numbers match
 			if (totalMissingMembers > totalMissingMemberships) {
+				overAssigned = true;
 				timer.start();
 				for (size_t i = totalMissingMemberships; i < totalMissingMembers; ++i) {
 					size_t j = drawIndex(nodeMemberships.size());
@@ -671,7 +674,7 @@ namespace NetworKit {
 
 					if (!overAssignment && communitiesToFind > 0) {
 						// we did over-assignment!
-						if (totalMissingMembers > totalMissingMemberships) {
+						if (overAssigned) {
 							// but this node nevertheless got less than it wanted
 							if (nodeCommunities[u].size() + numFreshAssignmentsOfU < desiredMemberships[u]) {
 								communitiesToFind = std::min(communitiesToFind, desiredMemberships[u] - nodeCommunities[u].size() - numFreshAssignmentsOfU);
@@ -687,7 +690,7 @@ namespace NetworKit {
 						}
 					}
 
-					assert(freshAssignmentsPerNode[u] + nodeCommunities[u].size() <= desiredMemberships[u] || totalMissingMembers > totalMissingMemberships);
+					assert(freshAssignmentsPerNode[u] + nodeCommunities[u].size() <= desiredMemberships[u] || overAssigned);
 				};
 
 
@@ -717,6 +720,7 @@ namespace NetworKit {
 						greedilyAssignNode(u, 1, false);
 					} else {
 					// if we had over-assignment, from the list of all nodes
+						overAssigned = true;
 						index j = drawIndex(nodeMemberships.size());
 						node u = nodeMemberships[j];
 
@@ -843,7 +847,7 @@ namespace NetworKit {
 			for (auto it : freshAssignments) {
 				const node u = it.first;
 				it.second->addNode(u);
-				assert(totalMissingMembers > totalMissingMemberships || nodeCommunities[u].size() <= desiredMemberships[u]);
+				assert(overAssigned || nodeCommunities[u].size() <= desiredMemberships[u]);
 			}
 			timer.stop();
 			INFO("Needed ", timer.elapsedMicroseconds() * 1.0 / 1000, "ms to assign ", freshAssignments.size(), " nodes to communities");
