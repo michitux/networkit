@@ -507,37 +507,101 @@ namespace NetworKit {
 			}
 
 			timer.start();
-			std::vector<std::pair<CommunityPtr, count>> communitiesByDesiredMembers;
 
-			{
-				std::vector<count> numCommunitiesWithDesired;
+			/**
+			 * Simple bucket PQ that stores communities by desired members
+			 */
+			struct CommunityPQ {
+				using value_type = std::pair<CommunityPtr, count>;
+				// Communities sorted by desired members in decreasing order
+				std::vector<value_type> communitiesByDesiredMembers;
+				// Start of each bucket, i.e., range of communities with that many members
+				std::vector<count> bucketStart;
 
-				for (CommunityPtr com : communitiesWithMissingMembers) {
-					const count desired = com->getDesiredNumberOfNodes();
+				CommunityPQ(const std::vector<CommunityPtr> &coms) {
+					if (coms.empty()) return;
 
-					if (desired >= numCommunitiesWithDesired.size()) {
-						numCommunitiesWithDesired.resize(desired + 1);
+					for (const CommunityPtr &com : coms) {
+						const count desired = com->getDesiredNumberOfNodes() - com->getNumberOfNodes();
+
+						if (desired >= bucketStart.size()) {
+							bucketStart.resize(desired + 1);
+						}
+
+						++bucketStart[desired];
 					}
 
-					++numCommunitiesWithDesired[desired];
+					count sum = 0;
+					// Reverse buckets by iterating in reverse order
+					for (auto it = bucketStart.rbegin(); it != bucketStart.rend(); ++it) {
+						const count tmp = *it;
+						*it = sum;
+						sum += tmp;
+					}
+
+					communitiesByDesiredMembers.resize(sum);
+
+					for (const CommunityPtr &com : coms) {
+						const count desired = com->getDesiredNumberOfNodes() - com->getNumberOfNodes();
+						communitiesByDesiredMembers[bucketStart[desired]] = {com, desired};
+						++bucketStart[desired];
+					}
+
+					for (size_t i = 0; i + 1 < bucketStart.size(); ++i) {
+						bucketStart[i] = bucketStart[i + 1];
+					}
+
+					bucketStart.back() = 0;
+
+					verify_invariants();
 				}
 
-				count sum = 0;
-				for (auto it = numCommunitiesWithDesired.begin(); it != numCommunitiesWithDesired.end(); ++it) {
-					const count tmp = *it;
-					*it = sum;
-					sum += tmp;
+				size_t size() const {
+					return communitiesByDesiredMembers.size();
 				}
 
-				communitiesByDesiredMembers.resize(sum);
-
-				for (CommunityPtr com : communitiesWithMissingMembers) {
-					const count desired = com->getDesiredNumberOfNodes();
-					const count actual = com->getNumberOfNodes();
-					communitiesByDesiredMembers[numCommunitiesWithDesired[desired]] = {com, desired - actual};
-					++numCommunitiesWithDesired[desired];
+				void verify_invariants() const {
+#ifndef NDEBUG
+					count last_desired = std::numeric_limits<count>::max();
+					for (size_t i = 0; i < size(); ++i) {
+						const count desired = operator[](i).second;
+						assert(desired > 0);
+						// Ensure that elements are in decreasing order
+						if (desired != last_desired) {
+							assert(desired < last_desired);
+							last_desired = desired;
+						}
+						// assert that the item is in the right bucket
+						assert(bucketStart[desired] <= i);
+						assert(bucketStart[desired-1] > i);
+					}
+#endif
 				}
-			}
+
+                                const value_type& operator[](size_t i) const {
+					return communitiesByDesiredMembers[i];
+				}
+
+				void decrementAt(size_t pos) {
+					const count desired = communitiesByDesiredMembers[pos].second;
+					assert(desired > 0);
+					if (desired == 1) {
+						communitiesByDesiredMembers[pos] = communitiesByDesiredMembers.back();
+						communitiesByDesiredMembers.pop_back();
+					} else {
+						--bucketStart[desired - 1];
+						index newPos = bucketStart[desired - 1];
+						assert(newPos >= pos);
+						using std::swap;
+						swap(communitiesByDesiredMembers[pos], communitiesByDesiredMembers[newPos]);
+						--communitiesByDesiredMembers[newPos].second;
+					}
+
+					verify_invariants();
+				}
+			};
+
+			CommunityPQ communitiesByDesiredMembers(communitiesWithMissingMembers);
 
 
 			std::vector<node> nodesByDesiredMemberships(nodesWithMissingCommunities.size(), none);
@@ -585,51 +649,24 @@ namespace NetworKit {
 
 			auto greedilyAssignNode =
 				[&](node u, count numMembers, bool overAssignment) {
-					index last_empty = communitiesByDesiredMembers.size();
 					count communitiesToFind = numMembers;
 					count &numFreshAssignmentsOfU = freshAssignmentsPerNode[u];
 
-					for (index i = 0; i < communitiesByDesiredMembers.size() && communitiesToFind > 0; ++i) {
+					for (index i = 0; i < communitiesByDesiredMembers.size() && communitiesToFind > 0;) {
 						// Iterate from back to front
-						const index ci = communitiesByDesiredMembers.size() - i - 1;
-						const CommunityPtr &com = communitiesByDesiredMembers[ci].first;
-						count &missing = communitiesByDesiredMembers[ci].second;
-						if (missing > 0 && !com->hasNode(u)) {
-							if (freshAssignments.insert({u, com.get()}) == 1) {
-								--missing;
-								--stillMissingMembers;
-								--communitiesToFind;
-								++numFreshAssignmentsOfU;
-							}
-						}
-
-						// Store the last community that is full
-						if (missing == 0) {
-							last_empty = ci;
+						const CommunityPtr &com = communitiesByDesiredMembers[i].first;
+						if (!com->hasNode(u) && freshAssignments.insert({u, com.get()}) == 1) {
+							--stillMissingMembers;
+							--communitiesToFind;
+							++numFreshAssignmentsOfU;
+							communitiesByDesiredMembers.decrementAt(i);
+						} else {
+							++i;
 						}
 
 						if (communitiesToFind == 0) {
 							break;
 						}
-					}
-
-					// If we found a full community, eliminate any full communities to ensure we do not iterate over them again and again
-					// Note that this only iterates over communities that were already touched in the previous loop
-					if (last_empty < communitiesByDesiredMembers.size()) {
-						// Shift everything to the front
-						index wi = last_empty;
-						for (index ri = last_empty; ri < communitiesByDesiredMembers.size(); ++ri) {
-							if (communitiesByDesiredMembers[ri].second > 0) {
-								communitiesByDesiredMembers[wi] = communitiesByDesiredMembers[ri];
-								++wi;
-							}
-						}
-
-						// Remove the remaining entries
-						while (communitiesByDesiredMembers.size() > wi) {
-							communitiesByDesiredMembers.pop_back();
-						}
-
 					}
 
 					if (!overAssignment && communitiesToFind > 0) {
