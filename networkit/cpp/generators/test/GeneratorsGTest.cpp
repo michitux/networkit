@@ -51,6 +51,7 @@ Dy * GeneratorsTest.cpp
 #include "../../global/ClusteringCoefficient.h"
 #include "../../community/PLM.h"
 #include "../../community/Modularity.h"
+#include <robin_hood.h>
 
 
 namespace NetworKit {
@@ -1129,6 +1130,37 @@ TEST_F(GeneratorsGTest, benchCKBDynamic) {
 	count n = 20000;
 	CKBDynamic gen(n, 6, n/10, -2.5, 1, n/10, -2.5, 0.01, 0.001, 0.01, 1, 0.5, 2.0/n, 0.8, 10, 1000);
 	gen.run();
+}
+
+TEST_F(GeneratorsGTest, benchRobin) {
+	robin_hood::unordered_flat_set<size_t> my_set;
+	for (size_t i = 0; i < 50000000; ++i) {
+		my_set.insert(i);
+	}
+
+	std::cout << "Inserted items" << std::endl;
+
+	my_set.clear();
+
+	for (size_t i = 0; i < 10; ++i) {
+		my_set.insert(9999999);
+		for (size_t j : my_set) {
+			std::cout << "Iterating over " << j << std::endl;
+		}
+		my_set.clear();
+	}
+
+	my_set.reserve(0);
+
+	std::cout << "Called reserve(0)" << std::endl;
+
+	for (size_t i = 0; i < 10; ++i) {
+		my_set.insert(9999999);
+		for (size_t j : my_set) {
+			std::cout << "Iterating over " << j << std::endl;
+		}
+		my_set.clear();
+	}
 }
 
 } /* namespace NetworKit */
