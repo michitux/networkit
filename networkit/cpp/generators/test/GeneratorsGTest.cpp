@@ -1126,8 +1126,8 @@ TEST_F(GeneratorsGTest, testCKBDynamic) {
 
 TEST_F(GeneratorsGTest, benchCKBDynamic) {
 	Aux::Random::setSeed(42, false);
-	count n = 10000;
-	CKBDynamic gen(n, 10, n/10, -2.5, 1, n/10, -2.5, 0.01, 0.001, 0.01, 2, 0.5, 2.0/n, 0.8, 10, 1000);
+	count n = 20000;
+	CKBDynamic gen(n, 6, n/10, -2.5, 1, n/10, -2.5, 0.01, 0.001, 0.01, 1, 0.5, 2.0/n, 0.8, 10, 1000);
 	gen.run();
 }
 
