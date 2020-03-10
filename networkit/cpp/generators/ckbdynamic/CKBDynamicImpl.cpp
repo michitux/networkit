@@ -46,6 +46,7 @@ namespace NetworKit {
 		}
 
 		void CKBDynamicImpl::addNodeToCommunity(node u, CommunityPtr com) {
+			assert(hasNode(u));
 			if (com != globalCommunity) {
 				if (desiredMemberships[u] == nodeCommunities[u].size()) {
 					nodesWithOverassignments.insert(u);
@@ -65,6 +66,7 @@ namespace NetworKit {
 		}
 
 		void CKBDynamicImpl::removeNodeFromCommunity(node u, CommunityPtr com) {
+			assert(hasNode(u));
 			if (com != globalCommunity) {
 				if (desiredMemberships[u] == nodeCommunities[u].size()) {
 					nodesWantingAssignments.insert(u);
@@ -212,9 +214,9 @@ namespace NetworKit {
 			}
 
 			assert(nodesAlive.contains(u));
-			nodesAlive.erase(u);
 			globalCommunity->removeNode(u);
 			nodesWantingAssignments.erase(u);
+			nodesAlive.erase(u);
 			eventStream.removeNode(currentTimeStep, u);
 		}
 

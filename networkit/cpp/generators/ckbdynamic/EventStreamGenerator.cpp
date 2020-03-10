@@ -74,6 +74,9 @@ namespace NetworKit {
 							assert(it != neighbors[e.second].end());
 							++it->second;
 						}
+
+						assert(deathTime[e.first] == none);
+						assert(deathTime[e.second] == none);
 					}
 				}
 
