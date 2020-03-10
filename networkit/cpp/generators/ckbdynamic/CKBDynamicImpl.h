@@ -61,6 +61,11 @@ namespace NetworKit {
 			 */
 			double drawProbability();
 
+			/**
+			 * Draw a node to over-assign a community to.
+			 */
+			node drawNodeForOverAssignment();
+
 
 			std::mt19937_64 urng;
 			std::unique_ptr<CommunitySizeDistribution> communitySizeSampler;

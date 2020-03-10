@@ -529,15 +529,7 @@ namespace NetworKit {
 				overAssigned = true;
 				timer.start();
 				for (size_t i = totalMissingMemberships; i < totalMissingMembers; ++i) {
-					size_t j = drawIndex(nodeMemberships.size());
-					node u = nodeMemberships[j];
-					// lazy deletion
-					while (!nodesAlive.contains(u)) {
-						nodeMemberships[j] = nodeMemberships.back();
-						nodeMemberships.pop_back();
-						j = drawIndex(nodeMemberships.size());
-						u = nodeMemberships[j];
-					}
+					node u = drawNodeForOverAssignment();
 
 					auto itSuccess = nodesWithMissingCommunities.insert({u, NodeMembership{desiredMemberships[u], 1}});
 					if (!itSuccess.second) {
@@ -737,9 +729,8 @@ namespace NetworKit {
 						greedilyAssignNode(u, 1);
 					} else {
 					// if we had over-assignment, from the list of all nodes
+						node u = drawNodeForOverAssignment();
 						overAssigned = true;
-						index j = drawIndex(nodeMemberships.size());
-						node u = nodeMemberships[j];
 
 						greedilyAssignNode(u, 1);
 					}
@@ -797,6 +788,20 @@ namespace NetworKit {
 				assert(actual == desired);
 			}
 			#endif
+		}
+
+		node CKBDynamicImpl::drawNodeForOverAssignment() {
+			index j = drawIndex(nodeMemberships.size());
+			node u = nodeMemberships[j];
+			// lazy deletion
+			while (!nodesAlive.contains(u)) {
+				nodeMemberships[j] = nodeMemberships.back();
+				nodeMemberships.pop_back();
+				j = drawIndex(nodeMemberships.size());
+				u = nodeMemberships[j];
+			}
+
+			return u;
 		}
 	}
 }
