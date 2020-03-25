@@ -41,6 +41,7 @@
 #include <networkit/community/CoverF1Similarity.hpp>
 #include <networkit/community/QuasiThresholdEditingLocalMover.hpp>
 #include <networkit/community/QuasiThresholdEditingLinear.hpp>
+#include <networkit/community/QuasiThresholdGreedyBound.hpp>
 
 #include <tlx/unused.hpp>
 
@@ -776,4 +777,28 @@ TEST_F(CommunityGTest, testQuasiThresholdEditingLinear) {
 	INFO("Moving improved this to ", mover2.getNumberOfEdits(), " edits");
 }
 
+TEST_F(CommunityGTest, testQuasiThresholdGreedyBound) {
+	Graph karate = METISGraphReader().read("input/karate.graph");
+
+	QuasiThresholdGreedyBound bound(karate);
+	bound.run();
+
+        INFO("Greedy bound on karate is ", bound.getMinDistance());
+        EXPECT_GT(bound.getMinDistance(), 1);
+        EXPECT_LE(bound.getMinDistance(), 21);
+}
+
+TEST_F(CommunityGTest, benchQuasiThresholdGreedyBound) {
+        std::string graphPath;
+        std::cout << "[INPUT] METIS graph file path for QT bound >" << std::endl;
+        std::getline(std::cin, graphPath);
+	Graph G = METISGraphReader().read(graphPath);
+
+	QuasiThresholdGreedyBound bound(G);
+	bound.run();
+
+        INFO("Greedy bound on the graph is ", bound.getMinDistance());
+        EXPECT_GT(bound.getMinDistance(), 1);
+        EXPECT_LE(bound.getMinDistance(), G.numberOfEdges() / 3);
+}
 } /* namespace NetworKit */
