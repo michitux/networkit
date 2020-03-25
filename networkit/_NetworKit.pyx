@@ -6131,6 +6131,21 @@ cdef class QuasiThresholdEditingLinear:
 	def getQuasiThresholdGraph(self):
 		return Graph().setThis(self._this.getQuasiThresholdGraph())
 
+cdef extern from "<networkit/community/QuasiThresholdGreedyBound.hpp>":
+	cdef cppclass _QuasiThresholdGreedyBound "NetworKit::QuasiThresholdGreedyBound"(_Algorithm):
+		_QuasiThresholdGreedyBound(_Graph G) except +
+		count getMinDistance() except +
+
+cdef class QuasiThresholdGreedyBound(Algorithm):
+	cdef Graph _G
+
+	def __cinit__(self, Graph G):
+		self._G = G
+		self._this = new _QuasiThresholdGreedyBound(G._this)
+
+	def getMinDistance(self):
+		return (<_QuasiThresholdGreedyBound*>(self._this)).getMinDistance()
+
 cdef class DissimilarityMeasure:
 	""" Abstract base class for partition/community dissimilarity measures """
 	# TODO: use conventional class design of parametrized constructor, run-method and getters
