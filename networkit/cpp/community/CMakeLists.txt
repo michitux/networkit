@@ -31,6 +31,7 @@ networkit_add_module(community
     PartitionIntersection.cpp
     QuasiThresholdEditingLinear.cpp
     QuasiThresholdEditingLocalMover.cpp
+    QuasiThresholdGreedyBound.cpp
     SampledGraphStructuralRandMeasure.cpp
     SampledNodeStructuralRandMeasure.cpp
     StablePartitionNodes.cpp
