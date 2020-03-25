@@ -33,51 +33,51 @@ void QuasiThresholdGreedyBound::run() {
 	};
 
 	minDist = 0;
-	std::vector<bool> uMarker(G.upperNodeIdBound(), false);
+	std::vector<robin_hood::unordered_flat_set<node>> neighbors(G.upperNodeIdBound());
+
+	G.forNodes([&](node u) {
+		if (G.degree(u) < 2) return; // avoid degree-1-nodes as we skip them anyway below
+		auto &uNeighbors = neighbors[u];
+		uNeighbors.reserve(G.degree(u));
+		G.forNeighborsOf(u, [&](node v) {
+			uNeighbors.insert(v);
+		});
+	});
+
+	// Find a neighbor of u that is not a neighbor of v and for which none of the node pairs is marked
+	auto findUnmarkedNeighbor = [&](node u, node v) {
+		for (node w : G.neighborRange(u)) {
+			if (w != v && neighbors[v].count(w) == 0 && !is_marked(u, w) && !is_marked(v, w)) {
+				return w;
+			}
+		}
+
+		return none;
+	};
 
 	G.forEdges([&](node u, node v) {
 		if (G.degree(u) < 2 || G.degree(v) < 2) return;
 		if (is_marked(u, v)) return;
 
+		// First check the lower-degree neighbor, then the higher-degree neighbor
 		if (G.degree(u) > G.degree(v)) std::swap(u, v);
 
-		G.forNeighborsOf(u, [&](node w) {
-			uMarker[w] = (w != v);
-		});
+		node uNeighbor = findUnmarkedNeighbor(u, v);
+		if (uNeighbor != none) {
+			node vNeighbor = findUnmarkedNeighbor(v, u);
 
-		node vNeighbor = none;
-
-		G.forNeighborsOf(v, [&](node w) {
-			if (uMarker[w]) {
-				uMarker[w] = false;
-			} else if (w != u && vNeighbor == none && !(is_marked(u, w) || is_marked(v, w))) {
-				vNeighbor = w;
-			}
-		});
-
-		if (vNeighbor != none) {
-			bool found = false;
-			G.forNeighborsOf(u, [&](node w) {
-				if (found) return;
-
-				if (uMarker[w] && (!(is_marked(u, w) || is_marked(v, w)))) {
-					mark(u, v);
-					mark(u, w);
-					mark(v, w);
-					mark(u, vNeighbor);
-					mark(v, vNeighbor);
-					found = true;
-					++minDist;
-					if (minDist % 1024 == 0) {
-						INFO("node ", u, " minDist increased to ", minDist);
-					}
+			if (vNeighbor != none) {
+				mark(u, v);
+				mark(u, uNeighbor);
+				mark(v, uNeighbor);
+				mark(u, vNeighbor);
+				mark(v, vNeighbor);
+				++minDist;
+				if (minDist % 10000 == 0) {
+					INFO("node ", u, " minDist increased to ", minDist);
 				}
-			});
+			}
 		}
-
-		G.forNeighborsOf(u, [&](node w) {
-			uMarker[w] = false;
-		});
 	});
 
 	hasRun = true;
