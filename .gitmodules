@@ -4,3 +4,6 @@
 [submodule "extlibs/tlx"]
 	path = extlibs/tlx
 	url = https://github.com/tlx/tlx
+[submodule "extlibs/robin_hood"]
+	path = extlibs/robin_hood
+	url = https://github.com/martinus/robin-hood-hashing.git

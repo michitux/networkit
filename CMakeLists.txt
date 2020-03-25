@@ -209,6 +209,15 @@ else()
 			INTERFACE_INCLUDE_DIRECTORIES "${NETWORKIT_EXT_TLX}/include/")
 endif()
 
+# Use robin_hood as a CMake submodule
+if(EXISTS "${PROJECT_SOURCE_DIR}/extlibs/robin_hood/CMakeLists.txt")
+        add_subdirectory(extlibs/robin_hood)
+else()
+        message(FATAL_ERROR
+                        "Missing robin_hood library in extlibs/robin_hood "
+                        "Please run `git submodule update --init` to fetch the submodule.")
+endif()
+
 ################################################################################
 # NETWORKIT MODULES
 if(NETWORKIT_BUILD_CORE AND NETWORKIT_MONOLITH)
@@ -227,7 +236,7 @@ if(NETWORKIT_BUILD_CORE AND NETWORKIT_MONOLITH)
 			LIBRARY DESTINATION ${NETWORKIT_LIB_DEST}
 			ARCHIVE DESTINATION ${NETWORKIT_LIB_DEST})
 
-	target_link_libraries(networkit PRIVATE tlx OpenMP::OpenMP_CXX)
+	target_link_libraries(networkit PRIVATE tlx OpenMP::OpenMP_CXX robin_hood)
 	target_include_directories(networkit BEFORE PUBLIC "${PROJECT_SOURCE_DIR}/include")
 	target_include_directories(networkit PUBLIC "${PROJECT_SOURCE_DIR}/extlibs/ttmath/")
 endif()
@@ -300,7 +309,7 @@ function(networkit_add_module modname)
 			COMPILE_FLAGS "${NETWORKIT_CXX_FLAGS}"
 			LINK_FLAGS "${NETWORKIT_LINK_FLAGS}")
 
-		target_link_libraries(${MODULE_TARGET} PRIVATE tlx OpenMP::OpenMP_CXX)
+		target_link_libraries(${MODULE_TARGET} PRIVATE tlx OpenMP::OpenMP_CXX robin_hood)
 		target_include_directories(${MODULE_TARGET} BEFORE PUBLIC "${PROJECT_SOURCE_DIR}/include")
 		target_include_directories(${MODULE_TARGET} PUBLIC "${PROJECT_SOURCE_DIR}/extlibs/ttmath/")
 
