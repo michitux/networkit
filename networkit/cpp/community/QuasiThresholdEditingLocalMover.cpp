@@ -7,12 +7,13 @@
 #include <networkit/community/QuasiThresholdEditingLocalMover.hpp>
 #include <networkit/generators/TreeReachabilityGraphGenerator.hpp>
 #include <networkit/graph/DynamicForest.hpp>
+#include <networkit/graph/GraphTools.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
 #include <networkit/auxiliary/Log.hpp>
 
 NetworKit::QuasiThresholdEditingLocalMover::QuasiThresholdEditingLocalMover(const NetworKit::Graph &G, const std::vector< NetworKit::node > &parent, NetworKit::count maxIterations, bool moveSubtrees)
 : G(G), maxIterations(maxIterations), moveSubtrees(moveSubtrees), numEdits(none) {
-	forest = Graph(G.copyNodes(), false, true);
+	forest = Graph(GraphTools::copyNodes(G), false, true);
 	G.forNodes([&](node u) {
 		if (parent[u] != none) {
 			forest.addEdge(u, parent[u]);

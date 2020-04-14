@@ -7,6 +7,7 @@
 #include <networkit/community/QuasiThresholdEditingLinear.hpp>
 #include <networkit/edgescores/TriangleEdgeScore.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
+#include <networkit/graph/GraphTools.hpp>
 
 NetworKit::QuasiThresholdEditingLinear::QuasiThresholdEditingLinear(const NetworKit::Graph &G) : G(G), hasRun(false) {
 }
@@ -138,7 +139,7 @@ std::vector< NetworKit::node > NetworKit::QuasiThresholdEditingLinear::getParent
 
 
 NetworKit::Graph NetworKit::QuasiThresholdEditingLinear::getDefiningForest() const {
-	Graph result(G.copyNodes(), false, true);
+	Graph result(GraphTools::copyNodes(G), false, true);
 
 	if (!hasRun) throw std::runtime_error("Error, run must be called first");
 
@@ -153,7 +154,7 @@ NetworKit::Graph NetworKit::QuasiThresholdEditingLinear::getDefiningForest() con
 
 
 NetworKit::Graph NetworKit::QuasiThresholdEditingLinear::getQuasiThresholdGraph() const {
-	Graph result(G.copyNodes());
+	Graph result(GraphTools::copyNodes(G));
 
 	if (!hasRun) throw std::runtime_error("Error, run must be called first");
 
