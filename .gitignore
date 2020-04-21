@@ -26,6 +26,10 @@ EnsembleClustering-O
 *.eps
 doxygen
 dist/
+build/*
+build_test/*
+include/ttmath/*
+networkit/extlibs/*
 
 ### NetworKit specific
 include/NetworKit
