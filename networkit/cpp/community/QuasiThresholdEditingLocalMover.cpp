@@ -11,6 +11,105 @@
 #include <networkit/auxiliary/SignalHandling.hpp>
 #include <networkit/auxiliary/Log.hpp>
 
+
+namespace NetworKit {
+class BucketQueue { 
+	count nextNode;
+	count currentBucket;
+	std::vector<node> nodes;
+	//points to first element in the bucket
+	std::vector<count> border;
+	
+	public :
+	BucketQueue(count n){
+		nodes = std::vector<node>(n);
+		border = std::vector<count>(n);
+		nextNode = none;
+		currentBucket = none;
+	}
+	
+	
+	void fill(std::vector<node> elements, std::vector<count> depth){
+		std::fill(border.begin(), border.end(), 0);
+		count max_depth = 0;
+		for (node u : elements) {
+			border[depth[u]] += 1;
+			max_depth = std::max(max_depth, depth[u]);
+		}
+		for (int m = 1; m <= max_depth; m++){
+			border[m] += border[m-1];
+		}
+    nextNode = none;
+		currentBucket = none;
+		TRACE("Border Array ", border);
+		for(int j = elements.size() - 1; j >= 0; j--){
+			node u = elements[j];
+			border[depth[u]] -= 1;
+    	nodes[border[depth[u]]] = u;
+			nextNode += 1;
+  	}
+		if(nextNode == none){
+			TRACE("Bucket queue initially empty");
+			return;
+		} 
+		currentBucket = max_depth;
+		/*if(currentBucket > 2 * elements.size()){
+			nextNode = border[(2 * elements.size()) + 1];
+			if(nextNode == 0) {
+				nextNode = none;
+				TRACE("Bucket queue initially empty");
+				return;
+			} else {
+				nextNode -= 1;
+			}
+			currentBucket = depth[nextNode];
+		}*/
+		TRACE("Constructed bucket queue", nodes, " from elements ", elements);
+		TRACE("Borders: ", border);
+		TRACE("Starting with: ", nodes[nextNode], " in bucket ", currentBucket);
+		//assert(currentBucket <= 2 * elements.size());
+		/*if(nextNode != 0){
+			for (int i = 1; i<= nextNode; i++){
+				assert(depth[nodes[i-1]] <= depth[nodes[i]]);
+			}
+		}*/
+			
+	}
+	
+	node next(){
+		if(nextNode == none){
+			return none;
+		}
+		node result = nodes[nextNode];
+		while(nextNode < border[currentBucket]){
+			currentBucket -= 1;
+		}
+		nextNode -= 1;
+		return result;
+	}
+	
+	void insertParent(node p){
+		nextNode += 1;
+		//first element of currentBucket
+		count bucketBorder = border[currentBucket];
+		node firstOfBucket = nodes[bucketBorder];
+		nodes[nextNode] = firstOfBucket;
+		nodes[bucketBorder] = p;
+		border[currentBucket] += 1;
+		TRACE("Move ", firstOfBucket, " to ", nextNode);
+		TRACE("Insert ", p, " to Bucket queue at pos ", bucketBorder);
+	}
+	
+	bool empty() {
+		return nextNode == none;
+	}
+	
+	
+};  
+} 
+
+
+
 NetworKit::QuasiThresholdEditingLocalMover::QuasiThresholdEditingLocalMover(const NetworKit::Graph &G, const std::vector< NetworKit::node > &parent, NetworKit::count maxIterations, bool moveSubtrees)
 : G(G), maxIterations(maxIterations), moveSubtrees(moveSubtrees), numEdits(none) {
 	forest = Graph(GraphTools::copyNodes(G), false, true);
@@ -67,7 +166,8 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 
 	handler.assureRunning();
 
-	std::vector<node> neighborQueue, currentLevel, nextLevel, touchedNodes, lastVisitedDFSNode(G.upperNodeIdBound(), none), bestParentBelow(G.upperNodeIdBound(), none);
+	NetworKit::BucketQueue bucketQueue(G.upperNodeIdBound());
+	std::vector<node> neighbors, currentLevel, touchedNodes, lastVisitedDFSNode(G.upperNodeIdBound(), none), bestParentBelow(G.upperNodeIdBound(), none);
 	G.parallelForNodes([&](node u) {
 		lastVisitedDFSNode[u] = u;
 	});
@@ -105,16 +205,12 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 			depth[nodeToMove] = 0;
 
 			G.forEdgesOf(nodeToMove, [&](node v) {
-				neighborQueue.emplace_back(v);
+				neighbors.push_back(v);
 			});
 
-			std::stable_sort(neighborQueue.begin(), neighborQueue.end(), [&](node u, node v) {return depth[u] < depth[v];}); // the queue shall be used from the end
-
+			bucketQueue.fill(neighbors, depth);
+			
 			count level = 0;
-			if (!neighborQueue.empty()) {
-				level = depth[neighborQueue.back()];
-			}
-
 			count bestParent = none;
 			count rootMaxGain = 0, rootEdits = 0;
 
@@ -196,7 +292,9 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 						if (!nodeTouched[p]) {
 							nodeTouched[p] = true;
 							touchedNodes.push_back(p);
-							nextLevel.push_back(p);
+							if(!marker[p]){
+								bucketQueue.insertParent(p);
+							}
 						}
 
 						if (editDifference[u] != none) {
@@ -223,29 +321,11 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 				if (dynamicForest.children(u).empty()) { assert(editDifference[u] == 1); }
 			};
 
-			while (!currentLevel.empty() || !neighborQueue.empty()) {
-				if (currentLevel.empty()) {
-					level = depth[neighborQueue.back()];
-				}
-
-				for (node u : currentLevel) {
-					assert(depth[u] == level);
-					processNode(u);
-				}
-
-				while (!neighborQueue.empty() && depth[neighborQueue.back()] == level) {
-					node u = neighborQueue.back();
-					neighborQueue.pop_back();
-					assert(depth[u] == level);
-
-					if (nodeTouched[u]) continue; // if the node was touched in the previous level, it was in currentLevel and thus has already been processed
-
-					processNode(u);
-				}
-
-				--level;
-				currentLevel.clear();
-				currentLevel.swap(nextLevel);
+		
+			while(!bucketQueue.empty()){
+				node u = bucketQueue.next();
+				level = depth[u];
+				processNode(u);
 			}
 
 			count bestEdits = G.degree(nodeToMove) - rootMaxGain;
@@ -318,7 +398,6 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 			count minEdits = curEdits;
 			std::vector<node> minChildren;
 			node minParent = curParent;
-
 			G.forNodes([&](node u) {
 				if (u == nodeToMove) return;
 				if (existingBelow[u] >= missingBelow[u] || (editDifference[u] > 0 && editDifference[u] != none)) {
@@ -397,6 +476,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 				bestParentBelow[u] = none;
 			}
 
+			neighbors.clear();
 			touchedNodes.clear();
 
 			G.forEdgesOf(nodeToMove, [&](node v) {
