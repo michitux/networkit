@@ -21,58 +21,38 @@ class BucketQueue {
 	std::vector<count> border;
 	
 	public :
-	BucketQueue(count n){
-		nodes = std::vector<node>(n);
-		border = std::vector<count>(n);
-		nextNode = none;
-		currentBucket = none;
+	BucketQueue(count n) : nodes(n), border(n), nextNode(none), currentBucket(none){
 	}
 	
 	
-	void fill(std::vector<node> elements, std::vector<count> depth){
-		std::fill(border.begin(), border.end(), 0);
-		count max_depth = 0;
+	void fill(const std::vector<node> &elements, const std::vector<count> &depth){
+		count max_depth = 2 * elements.size();
+		std::fill(border.begin(), border.begin() + std::min(max_depth + 1, border.size()), 0);
 		for (node u : elements) {
+			if(depth[u] > max_depth) continue;
 			border[depth[u]] += 1;
-			max_depth = std::max(max_depth, depth[u]);
 		}
 		for (int m = 1; m <= max_depth; m++){
 			border[m] += border[m-1];
 		}
+		currentBucket = max_depth;
     nextNode = none;
-		currentBucket = none;
-		TRACE("Border Array ", border);
 		for(int j = elements.size() - 1; j >= 0; j--){
 			node u = elements[j];
+			if(depth[u] > max_depth){
+				TRACE("Skip ", u);
+				continue;
+			}
 			border[depth[u]] -= 1;
     	nodes[border[depth[u]]] = u;
 			nextNode += 1;
   	}
+	
 		if(nextNode == none){
 			TRACE("Bucket queue initially empty");
 			return;
 		} 
-		currentBucket = max_depth;
-		/*if(currentBucket > 2 * elements.size()){
-			nextNode = border[(2 * elements.size()) + 1];
-			if(nextNode == 0) {
-				nextNode = none;
-				TRACE("Bucket queue initially empty");
-				return;
-			} else {
-				nextNode -= 1;
-			}
-			currentBucket = depth[nextNode];
-		}*/
-		TRACE("Constructed bucket queue", nodes, " from elements ", elements);
-		TRACE("Borders: ", border);
-		TRACE("Starting with: ", nodes[nextNode], " in bucket ", currentBucket);
-		//assert(currentBucket <= 2 * elements.size());
-		/*if(nextNode != 0){
-			for (int i = 1; i<= nextNode; i++){
-				assert(depth[nodes[i-1]] <= depth[nodes[i]]);
-			}
-		}*/
+
 			
 	}
 	
@@ -102,6 +82,20 @@ class BucketQueue {
 	
 	bool empty() {
 		return nextNode == none;
+	}
+	
+	std::string printQueue(){
+		std::stringstream ss;
+		ss << "BucketQueue:";
+		int j = 0;
+		for (count i = 0; i <= nextNode; i++){
+			while(border[j] == i){
+				ss << "| ";
+				j++;
+			}
+			ss << nodes[i] << " ";
+		}
+		return ss.str();
 	}
 	
 	
@@ -182,6 +176,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 			handler.assureRunning();
 			G.forEdgesOf(nodeToMove, [&](node v) {
 				marker[v] = true;
+				neighbors.push_back(v);
 			});
 
 			// remove the node from its tree but store the old position.
@@ -204,9 +199,6 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 
 			depth[nodeToMove] = 0;
 
-			G.forEdgesOf(nodeToMove, [&](node v) {
-				neighbors.push_back(v);
-			});
 
 			bucketQueue.fill(neighbors, depth);
 			
@@ -323,6 +315,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 
 		
 			while(!bucketQueue.empty()){
+				TRACE(bucketQueue.printQueue());
 				node u = bucketQueue.next();
 				level = depth[u];
 				processNode(u);
@@ -399,7 +392,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 			std::vector<node> minChildren;
 			node minParent = curParent;
 			G.forNodes([&](node u) {
-				if (u == nodeToMove) return;
+				if (u == nodeToMove || depth[u] > 2 * G.degree(nodeToMove)) return;
 				if (existingBelow[u] >= missingBelow[u] || (editDifference[u] > 0 && editDifference[u] != none)) {
 					assert(editDifference[u] == existingBelow[u] - missingBelow[u]);
 				} else if (nodeTouched[u]) {
@@ -408,7 +401,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 			});
 
 			G.forNodes([&](node u) {
-				if (dynamicForest.children(u).empty() && marker[u]) {
+				if (dynamicForest.children(u).empty() && marker[u] && depth[u] < 2*G.degree(nodeToMove)) {
 					assert(editDifference[u] == 1);
 				}
 			});
@@ -425,7 +418,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 				std::vector<node> children;
 				dynamicForest.forChildrenOf(p, [&](node c) {
 					if (c == nodeToMove) return;
-					if (existingBelow[c] > missingBelow[c]) { // TODO try >= (more children...)
+					if (existingBelow[c] > missingBelow[c] && depth[c] < 2*G.degree(nodeToMove)) { // TODO try >= (more children...)
 						if (dynamicForest.children(c).empty() && marker[c]) {
 							assert(editDifference[c] == 1);
 						}
