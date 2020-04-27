@@ -147,9 +147,6 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 
 	std::vector<count> numNeighbors;
 
-	if (moveSubtrees) {
-		numNeighbors.resize(G.upperNodeIdBound(), 0);
-	}
 
 	std::vector<count> depth(G.upperNodeIdBound(), 0);
 	dynamicForest.dfsFrom(none, [&](node c) {
@@ -338,7 +335,8 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 
 			std::vector<count> missingBelow, missingAbove, existingBelow, existingAbove;
 
-			bool countExactEdits = moveSubtrees;
+			//bool countExactEdits = moveSubtrees;
+			bool countExactEdits = true;
 #ifndef NDEBUG
 			countExactEdits = true;
 #endif
@@ -455,7 +453,6 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 			TRACE("Quadratic algorithm wants to have new parent ", minParent, " and new children ", minChildren);
 			TRACE("Linear algorithm wants to have new parent ", bestParent, " and new children ", bestChildren);
 #endif
-			bool moveWithSubtree = false;
 
 			// calculate the number of saved edits as comparing the absolute number of edits doesn't make sense
 			count savedEdits = curEdits - bestEdits;
@@ -476,104 +473,9 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 				marker[v] = false;
 			});
 
-			if (moveSubtrees) {
-				dynamicForest.setParent(nodeToMove, curParent);
-				for (node c : curChildren) {
-					dynamicForest.setParent(c, nodeToMove);
-				}
-
-				count subtreeSize = 0;
-				dynamicForest.dfsFrom(nodeToMove, [&](node d) {
-					marker[d] = true;
-					++subtreeSize;
-				}, [](node) {});
-
-				count subtreeExtDegree = 0;
-				dynamicForest.dfsFrom(nodeToMove, [&](node d) {
-					G.forNeighborsOf(d, [&](node v) {
-						if (!marker[v]) {
-							++numNeighbors[v];
-							++subtreeExtDegree;
-						}
-					});
-				}, [](node) {});
-
-				dynamicForest.forChildrenOf(none, [&](node r) {
-					dynamicForest.dfsFrom(r,
-					[&](node u) {
-						if (!marker[u]) {
-							missingAbove[u] = subtreeSize - numNeighbors[u];
-							existingAbove[u] = numNeighbors[u];
-							node p = dynamicForest.parent(u);
-							if (p != none) {
-								missingAbove[u] += missingAbove[p];
-								existingAbove[u] += existingAbove[p];
-							}
-						}
-					},
-					[](node) {});
-				});
-
-				// virtually remove the subtree of u from the forest concerning the missing/existingBelow-counters
-				for (node u = curParent; u != none; u = dynamicForest.parent(u)) {
-					existingBelow[u] -= existingBelow[nodeToMove];
-					missingBelow[u] -= missingBelow[nodeToMove];
-				}
-
-				// calculate how many edits the whole subtree currently needs
-				count curSubtreeEdits = subtreeExtDegree;
-				if (curParent != none) { // FIXME here we ignore edits inside the tree as they do not change. Is this okay?
-					curSubtreeEdits += missingAbove[curParent];
-					curSubtreeEdits -= existingAbove[curParent];
-				}
-
-				auto trySubtreeEditBelow = [&](node p) {
-					if (p != none && marker[p]) return;
-
-					count edits = subtreeExtDegree;
-					if (p != none) {
-						edits += missingAbove[p];
-						edits -= existingAbove[p];
-					}
-
-					std::vector<node> children;
-					dynamicForest.forChildrenOf(p, [&](node c) {
-						if (marker[c]) return;
-						if (existingBelow[c] >= missingBelow[c]) { // TODO try >= (more children...)
-							children.emplace_back(c);
-							edits -= existingBelow[c] - missingBelow[c];
-						}
-					});
-
-					if (edits < curSubtreeEdits && savedEdits < curSubtreeEdits - edits) {
-						bestEdits = edits;
-						bestChildren = std::move(children);
-						bestParent = p;
-						moveWithSubtree = true;
-						savedEdits = curSubtreeEdits - edits;
-					}
-
-				};
-
-				G.forNodes(trySubtreeEditBelow);
-				trySubtreeEditBelow(none);
-
-				dynamicForest.dfsFrom(nodeToMove, [&](node d) {
-					marker[d] = false;
-					G.forNeighborsOf(d, [&](node v) {
-						numNeighbors[v] = 0;
-					});
-				}, [](node) {});
-
-				TRACE("After subtree moving, ", savedEdits, " edits will be saved");
-				TRACE("After subtree moving (quadratic) algorithm wants to have new parent ", bestParent, " and new children ", bestChildren);
-			}
-
 
 			if (savedEdits > 0) {
-				if (!moveWithSubtree) {
-					dynamicForest.isolate(nodeToMove);
-				}
+				dynamicForest.isolate(nodeToMove);
 				dynamicForest.setParent(nodeToMove, bestParent);
 				for (node c : bestChildren) {
 					dynamicForest.setParent(c, nodeToMove);
@@ -586,7 +488,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 				forest = dynamicForest.toGraph();
 				assert(numEdits == countNumberOfEdits());
 #endif
-			} else if (!moveSubtrees) {
+			} else  {
 				dynamicForest.setParent(nodeToMove, curParent);
 				for (node c : curChildren) {
 					dynamicForest.setParent(c, nodeToMove);
