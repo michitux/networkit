@@ -25,12 +25,12 @@ class BucketQueue {
 	}
 	
 	
-	void fill(const std::vector<node> &elements, const std::vector<count> &depth){
+	void fill(const std::vector<node> &elements, const DynamicForest &dynamicForest){
 		count max_depth = 2 * elements.size();
 		std::fill(border.begin(), border.begin() + std::min(max_depth + 1, border.size()), 0);
 		for (node u : elements) {
-			if(depth[u] > max_depth) continue;
-			border[depth[u]] += 1;
+			if(dynamicForest.depth(u) > max_depth) continue;
+			border[dynamicForest.depth(u)] += 1;
 		}
 		for (int m = 1; m <= max_depth; m++){
 			border[m] += border[m-1];
@@ -39,12 +39,12 @@ class BucketQueue {
     nextNode = none;
 		for(int j = elements.size() - 1; j >= 0; j--){
 			node u = elements[j];
-			if(depth[u] > max_depth){
+			if(dynamicForest.depth(u) > max_depth){
 				TRACE("Skip ", u);
 				continue;
 			}
-			border[depth[u]] -= 1;
-    	nodes[border[depth[u]]] = u;
+			border[dynamicForest.depth(u)] -= 1;
+    	nodes[border[dynamicForest.depth(u)]] = u;
 			nextNode += 1;
   	}
 	
@@ -148,13 +148,6 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 	std::vector<count> numNeighbors;
 
 
-	std::vector<count> depth(G.upperNodeIdBound(), 0);
-	dynamicForest.dfsFrom(none, [&](node c) {
-		if (c != none && dynamicForest.parent(c) != none) {
-			depth[c] = depth[dynamicForest.parent(c)] + 1;
-		}
-	}, [](node){});
-
 	handler.assureRunning();
 
 	NetworKit::BucketQueue bucketQueue(G.upperNodeIdBound());
@@ -182,7 +175,6 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 			count curEdits = G.degree(nodeToMove);
 
 			dynamicForest.dfsFrom(nodeToMove, [&](node c) {
-				--depth[c];
 				if (c != nodeToMove) {
 					curEdits += 1 - 2 * marker[c];
 				}
@@ -194,17 +186,15 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 
 			dynamicForest.isolate(nodeToMove);
 
-			depth[nodeToMove] = 0;
 
-
-			bucketQueue.fill(neighbors, depth);
+			bucketQueue.fill(neighbors, dynamicForest);
 			
 			count level = 0;
 			count bestParent = none;
 			count rootMaxGain = 0, rootEdits = 0;
 
 			auto processNode = [&](node u) {
-				TRACE("Processing node ", u, " of depth ", depth[u], " (node to move: ", nodeToMove, ")");
+				TRACE("Processing node ", u, " of depth ", dynamicForest.depth(u), " (node to move: ", nodeToMove, ")");
 				TRACE("Parent: ", dynamicForest.parent(u), ", children: ", dynamicForest.children(u));
 				assert(u != nodeToMove);
 
@@ -231,7 +221,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 					node c = dynamicForest.nextDFSNodeOnEnter(u, u);
 
 					while (c != u) {
-						assert(depth[c] > level);
+						assert(dynamicForest.depth(c) > level);
 
 						if (!nodeTouched[c] || editDifference[c] == none) {
 							--editDifference[u];
@@ -314,7 +304,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 			while(!bucketQueue.empty()){
 				TRACE(bucketQueue.printQueue());
 				node u = bucketQueue.next();
-				level = depth[u];
+				level = dynamicForest.depth(u);
 				processNode(u);
 			}
 
@@ -390,7 +380,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 			std::vector<node> minChildren;
 			node minParent = curParent;
 			G.forNodes([&](node u) {
-				if (u == nodeToMove || depth[u] > 2 * G.degree(nodeToMove)) return;
+				if (u == nodeToMove || dynamicForest.depth(u) > 2 * G.degree(nodeToMove)) return;
 				if (existingBelow[u] >= missingBelow[u] || (editDifference[u] > 0 && editDifference[u] != none)) {
 					assert(editDifference[u] == existingBelow[u] - missingBelow[u]);
 				} else if (nodeTouched[u]) {
@@ -399,7 +389,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 			});
 
 			G.forNodes([&](node u) {
-				if (dynamicForest.children(u).empty() && marker[u] && depth[u] < 2*G.degree(nodeToMove)) {
+				if (dynamicForest.children(u).empty() && marker[u] && dynamicForest.depth(u) < 2*G.degree(nodeToMove)) {
 					assert(editDifference[u] == 1);
 				}
 			});
@@ -416,7 +406,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 				std::vector<node> children;
 				dynamicForest.forChildrenOf(p, [&](node c) {
 					if (c == nodeToMove) return;
-					if (existingBelow[c] > missingBelow[c] && depth[c] < 2*G.degree(nodeToMove)) { // TODO try >= (more children...)
+					if (existingBelow[c] > missingBelow[c] && dynamicForest.depth(c) < 2*G.degree(nodeToMove)) { // TODO try >= (more children...)
 						if (dynamicForest.children(c).empty() && marker[c]) {
 							assert(editDifference[c] == 1);
 						}
@@ -475,11 +465,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 
 
 			if (savedEdits > 0) {
-				dynamicForest.isolate(nodeToMove);
-				dynamicForest.setParent(nodeToMove, bestParent);
-				for (node c : bestChildren) {
-					dynamicForest.setParent(c, nodeToMove);
-				}
+				dynamicForest.moveToPosition(nodeToMove, bestParent, bestChildren);
 
 				hasMoved = true;
 				numEdits -= savedEdits;
@@ -489,19 +475,8 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 				assert(numEdits == countNumberOfEdits());
 #endif
 			} else  {
-				dynamicForest.setParent(nodeToMove, curParent);
-				for (node c : curChildren) {
-					dynamicForest.setParent(c, nodeToMove);
-				}
+				dynamicForest.moveToPosition(nodeToMove, curParent, curChildren);
 			}
-
-			dynamicForest.dfsFrom(nodeToMove, [&](node c) {
-				if (dynamicForest.parent(c) != none) {
-					depth[c] = depth[dynamicForest.parent(c)] + 1;
-				} else {
-					depth[c] = 0;
-				}
-			}, [](node){});
 		});
 
 		usedIterations = i+1;

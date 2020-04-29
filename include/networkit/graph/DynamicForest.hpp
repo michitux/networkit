@@ -6,6 +6,7 @@
 
 #include <networkit/Globals.hpp>
 #include <networkit/graph/Graph.hpp>
+#include <tlx/counting_ptr.hpp>
 
 namespace NetworKit {
 
@@ -14,6 +15,7 @@ public:
 	DynamicForest(const Graph& G);
 
 	node parent(node u) const { return nodes[u].parent; };
+	count depth(node u) const { return d[u]; };
 	std::vector<node> children(node u) const;
 	Graph toGraph() const;
 
@@ -74,6 +76,13 @@ public:
 
 	template <typename F>
 	void forChildrenOf(node u, F handle) const;
+	
+	void moveUpNeighbor(node referenceNode, node Neighbor);
+	void splitPath(node u);
+	void unionPathWith(node moveNode, node keepNode);
+	
+	void moveToPosition(node u, node p, const std::vector<node> &children);
+	
 private:
 	struct TreeNode {
 		node parent;
@@ -81,9 +90,25 @@ private:
 		std::vector<node> children;
 		TreeNode() : parent(none) {};
 	};
-
+	
+	struct SimplePath : public tlx::ReferenceCounter {
+		std::vector<node> path;
+		count neighborCount;
+		node referenceNode;
+	};
+	
+	using SimplePathPtr = tlx::CountingPtr<SimplePath>;
+	std::vector<tlx::CountingPtr<SimplePath>> path_membership;
+	std::vector<count> path_pos;
+	std::vector<tlx::CountingPtr<SimplePath>> simplePaths;
+	
+	void removeFromPath(node u);
+	
 	std::vector<node> roots;
 	std::vector<TreeNode> nodes;
+	
+	std::vector<count> d;
+	
 };
 
 template <typename F1, typename F2>
