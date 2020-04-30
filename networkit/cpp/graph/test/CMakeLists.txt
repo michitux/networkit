@@ -5,6 +5,7 @@ networkit_add_test(graph GraphGTest
 networkit_add_test(graph GraphToolsGTest generators)
 networkit_add_test(graph TraversalGTest generators)
 networkit_add_test(graph SpanningGTest io)
+networkit_add_test(graph DynamicForestGTest)
 
 networkit_add_benchmark(graph Graph2Benchmark)
 networkit_add_benchmark(graph GraphBenchmark auxiliary)

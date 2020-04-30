@@ -92,9 +92,10 @@ private:
 	};
 	
 	struct SimplePath : public tlx::ReferenceCounter {
-		std::vector<node> path;
+		std::vector<node> pathNodes;
 		count neighborCount;
 		node referenceNode;
+		SimplePath () : neighborCount(0) , referenceNode(none){};
 	};
 	
 	using SimplePathPtr = tlx::CountingPtr<SimplePath>;
@@ -103,6 +104,10 @@ private:
 	std::vector<tlx::CountingPtr<SimplePath>> simplePaths;
 	
 	void removeFromPath(node u);
+	void swapNodes(node u, node v);
+	
+	bool pathsValid();
+	std::string printPaths();
 	
 	std::vector<node> roots;
 	std::vector<TreeNode> nodes;

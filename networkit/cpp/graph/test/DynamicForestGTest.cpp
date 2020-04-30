@@ -3,7 +3,12 @@
  */
 
 #include "DynamicForestGTest.h"
-#include "../DynamicForest.h"
+#include <networkit/graph/DynamicForest.hpp>
+#include <networkit/io/METISGraphReader.hpp>
+#include <networkit/components/RandomSpanningForest.hpp>
+#include <networkit/community/QuasiThresholdEditingLinear.hpp>
+#include <networkit/graph/GraphTools.hpp>
+
 
 namespace NetworKit {
 
@@ -69,4 +74,48 @@ TEST_F(DynamicForestGTest, testIsolate) {
 	EXPECT_EQ(3, dynForest.children(0).size());
 }
 
+TEST_F(DynamicForestGTest, testPathStructures) {
+	Graph karate = METISGraphReader().read("input/karate.graph");
+	
+	karate.indexEdges();
+	QuasiThresholdEditingLinear editing(karate);
+	editing.run();
+	std::vector<node> parent = editing.getParents();
+	
+	Graph forest = Graph(GraphTools::copyNodes(karate), false, true);
+	karate.forNodes([&](node u) {
+		if (parent[u] != none) {
+			forest.addEdge(u, parent[u]);
+		}
+	});
+	DynamicForest dynForest(forest);
+	forest.forNodesInRandomOrder ([&](node nodeToMove){
+		TRACE("Node to move ", nodeToMove);
+		forest.forNodesInRandomOrder([&](node parent){
+			if(nodeToMove != parent){
+				std::vector<node> children = dynForest.children(parent);
+				for(int i = 0; i < children.size(); i++){
+					if(children[i] == nodeToMove){
+						children.erase(children.begin()+i);
+						break;
+					}
+				}
+				count pow_set_size = pow(2, children.size());
+				count counter, j;
+				std::vector<node> adopted;
+				for(counter = 0; counter < pow_set_size; counter++) {
+					adopted.clear(); 
+					for(j = 0; j < children.size(); j++) {
+						if(counter & (1 << j)){
+							adopted.push_back(children[j]);
+						}
+					}
+					dynForest.isolate(nodeToMove);
+					dynForest.moveToPosition(nodeToMove, parent, adopted);
+			}
+			
+			}
+		});
+	});
+}
 }
