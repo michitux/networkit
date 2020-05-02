@@ -77,10 +77,7 @@ public:
 	template <typename F>
 	void forChildrenOf(node u, F handle) const;
 	
-	void moveUpNeighbor(node referenceNode, node Neighbor);
-	void splitPath(node u);
-	void unionPathWith(node moveNode, node keepNode);
-	
+	void moveUpNeighbor(node referenceNode, node Neighbor);	
 	void moveToPosition(node u, node p, const std::vector<node> &children);
 	
 private:
@@ -101,10 +98,10 @@ private:
 	using SimplePathPtr = tlx::CountingPtr<SimplePath>;
 	std::vector<tlx::CountingPtr<SimplePath>> path_membership;
 	std::vector<count> path_pos;
-	std::vector<tlx::CountingPtr<SimplePath>> simplePaths;
-	
+
 	void removeFromPath(node u);
-	void swapNodes(node u, node v);
+	void splitPath(node u);
+	void unionPathWith(node moveNode, node keepNode);
 	
 	bool pathsValid();
 	std::string printPaths();

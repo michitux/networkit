@@ -167,28 +167,24 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 			G.forEdgesOf(nodeToMove, [&](node v) {
 				marker[v] = true;
 				neighbors.push_back(v);
+				dynamicForest.moveUpNeighbor(v, nodeToMove);
 			});
 
+			dynamicForest.moveUpNeighbor(nodeToMove, nodeToMove);
 			// remove the node from its tree but store the old position.
 			std::vector<node> curChildren(dynamicForest.children(nodeToMove));
 			node curParent = dynamicForest.parent(nodeToMove);
 			count curEdits = G.degree(nodeToMove);
-
 			dynamicForest.dfsFrom(nodeToMove, [&](node c) {
 				if (c != nodeToMove) {
 					curEdits += 1 - 2 * marker[c];
 				}
 			}, [](node){});
-
 			for (node p = dynamicForest.parent(nodeToMove); p != none; p = dynamicForest.parent(p)) {
 				curEdits += 1 - 2 * marker[p];
 			}
-
 			dynamicForest.isolate(nodeToMove);
-
-
 			bucketQueue.fill(neighbors, dynamicForest);
-			
 			count level = 0;
 			count bestParent = none;
 			count rootMaxGain = 0, rootEdits = 0;

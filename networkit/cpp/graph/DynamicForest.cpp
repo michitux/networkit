@@ -9,7 +9,6 @@ NetworKit::DynamicForest::DynamicForest(const NetworKit::Graph &G) :
 nodes(G.upperNodeIdBound()),
 path_membership(G.upperNodeIdBound(), nullptr),
 path_pos(G.upperNodeIdBound(), none),
-simplePaths(),
 d(G.upperNodeIdBound(), 0) {
 	
 	G.forNodes([&](node u) {
@@ -19,7 +18,6 @@ d(G.upperNodeIdBound(), 0) {
 			d[u] = 0;
 		}
 
-		assert(nodes[u].parent == none);
 		G.forEdgesOf(u, [&](node v) {
 			nodes[u].parent = v;
 			nodes[u].posInParent = nodes[v].children.size();
@@ -54,8 +52,7 @@ std::vector< NetworKit::node > NetworKit::DynamicForest::children(NetworKit::nod
 void NetworKit::DynamicForest::setParent(NetworKit::node u, NetworKit::node p) {
 	node oldP = parent(u);
 
-	if (oldP == p) return;
-
+	if (oldP == p || u == p) return;
 	index oldPos = nodes[u].posInParent;
 
 	if (oldP != none) {
@@ -119,7 +116,7 @@ NetworKit::Graph NetworKit::DynamicForest::toGraph() const {
 	return result;
 }
 
-void NetworKit::DynamicForest::moveUpNeighbor(node referenceNode, node neighbor) {
+void NetworKit::DynamicForest::moveUpNeighbor(node neighbor, node referenceNode) {
 	if(path_membership[neighbor].valid()){
 		TRACE("Move up ", neighbor);
 		SimplePathPtr sp = path_membership[neighbor];
@@ -127,39 +124,44 @@ void NetworKit::DynamicForest::moveUpNeighbor(node referenceNode, node neighbor)
 			sp->referenceNode = referenceNode;
 			sp->neighborCount = 0;
 		}
+		if(sp->neighborCount >= sp->pathNodes.size()) return;
 		count oldPos = path_pos[neighbor];
-		//neighbor already considered
-		if(oldPos < sp->neighborCount){
-			return;
+		count neighborPos = sp->pathNodes.size() - 1 - sp->neighborCount;
+		if(oldPos <= neighborPos){
+			sp->neighborCount++;
+			if(oldPos ==  neighborPos) return;
+			node firstNonNeighbor = sp->pathNodes[neighborPos];
+			sp->pathNodes[neighborPos] = neighbor;
+			path_pos[neighbor] = neighborPos;
+			sp->pathNodes[oldPos] = firstNonNeighbor;
+			path_pos[firstNonNeighbor] = oldPos;
+			if(oldPos == 0){
+				for(node c : nodes[neighbor].children){
+					setParent(c, firstNonNeighbor);
+				}
+			} else {
+				setParent(sp->pathNodes[oldPos - 1], firstNonNeighbor);
+			} 
+			
+			if (neighborPos == sp->pathNodes.size() - 1){
+				setParent(neighbor, parent(firstNonNeighbor));
+			} else {
+				setParent(neighbor, sp->pathNodes[neighborPos + 1]);
+			}
+			if(oldPos ==  neighborPos - 1){
+				setParent(firstNonNeighbor, neighbor);
+			} else {
+				setParent(sp->pathNodes[neighborPos - 1], neighbor);
+				setParent(firstNonNeighbor, sp->pathNodes[oldPos + 1]);	
+			}
+			count oldDepth = d[neighbor];
+			d[neighbor] = d[firstNonNeighbor];
+			d[firstNonNeighbor] = oldDepth;
 		}
-		node firstNonNeighbor = sp->pathNodes[sp->neighborCount];
-		sp->pathNodes[sp->neighborCount] = neighbor;
-		path_pos[neighbor] = sp->neighborCount;
-		sp->pathNodes[oldPos] = firstNonNeighbor;
-		path_pos[firstNonNeighbor] = oldPos;
-		sp->neighborCount++;
-		
-		swapNodes(neighbor, firstNonNeighbor);
-		
+		assert(pathsValid());		
 	}
-	assert(pathsValid());
 }
 
-void NetworKit::DynamicForest::swapNodes(node u, node v){
-	node oldParent = parent(u);
-	std::vector<node> oldChildren = nodes[u].children;
-	setParent(u, parent(v));
-	for(node c : nodes[v].children){
-		setParent(c, u);
-	}
-	setParent(v, oldParent);
-	for(node c : oldChildren){
-		setParent(c, v);
-	}
-	count oldDepth = d[u];
-	d[u] = d[v];
-	d[v] = oldDepth;
-}
 
 void NetworKit::DynamicForest::removeFromPath(node u) {
 	if(path_membership[u].valid()){
@@ -197,33 +199,24 @@ void NetworKit::DynamicForest::splitPath(node u){
 		TRACE("Split path ", oldPath ," after ", u);
 		count oldPos = path_pos[u];
 		count length = oldPath->pathNodes.size();
-		if(oldPos == length - 1){
-			return;
-		}
-		if(oldPos == length - 2){
-			removeFromPath(oldPath->pathNodes[length -1]);
-			return;
-		}
 		if (oldPos == 0){
+			return;
+		}
+		if (oldPos == 1){
 			removeFromPath(oldPath->pathNodes[0]);
 			return;
 		}
+		if(oldPos == length - 1){
+			removeFromPath(oldPath->pathNodes[length -1]);
+			return;
+		}
 		SimplePathPtr newPath(new SimplePath);
-		newPath->neighborCount = 0;
-		newPath->referenceNode = none;
-		newPath->pathNodes = std::vector<node>();
-		for(int i = 0; i <= oldPos; i++){
-			node nodeToMove = oldPath->pathNodes[i];
+		newPath->pathNodes = std::vector<node>(length - oldPos);
+		for(int i = length - oldPos - 1; i >= 0 ; i--){
+			node nodeToMove = oldPath->pathNodes[i + oldPos];
+			newPath->pathNodes[i] = nodeToMove;
 			path_pos[nodeToMove] = i;
 			path_membership[nodeToMove] = newPath;
-			newPath->pathNodes.push_back(nodeToMove);
-		}
-		for(int i = oldPos + 1; i < length; i++){
-			node nodeToMove = oldPath->pathNodes[i];
-			oldPath->pathNodes[i - (oldPos + 1)] = nodeToMove;
-			path_pos[nodeToMove] = i - (oldPos + 1);
-		}
-		for(int i = 0; i <= oldPos; i++){
 			oldPath->pathNodes.pop_back();
 		}
 	}
@@ -233,89 +226,61 @@ void NetworKit::DynamicForest::splitPath(node u){
 
 void NetworKit::DynamicForest::unionPathWith(node moveNode, node keepNode){
 	TRACE("Union paths of ", moveNode, " and ", keepNode);
-	/*if(!path_membership[keepNode].valid()){
-		SimplePathPtr newPath(new SimplePath);
-		newPath->neighborCount = 0;
-		newPath->referenceNode = none;
-		newPath->pathNodes = std::vector<node>();
-		newPath->pathNodes.push_back(keepNode);
-		path_membership[keepNode] = newPath;
-		path_pos[keepNode] = 0;
-	}
-	
-	SimplePathPtr newPath = path_membership[keepNode];
-	
-	if(!path_membership[moveNode].valid()){
-		path_pos[moveNode] = newPath->pathNodes.size();
-		path_membership[moveNode] = newPath;
-		newPath->pathNodes.push_back(moveNode);
-		return;		
-	}
-	SimplePathPtr oldPath = path_membership[moveNode];
-	count length = oldPath->pathNodes.size();
-	for(int i = 0; i < length; i++){
-		//hier müssen die Knoten eigentlich vorne 
-	}*/
 	if(moveNode == keepNode){
 		return;
 	}
 	if(path_membership[moveNode].valid() && path_membership[keepNode].valid() && path_membership[moveNode] == path_membership[keepNode]){
 		return;
 	}
-	SimplePathPtr newPath(new SimplePath);
-	newPath->neighborCount = 0;
-	newPath->referenceNode = none;
-	newPath->pathNodes = std::vector<node>();
-	newPath->pathNodes.size();
-	count moveLength;
-	if(!path_membership[moveNode].valid()){
-		newPath->pathNodes.push_back(moveNode);
-		path_membership[moveNode] = newPath;
-		path_pos[moveNode] = 0;
-		moveLength = 1;
-	} else {
-		SimplePathPtr movePath = path_membership[moveNode];
-		moveLength = movePath->pathNodes.size();
-		for(int j = 0; j < moveLength; j++){
-			node curr = movePath->pathNodes[j];
-			path_membership[curr] = newPath;
-			path_pos[curr] = j;
-			newPath->pathNodes.push_back(curr);
-		}
-	}
+	
 	if(!path_membership[keepNode].valid()){
+		SimplePathPtr newPath(new SimplePath);
 		newPath->pathNodes.push_back(keepNode);
 		path_membership[keepNode] = newPath;
-		path_pos[keepNode] = moveLength;
-	} else {
-		SimplePathPtr keepPath = path_membership[keepNode];
-		count keepLength = keepPath->pathNodes.size();
-		for(int j = 0; j < keepLength; j++){
-			node curr = keepPath->pathNodes[j];
-			path_membership[curr] = newPath;
-			path_pos[curr] = j + moveLength;
-			newPath->pathNodes.push_back(curr);
-		}
+		path_pos[keepNode] = 0;
 	}
-	
+	SimplePathPtr keepPath = path_membership[keepNode];
+	count offset = keepPath->pathNodes.size();
+	if(!path_membership[moveNode].valid()){
+		keepPath->pathNodes.push_back(moveNode);
+		path_membership[moveNode] = keepPath;
+		path_pos[moveNode] = offset;
+	} else {
+		SimplePathPtr movePath = path_membership[moveNode];
+		count moveLength = movePath->pathNodes.size();
+		for(count i = 0; i < moveLength; i++){
+			node currentNode = movePath->pathNodes[i];
+			keepPath->pathNodes.push_back(currentNode);
+			path_membership[currentNode] = keepPath;
+			path_pos[currentNode] = offset;
+			offset++;
+		}
+
+}
 }
 
 
 void NetworKit::DynamicForest::moveToPosition(node u, node p, const std::vector<node> &children){
-	//assert(allChildren adopted);
 	node oldP = parent(u);
-	std::vector<node> oldChildren = nodes[p].children;
-	count oldChildCount = oldChildren.size();
-	
-	for(node c : children){
-		assert(std::find(oldChildren.begin(), oldChildren.end(), c) != oldChildren.end());
+	count oldChildCount = none;
+	if(p != none){
+		std::vector<node> oldChildren = nodes[p].children;
+		//TRACE("Move ", u, " below parent ", p, " adopting children ", children, " out of ", oldChildren);
+		oldChildCount = oldChildren.size();
+		for(node c : children){
+			assert(std::find(oldChildren.begin(), oldChildren.end(), c) != oldChildren.end());
+		}
+	} else {
+		//TRACE("Make ", u, " root adopting children ", children);
+		for(node c : children){
+			assert(std::find(roots.begin(), roots.end(), c) != roots.end());
+		}
 	}
 	
 	setParent(u, p);
 	for (node c : children) {
 		setParent(c, u);
 	}
-	TRACE("Move ", u, " below parent ", p, " adopting children ", children);
 	removeFromPath(u);
 	if(p != none){
 		splitPath(p);
@@ -339,7 +304,6 @@ void NetworKit::DynamicForest::moveToPosition(node u, node p, const std::vector<
 		}
 	}, [](node){});
 	
-	TRACE("New place");
 	assert(pathsValid());
 	
 
@@ -347,7 +311,19 @@ void NetworKit::DynamicForest::moveToPosition(node u, node p, const std::vector<
 
 
 bool NetworKit::DynamicForest::pathsValid(){
-	TRACE(printPaths());
+	//TRACE(printPaths());
+	//checking if tree is acyclic
+	/*for(node u = 0; u < nodes.size(); u++){
+		std::vector<bool> marked(nodes.size(), 0);
+		dfsFrom(u, [&](node c) {
+			if(marked[c] == 1){
+				TRACE(c, " visited two times from ", u);
+			}
+			assert(marked[c] == 0);
+			marked[c] = 1;
+			}, [](node){});
+	}*/
+
 	for(int i = 0; i < nodes.size(); i++){
 		TreeNode u = nodes[i];
 		for(node c : u.children){
@@ -364,7 +340,7 @@ bool NetworKit::DynamicForest::pathsValid(){
 				}
 			}
 		}, [](node){});
-	for (node u = 0; u < path_membership.size(); u++){
+	for (node u = 0; u < nodes.size(); u++){
 		if(!path_membership[u].valid()){
 			assert(path_pos[u] == none);
 		} else {
@@ -375,6 +351,9 @@ bool NetworKit::DynamicForest::pathsValid(){
 				node v = pNodes[i];
 				assert(path_membership[v] == path_membership[u]);
 				assert(path_pos[v] == i);
+				if(i > 0){
+					assert(nodes[v].children.size() == 1 && nodes[v].children[0] == pNodes[i-1]);
+				}
 			}
 		}
 	}
