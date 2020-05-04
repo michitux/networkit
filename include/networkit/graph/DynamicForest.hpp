@@ -110,6 +110,8 @@ private:
 		return freePlace;
 	};
 	
+	void addToPath(node u, index newId);
+	
 	std::vector<SimplePath> paths;
 	std::vector<index> freeList;
 	std::vector<index> path_membership;

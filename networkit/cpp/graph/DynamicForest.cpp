@@ -171,11 +171,7 @@ void NetworKit::DynamicForest::removeFromPath(node u) {
 	SimplePath* sp = path(u);
 	count pos = path_pos[u];
 	if(sp->length() > 1){
-		index pathId = newPath();
-		SimplePath* newPath = &paths[pathId];
-		newPath->pathNodes.push_back(u);
-		path_membership[u] = pathId;
-		path_pos[u] = 0;
+		addToPath(u, newPath());
 		for(int i = pos + 1; i < sp->length(); i++){
 			node v = sp->pathNodes[i];
 			sp->pathNodes[i - 1] = v;
@@ -184,6 +180,14 @@ void NetworKit::DynamicForest::removeFromPath(node u) {
 		sp->pathNodes.pop_back();
 	}
 
+}
+
+void NetworKit::DynamicForest::addToPath(node u, index newId){
+	TRACE("Adding ", u, " to path ", newId);
+	SimplePath* sp = &(paths[newId]);
+	path_membership[u] = newId;
+	path_pos[u] = sp->length();
+	sp->pathNodes.push_back(u);
 }
 
 //split after u
@@ -206,10 +210,7 @@ void NetworKit::DynamicForest::splitPath(node u){
 		index newId = newPath();
 		SimplePath* newPath = &paths[newId];
 		for(int i = oldPos; i < oldPath->length(); i++){
-			node nodeToMove = oldPath->pathNodes[i];
-			newPath->pathNodes.push_back(nodeToMove);
-			path_pos[nodeToMove] = i - oldPos;
-			path_membership[nodeToMove] = newId;
+			addToPath(oldPath->pathNodes[i], newId);
 		}
 		oldPath->pathNodes.erase(oldPath->pathNodes.begin() + oldPos, oldPath->pathNodes.end());
 	}
@@ -223,16 +224,11 @@ void NetworKit::DynamicForest::unionPathWith(node moveNode, node keepNode){
 		return;
 	}
 	index keepPathId = path_membership[keepNode];
-	SimplePath* keepPath = path(keepNode);
-	count offset = keepPath->length();
 	index movePathId = path_membership[moveNode];
 	SimplePath* movePath = path(moveNode);
-	for(count i = 0; i < movePath->length(); i++){
-		node currentNode = movePath->pathNodes[i];
-		keepPath->pathNodes.push_back(currentNode);
-		path_membership[currentNode] = keepPathId;
-		path_pos[currentNode] = offset;
-		offset++;
+	count l = movePath->length();
+	for(count i = 0; i < l; i++){
+		addToPath(movePath->pathNodes[i], keepPathId);
 	}
 	deletePath(movePathId);
 }
