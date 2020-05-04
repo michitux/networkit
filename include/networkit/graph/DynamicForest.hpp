@@ -13,7 +13,6 @@ namespace NetworKit {
 class DynamicForest {
 public:
 	DynamicForest(const Graph& G);
-
 	node parent(node u) const { return nodes[u].parent; };
 	count depth(node u) const { return d[u]; };
 	std::vector<node> children(node u) const;
@@ -88,16 +87,33 @@ private:
 		TreeNode() : parent(none) {};
 	};
 	
-	struct SimplePath : public tlx::ReferenceCounter {
+	struct SimplePath {
 		std::vector<node> pathNodes;
 		count neighborCount;
 		node referenceNode;
+		count length(){return pathNodes.size();};
 		SimplePath () : neighborCount(0) , referenceNode(none){};
 	};
 	
-	using SimplePathPtr = tlx::CountingPtr<SimplePath>;
-	std::vector<tlx::CountingPtr<SimplePath>> path_membership;
-	std::vector<count> path_pos;
+	SimplePath* path(node u){return &paths[path_membership[u]];};
+	
+	void deletePath(index i){
+		SimplePath* sp = &paths[i];
+		sp->pathNodes.clear();
+		sp->referenceNode = none;
+		freeList.push_back(i);
+	};
+	
+	index newPath(){
+		index freePlace = freeList.back();
+		freeList.pop_back();
+		return freePlace;
+	};
+	
+	std::vector<SimplePath> paths;
+	std::vector<index> freeList;
+	std::vector<index> path_membership;
+	std::vector<index> path_pos;
 
 	void removeFromPath(node u);
 	void splitPath(node u);

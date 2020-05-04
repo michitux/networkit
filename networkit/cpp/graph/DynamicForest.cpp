@@ -7,31 +7,35 @@
 
 NetworKit::DynamicForest::DynamicForest(const NetworKit::Graph &G) : 
 nodes(G.upperNodeIdBound()),
-path_membership(G.upperNodeIdBound(), nullptr),
-path_pos(G.upperNodeIdBound(), none),
-d(G.upperNodeIdBound(), 0) {
+path_membership(G.upperNodeIdBound(), none),
+path_pos(G.upperNodeIdBound(), 0),
+d(G.upperNodeIdBound(), 0),
+freeList(G.upperNodeIdBound()),
+paths(G.upperNodeIdBound(), SimplePath()) {
 	
+	std::iota(path_membership.begin(), path_membership.end(), 0);
 	G.forNodes([&](node u) {
+		paths[u].pathNodes.push_back(u);
+		
 		if (G.degreeOut(u) == 0) {
 			nodes[u].posInParent = roots.size();
 			roots.push_back(u);
 			d[u] = 0;
 		}
-
 		G.forEdgesOf(u, [&](node v) {
 			nodes[u].parent = v;
 			nodes[u].posInParent = nodes[v].children.size();
 			nodes[v].children.push_back(u);
 		});
 	});
-	
-dfsFrom(none, [&](node c) {
+	dfsFrom(none, [&](node c) {
 		if (c != none && parent(c) != none) {
 			d[c] = d[parent(c)] + 1;
 			//node has no siblings
 			if(nodes[parent(c)].children.size() == 1){
 				unionPathWith(parent(c), c);
 			}
+			
 		}
 	}, [](node){});
 	assert(pathsValid());
@@ -117,16 +121,16 @@ NetworKit::Graph NetworKit::DynamicForest::toGraph() const {
 }
 
 void NetworKit::DynamicForest::moveUpNeighbor(node neighbor, node referenceNode) {
-	if(path_membership[neighbor].valid()){
+	SimplePath* sp = path(neighbor);
+	if(sp->length() > 1){
 		TRACE("Move up ", neighbor);
-		SimplePathPtr sp = path_membership[neighbor];
 		if(sp->referenceNode != referenceNode){
 			sp->referenceNode = referenceNode;
 			sp->neighborCount = 0;
 		}
-		if(sp->neighborCount >= sp->pathNodes.size()) return;
+		if(sp->neighborCount >= sp->length()) return;
 		count oldPos = path_pos[neighbor];
-		count neighborPos = sp->pathNodes.size() - 1 - sp->neighborCount;
+		count neighborPos = sp->length() - 1 - sp->neighborCount;
 		if(oldPos <= neighborPos){
 			sp->neighborCount++;
 			if(oldPos ==  neighborPos) return;
@@ -143,7 +147,7 @@ void NetworKit::DynamicForest::moveUpNeighbor(node neighbor, node referenceNode)
 				setParent(sp->pathNodes[oldPos - 1], firstNonNeighbor);
 			} 
 			
-			if (neighborPos == sp->pathNodes.size() - 1){
+			if (neighborPos == sp->length() - 1){
 				setParent(neighbor, parent(firstNonNeighbor));
 			} else {
 				setParent(neighbor, sp->pathNodes[neighborPos + 1]);
@@ -164,41 +168,30 @@ void NetworKit::DynamicForest::moveUpNeighbor(node neighbor, node referenceNode)
 
 
 void NetworKit::DynamicForest::removeFromPath(node u) {
-	if(path_membership[u].valid()){
-		SimplePathPtr sp = path_membership[u];
-		count pos = path_pos[u];
-		path_membership[u] = nullptr;
-		path_pos[u] = none;
-		count length = sp->pathNodes.size();
-		if(length == 2){
-			node other;
-			if(pos == 0){
-				other = sp->pathNodes[1];
-			} else {
-				other = sp->pathNodes[0];
-			}
-			path_membership[other] = nullptr;
-			path_pos[other] = none;
-		} else {
-			for(int i = pos + 1; i < length; i++){
-				node v = sp->pathNodes[i];
-				sp->pathNodes[i - 1] = v;
-				path_pos[v] = i - 1;
-			}
-			sp->pathNodes.pop_back();
+	SimplePath* sp = path(u);
+	count pos = path_pos[u];
+	if(sp->length() > 1){
+		index pathId = newPath();
+		SimplePath* newPath = &paths[pathId];
+		newPath->pathNodes.push_back(u);
+		path_membership[u] = pathId;
+		path_pos[u] = 0;
+		for(int i = pos + 1; i < sp->length(); i++){
+			node v = sp->pathNodes[i];
+			sp->pathNodes[i - 1] = v;
+			path_pos[v] = i - 1;
 		}
-
+		sp->pathNodes.pop_back();
 	}
 
 }
 
 //split after u
 void NetworKit::DynamicForest::splitPath(node u){
-	if(path_membership[u].valid()){
-		SimplePathPtr oldPath = path_membership[u];
-		TRACE("Split path ", oldPath ," after ", u);
+	SimplePath* oldPath = path(u);
+	if(oldPath->length() > 1){
+		TRACE("Split path after ", u);
 		count oldPos = path_pos[u];
-		count length = oldPath->pathNodes.size();
 		if (oldPos == 0){
 			return;
 		}
@@ -206,19 +199,19 @@ void NetworKit::DynamicForest::splitPath(node u){
 			removeFromPath(oldPath->pathNodes[0]);
 			return;
 		}
-		if(oldPos == length - 1){
-			removeFromPath(oldPath->pathNodes[length -1]);
+		if(oldPos == oldPath->length() - 1){
+			removeFromPath(oldPath->pathNodes[oldPath->length() -1]);
 			return;
 		}
-		SimplePathPtr newPath(new SimplePath);
-		newPath->pathNodes = std::vector<node>(length - oldPos);
-		for(int i = length - oldPos - 1; i >= 0 ; i--){
-			node nodeToMove = oldPath->pathNodes[i + oldPos];
-			newPath->pathNodes[i] = nodeToMove;
-			path_pos[nodeToMove] = i;
-			path_membership[nodeToMove] = newPath;
-			oldPath->pathNodes.pop_back();
+		index newId = newPath();
+		SimplePath* newPath = &paths[newId];
+		for(int i = oldPos; i < oldPath->length(); i++){
+			node nodeToMove = oldPath->pathNodes[i];
+			newPath->pathNodes.push_back(nodeToMove);
+			path_pos[nodeToMove] = i - oldPos;
+			path_membership[nodeToMove] = newId;
 		}
+		oldPath->pathNodes.erase(oldPath->pathNodes.begin() + oldPos, oldPath->pathNodes.end());
 	}
 	
 	
@@ -226,37 +219,22 @@ void NetworKit::DynamicForest::splitPath(node u){
 
 void NetworKit::DynamicForest::unionPathWith(node moveNode, node keepNode){
 	TRACE("Union paths of ", moveNode, " and ", keepNode);
-	if(moveNode == keepNode){
+	if(path_membership[moveNode] == path_membership[keepNode]){
 		return;
 	}
-	if(path_membership[moveNode].valid() && path_membership[keepNode].valid() && path_membership[moveNode] == path_membership[keepNode]){
-		return;
+	index keepPathId = path_membership[keepNode];
+	SimplePath* keepPath = path(keepNode);
+	count offset = keepPath->length();
+	index movePathId = path_membership[moveNode];
+	SimplePath* movePath = path(moveNode);
+	for(count i = 0; i < movePath->length(); i++){
+		node currentNode = movePath->pathNodes[i];
+		keepPath->pathNodes.push_back(currentNode);
+		path_membership[currentNode] = keepPathId;
+		path_pos[currentNode] = offset;
+		offset++;
 	}
-	
-	if(!path_membership[keepNode].valid()){
-		SimplePathPtr newPath(new SimplePath);
-		newPath->pathNodes.push_back(keepNode);
-		path_membership[keepNode] = newPath;
-		path_pos[keepNode] = 0;
-	}
-	SimplePathPtr keepPath = path_membership[keepNode];
-	count offset = keepPath->pathNodes.size();
-	if(!path_membership[moveNode].valid()){
-		keepPath->pathNodes.push_back(moveNode);
-		path_membership[moveNode] = keepPath;
-		path_pos[moveNode] = offset;
-	} else {
-		SimplePathPtr movePath = path_membership[moveNode];
-		count moveLength = movePath->pathNodes.size();
-		for(count i = 0; i < moveLength; i++){
-			node currentNode = movePath->pathNodes[i];
-			keepPath->pathNodes.push_back(currentNode);
-			path_membership[currentNode] = keepPath;
-			path_pos[currentNode] = offset;
-			offset++;
-		}
-
-}
+	deletePath(movePathId);
 }
 
 
@@ -326,8 +304,10 @@ bool NetworKit::DynamicForest::pathsValid(){
 
 	for(int i = 0; i < nodes.size(); i++){
 		TreeNode u = nodes[i];
-		for(node c : u.children){
+		for(index j = 0; j < children(i).size(); j++){
+			node c = children(i)[j];
 			assert(parent(c) == i);
+			assert(nodes[c].posInParent == j);
 		}
 	}
 	
@@ -341,19 +321,16 @@ bool NetworKit::DynamicForest::pathsValid(){
 			}
 		}, [](node){});
 	for (node u = 0; u < nodes.size(); u++){
-		if(!path_membership[u].valid()){
-			assert(path_pos[u] == none);
-		} else {
-			std::vector<node> pNodes = path_membership[u]->pathNodes;
-			assert(pNodes[path_pos[u]] == u);
-			assert(pNodes.size() >= 2);
-			for(int i = 0; i < pNodes.size(); i++){
-				node v = pNodes[i];
-				assert(path_membership[v] == path_membership[u]);
-				assert(path_pos[v] == i);
-				if(i > 0){
-					assert(nodes[v].children.size() == 1 && nodes[v].children[0] == pNodes[i-1]);
-				}
+		std::vector<node> pNodes = path(u)->pathNodes;
+		assert(pNodes[path_pos[u]] == u);
+		for(int i = 0; i < pNodes.size(); i++){
+			node v = pNodes[i];
+			assert(path_membership[v] == path_membership[u]);
+			assert(path_pos[v] == i);
+			if(i > 0){
+				assert(nodes[v].children.size() == 1 && nodes[v].children[0] == pNodes[i-1]);
+			} else {
+				assert(nodes[v].children.size() != 1);
 			}
 		}
 	}
@@ -365,14 +342,12 @@ std::string NetworKit::DynamicForest::printPaths(){
 	std::stringstream ss;
 	for(node u = 0; u < path_membership.size(); u++){
 		ss << "{" << u << " ";
-		if(path_membership[u].valid()){
-			ss << "[";
-			std::vector<node> pNodes = path_membership[u]->pathNodes;
-			for(node u : pNodes){
-				ss << u << " ";
-			}
-			ss << "]";
-		} 
+		ss << "[";
+		std::vector<node> pNodes = path(u)->pathNodes;
+		for(node u : pNodes){
+			ss << u << " ";
+		}
+		ss << "]";
 		if(path_pos[u] != none){
 			ss << " pos " << path_pos[u];
 		}
