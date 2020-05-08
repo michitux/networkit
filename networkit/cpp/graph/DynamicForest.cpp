@@ -5,44 +5,46 @@
 #include <networkit/graph/DynamicForest.hpp>
 #include <set>
 
-NetworKit::DynamicForest::DynamicForest(const NetworKit::Graph &G) : 
-nodes(G.upperNodeIdBound()),
+namespace NetworKit {
+
+DynamicForest::DynamicForest(const NetworKit::Graph &G) :
 path_membership(G.upperNodeIdBound(), none),
 path_pos(G.upperNodeIdBound(), 0),
-d(G.upperNodeIdBound(), 0),
-freeList(G.upperNodeIdBound()),
+freeList(),
 paths(G.upperNodeIdBound(), SimplePath()) {
-	
+	//at first every node is in its own path
 	std::iota(path_membership.begin(), path_membership.end(), 0);
+	
+	//build up parent/child relations
 	G.forNodes([&](node u) {
-		paths[u].pathNodes.push_back(u);
-		
+		paths[path(u)].pathNodes.push_back(u);
 		if (G.degreeOut(u) == 0) {
-			nodes[u].posInParent = roots.size();
-			roots.push_back(u);
-			d[u] = 0;
+			paths[path(u)].posInParent = roots.size();
+			roots.push_back(path(u));
+			paths[path(u)].depth = 0;
 		}
 		G.forEdgesOf(u, [&](node v) {
-			nodes[u].parent = v;
-			nodes[u].posInParent = nodes[v].children.size();
-			nodes[v].children.push_back(u);
+			paths[path(u)].parent = path(v);
+			paths[path(u)].posInParent = paths[path(v)].childPaths.size();
+			paths[path(v)].childPaths.push_back(path(u));
 		});
 	});
-	dfsFrom(none, [&](node c) {
-		if (c != none && parent(c) != none) {
-			d[c] = d[parent(c)] + 1;
-			//node has no siblings
-			if(nodes[parent(c)].children.size() == 1){
-				unionPathWith(parent(c), c);
+	
+	//union nodes in simple paths by dfs
+	pathDfsFrom(none, [&](pid subtreePath) {
+		if(subtreePath != none){
+			pid p = paths[subtreePath].parent;
+			if(p != none && paths[p].childPaths.size() == 1){
+				unionPaths(p, subtreePath);
 			}
-			
 		}
-	}, [](node){});
+	}, [](pid){});
+	updateDepthInSubtree(none);
 	assert(pathsValid());
 	TRACE("Dynamic Forest constructed");
 }
 
-std::vector< NetworKit::node > NetworKit::DynamicForest::children(NetworKit::node u) const {
+std::vector<node> DynamicForest::children(node u) const {
 	std::vector<node> result;
 
 	forChildrenOf(u, [&](node c) {
@@ -52,294 +54,407 @@ std::vector< NetworKit::node > NetworKit::DynamicForest::children(NetworKit::nod
 	return result;
 }
 
+node DynamicForest::parent(node u) const { 
+	if(u == none){
+		return none;
+	} else if(isUpperEnd(u)){
+		pid p = paths[path(u)].parent;
+		return (p == none) ? none : paths[p].lowerEnd();
+	} else {
+		return previousNodeInPath(u);
+	} 
+}
 
-void NetworKit::DynamicForest::setParent(NetworKit::node u, NetworKit::node p) {
-	node oldP = parent(u);
+count DynamicForest::depth(node u) const { 
+	if(u ==  none){
+		return none;
+	} else {
+		return paths[path(u)].depth + paths[path(u)].length() - 1 - path_pos[u];
+	}
+}
 
-	if (oldP == p || u == p) return;
-	index oldPos = nodes[u].posInParent;
 
+void DynamicForest::updateDepthInSubtree(pid start){
+	pathDfsFrom(start, [&](pid sp) {
+		if (sp != none){
+			pid p = paths[sp].parent;
+			if(p != none){
+				paths[sp].depth = paths[p].depth + paths[p].length();
+			} else {
+				paths[sp].depth = 0;
+			}
+		}  
+	}, [](pid){});
+}
+
+
+void DynamicForest::setParentPath(pid s, pid p){
+	pid oldP = paths[s].parent;
+	if (oldP == p || s == p) return;
+	index oldPos = paths[s].posInParent;
+	//tidy up at old position
 	if (oldP != none) {
-		nodes[oldP].children[oldPos] = nodes[oldP].children.back();
-		nodes[oldP].children.pop_back();
-		nodes[nodes[oldP].children[oldPos]].posInParent = oldPos;
+		paths[oldP].childPaths[oldPos] = paths[oldP].childPaths.back();
+		paths[oldP].childPaths.pop_back();
+		paths[paths[oldP].childPaths[oldPos]].posInParent = oldPos;
 	} else {
 		roots[oldPos] = roots.back();
 		roots.pop_back();
-		nodes[roots[oldPos]].posInParent = oldPos;
+		paths[roots[oldPos]].posInParent = oldPos;
 	}
 
-	nodes[u].parent = p;
-
+	//place at new position
+	paths[s].parent = p;
 	if (p == none) {
-		nodes[u].posInParent = roots.size();
-		roots.push_back(u);
+		paths[s].posInParent = roots.size();
+		roots.push_back(s);
+		paths[s].depth = 0;
 	} else {
-		nodes[u].posInParent = nodes[p].children.size();
-		nodes[p].children.push_back(u);
+		paths[s].posInParent = paths[p].childPaths.size();
+		paths[p].childPaths.push_back(s);
+		paths[s].depth = paths[p].depth + 1;
 	}
 }
 
-void NetworKit::DynamicForest::isolate(NetworKit::node u) {
-	removeFromPath(u);
-	dfsFrom(u, [&](node c) {
-		--d[c];
-	}, [](node){});
-	d[u] = 0;
-	
-	std::vector<node> oldChildren = nodes[u].children;
-	node p = nodes[u].parent;
 
-	setParent(u, none);
-
-	for (node c : oldChildren) {
-		setParent(c, p);
+void DynamicForest::isolate(node u) {
+	node oldParent = parent(u);
+	if(paths[path(u)].length() == 1){
+		TRACE("Isolate ", u, " as path");
+		isolatePath(path(u));
+	} else {
+		TRACE("Isolate ", u, " from path");
+		isolateNode(u);
 	}
-	
-	if(p != none && nodes[p].children.size() == 1){
-		unionPathWith(p, nodes[p].children[0]);
-	}
-
-	
-	TRACE("Isolate ", u);
+	updateDepthInSubtree(path(u));
+	updateDepthInSubtree(path(oldParent));
 	assert(pathsValid());
 	
 }
 
-NetworKit::Graph NetworKit::DynamicForest::toGraph() const {
-	Graph result(nodes.size(), false, true);
-
-	for (node r : roots) {
-		dfsFrom(r, [](node) {}, [&](node u) {
-			if (parent(u) != none) {
-				result.addEdge(u, parent(u));
-			}
-		});
+//isolate complete simple path
+void DynamicForest::isolatePath(pid sp){
+	std::vector<pid> oldChildren = paths[sp].childPaths;	
+	assert(oldChildren.size() != 1);
+	pid oldParent = paths[sp].parent;
+	count siblings = paths[oldParent].childPaths.size() -1;
+	assert(siblings >= 0);
+	setParentPath(sp, none);
+	//union paths if exactly one sibling is left back
+	if(oldChildren.size() == 0 && siblings == 1){
+		assert(paths[oldParent].childPaths.size() == 1);
+		unionPaths(oldParent, paths[oldParent].childPaths[0]);
+	} else {
+		for(pid child : oldChildren){
+			setParentPath(child, oldParent);
+		}
 	}
-
-	return result;
+	for(pid i = 0; i < paths.size(); i++){
+		assert(paths[i].parent != sp);
+		for(pid c : paths[i].childPaths){
+			assert(c != sp);
+		}
+	}
 }
 
-void NetworKit::DynamicForest::moveUpNeighbor(node neighbor, node referenceNode) {
-	SimplePath* sp = path(neighbor);
-	if(sp->length() > 1){
+//isolate a node from a path of size >= 2
+void DynamicForest::isolateNode(node u){
+	pid sp = path(u);
+	index oldPos = path_pos[u];
+	assert(paths[sp].length() >= 2);
+	//shift nodes
+	for(index i = oldPos + 1; i < paths[sp].length(); i++){
+		node nodeToMove = paths[sp].pathNodes[i];
+		paths[sp].pathNodes[i-1] = nodeToMove;
+		path_pos[nodeToMove] = i-1;
+	}
+	paths[sp].pathNodes.pop_back();
+	//create new isolated path
+	pid np = newPath();
+	paths[np].posInParent = roots.size();
+	roots.push_back(np);
+	addToPath(u, np);
+}
+
+
+void DynamicForest::moveUpNeighbor(node neighbor, node referenceNode) {
+	pid sp = path(neighbor);
+	if(paths[sp].length() > 1){
 		TRACE("Move up ", neighbor);
-		if(sp->referenceNode != referenceNode){
-			sp->referenceNode = referenceNode;
-			sp->neighborCount = 0;
+		if(paths[sp].referenceNode != referenceNode){
+			paths[sp].referenceNode = referenceNode;
+			paths[sp].neighborCount = 0;
 		}
-		if(sp->neighborCount >= sp->length()) return;
-		count oldPos = path_pos[neighbor];
-		count neighborPos = sp->length() - 1 - sp->neighborCount;
-		if(oldPos <= neighborPos){
-			sp->neighborCount++;
-			if(oldPos ==  neighborPos) return;
-			node firstNonNeighbor = sp->pathNodes[neighborPos];
-			sp->pathNodes[neighborPos] = neighbor;
-			path_pos[neighbor] = neighborPos;
-			sp->pathNodes[oldPos] = firstNonNeighbor;
-			path_pos[firstNonNeighbor] = oldPos;
-			if(oldPos == 0){
-				for(node c : nodes[neighbor].children){
-					setParent(c, firstNonNeighbor);
-				}
-			} else {
-				setParent(sp->pathNodes[oldPos - 1], firstNonNeighbor);
-			} 
-			
-			if (neighborPos == sp->length() - 1){
-				setParent(neighbor, parent(firstNonNeighbor));
-			} else {
-				setParent(neighbor, sp->pathNodes[neighborPos + 1]);
-			}
-			if(oldPos ==  neighborPos - 1){
-				setParent(firstNonNeighbor, neighbor);
-			} else {
-				setParent(sp->pathNodes[neighborPos - 1], neighbor);
-				setParent(firstNonNeighbor, sp->pathNodes[oldPos + 1]);	
-			}
-			count oldDepth = d[neighbor];
-			d[neighbor] = d[firstNonNeighbor];
-			d[firstNonNeighbor] = oldDepth;
+		if(paths[sp].neighborCount >= paths[sp].length()) return;
+		index oldPos = path_pos[neighbor];
+		index neighborPos = paths[sp].length() - 1 - paths[sp].neighborCount;
+		if(oldPos > neighborPos) return; //neighbor already considered
+		paths[sp].neighborCount++;
+		if(oldPos ==  neighborPos) return; //neighbor was not considered but is at right position
+		node firstNonNeighbor = paths[sp].pathNodes[neighborPos];
+		swapNodesWithinPath(firstNonNeighbor, neighbor);
 		}
-		assert(pathsValid());		
-	}
+	updateDepthInSubtree(sp);
+	assert(pathsValid());		
 }
 
 
-void NetworKit::DynamicForest::removeFromPath(node u) {
-	SimplePath* sp = path(u);
-	count pos = path_pos[u];
-	if(sp->length() > 1){
-		addToPath(u, newPath());
-		for(int i = pos + 1; i < sp->length(); i++){
-			node v = sp->pathNodes[i];
-			sp->pathNodes[i - 1] = v;
-			path_pos[v] = i - 1;
-		}
-		sp->pathNodes.pop_back();
-	}
-
-}
-
-void NetworKit::DynamicForest::addToPath(node u, index newId){
-	TRACE("Adding ", u, " to path ", newId);
-	SimplePath* sp = &(paths[newId]);
-	path_membership[u] = newId;
-	path_pos[u] = sp->length();
-	sp->pathNodes.push_back(u);
-}
-
-//split after u
-void NetworKit::DynamicForest::splitPath(node u){
-	SimplePath* oldPath = path(u);
-	if(oldPath->length() > 1){
-		TRACE("Split path after ", u);
-		count oldPos = path_pos[u];
-		if (oldPos == 0){
-			return;
-		}
-		if (oldPos == 1){
-			removeFromPath(oldPath->pathNodes[0]);
-			return;
-		}
-		if(oldPos == oldPath->length() - 1){
-			removeFromPath(oldPath->pathNodes[oldPath->length() -1]);
-			return;
-		}
-		index newId = newPath();
-		SimplePath* newPath = &paths[newId];
-		for(int i = oldPos; i < oldPath->length(); i++){
-			addToPath(oldPath->pathNodes[i], newId);
-		}
-		oldPath->pathNodes.erase(oldPath->pathNodes.begin() + oldPos, oldPath->pathNodes.end());
-	}
-	
-	
-}
-
-void NetworKit::DynamicForest::unionPathWith(node moveNode, node keepNode){
-	TRACE("Union paths of ", moveNode, " and ", keepNode);
-	if(path_membership[moveNode] == path_membership[keepNode]){
+void DynamicForest::swapNodesWithinPath(node u, node v){
+	pid sp = path(u);
+	assert(path(v) == sp);
+	if(u == v){
 		return;
 	}
-	index keepPathId = path_membership[keepNode];
-	index movePathId = path_membership[moveNode];
-	SimplePath* movePath = path(moveNode);
-	count l = movePath->length();
-	for(count i = 0; i < l; i++){
-		addToPath(movePath->pathNodes[i], keepPathId);
+	index oldPos = path_pos[u];
+	path_pos[u] = path_pos[v];
+	paths[sp].pathNodes[path_pos[v]] = u;
+	path_pos[v] = oldPos;
+	paths[sp].pathNodes[oldPos] = v;
+}
+
+void DynamicForest::addToPath(node u, pid newId){
+	path_membership[u] = newId;
+	path_pos[u] = paths[newId].length();
+	paths[newId].pathNodes.push_back(u);
+}
+
+void DynamicForest::splitPath(pid sp, index splitPos){
+	if(paths[sp].length() <= 1 || splitPos == 0) return; //nothing to split
+	//TRACE("Split path ", sp);
+	
+	pid oldParent = paths[sp].parent;
+	index oldPosInParent = paths[sp].posInParent;
+	count oldDepth = paths[sp].depth;
+	
+	pid np = newPath();
+	//move upper nodes to new path
+	for(int i = splitPos; i < paths[sp].length(); i++){
+		addToPath(paths[sp].pathNodes[i], np);
 	}
-	deletePath(movePathId);
+	paths[sp].pathNodes.erase(paths[sp].pathNodes.begin() + splitPos, paths[sp].pathNodes.end());
+	
+	//update tree structure
+	paths[sp].parent = np;
+	paths[sp].posInParent = 0;
+	paths[np].parent = oldParent;
+	paths[np].posInParent = oldPosInParent;
+	if(oldParent != none){
+		paths[oldParent].childPaths[oldPosInParent] = np;
+	} else {
+		roots[oldPosInParent] = np;
+	}
+	paths[np].childPaths.push_back(sp);
+	
+	//paths[np].depth = oldDepth;
+	//updateDepthInSubtree(np);
+	assert(parent(paths[sp].upperEnd())==paths[np].lowerEnd());
+	assert(children(paths[np].lowerEnd()).size() == 1);
+	assert(children(paths[np].lowerEnd())[0]==paths[sp].upperEnd());
+	
+}
+
+void DynamicForest::unionPaths(pid upperPath, pid lowerPath){
+	if(upperPath == lowerPath){
+		return;
+	}
+	//TRACE("Union upper path ", upperPath, " with above path ", lowerPath);
+	assert(paths[upperPath].childPaths.size() == 1);
+	assert(paths[upperPath].childPaths[0] == lowerPath);
+	
+	pid upperParent = paths[upperPath].parent;
+	pid upperPos = paths[upperPath].posInParent;
+	
+	//update tree structure
+	paths[upperPath].childPaths.pop_back();
+	paths[lowerPath].parent = upperParent;
+	paths[lowerPath].posInParent = upperPos;
+	if(upperParent != none){
+		paths[upperParent].childPaths[upperPos] = lowerPath;
+	} else {
+		roots[upperPos] = lowerPath;
+	}
+	//move nodes of upper path to lower path
+	count l = paths[upperPath].length();
+	for(count i = 0; i < l; i++){
+		addToPath(paths[upperPath].pathNodes[i], lowerPath);
+	}
+	deletePath(upperPath);
+	if(paths[lowerPath].parent != none){
+		assert(paths[paths[lowerPath].parent].childPaths[upperPos] == lowerPath);
+	} else {
+		assert(roots[upperPos] ==  lowerPath);
+	}
 }
 
 
-void NetworKit::DynamicForest::moveToPosition(node u, node p, const std::vector<node> &children){
-	node oldP = parent(u);
-	count oldChildCount = none;
+void DynamicForest::moveToPosition(node u, node p, const std::vector<node> &adoptedChildren){
+	//check that the node is isolated
+	pid parentPath = path(p);
+	pid oldPath = path(u);
+	assert(paths[oldPath].parent == none);
+	assert(parent(u) == none);
+	assert(childCount(u) == 0);
+	assert(paths[path(u)].length() == 1);
+	//check that all children are adopted
+	count oldChildCount = 0;
 	if(p != none){
-		std::vector<node> oldChildren = nodes[p].children;
-		//TRACE("Move ", u, " below parent ", p, " adopting children ", children, " out of ", oldChildren);
+		std::vector<node> oldChildren = children(p);
+		TRACE("Move ", u, " below parent ", p, " adopting children ", adoptedChildren, " out of ", oldChildren);
 		oldChildCount = oldChildren.size();
-		for(node c : children){
+		for(node c : adoptedChildren){
 			assert(std::find(oldChildren.begin(), oldChildren.end(), c) != oldChildren.end());
 		}
 	} else {
-		//TRACE("Make ", u, " root adopting children ", children);
-		for(node c : children){
-			assert(std::find(roots.begin(), roots.end(), c) != roots.end());
+		TRACE("Make ", u, " root adopting children ", adoptedChildren);
+		for(node c : adoptedChildren){
+			assert(std::find(roots.begin(), roots.end(), path(c)) != roots.end());
 		}
 	}
 	
-	setParent(u, p);
-	for (node c : children) {
-		setParent(c, u);
-	}
-	removeFromPath(u);
-	if(p != none){
-		splitPath(p);
-	}
-	if(oldP != none && nodes[oldP].children.size() == 1){
-		unionPathWith(oldP, nodes[oldP].children[1]);
-	} 
-	
-	if(children.size() == 1){
-		unionPathWith(u, children[0]);
-	}
-	if(p != none && oldChildCount == children.size()){
-		unionPathWith(p, u);
-	}
-	
-	dfsFrom(u, [&](node c) {
-		if (parent(c) != none) {
-			d[c] = d[parent(c)] + 1;
+	//if all children are adopted, insert after parent
+	if (adoptedChildren.size() == childCount(p)){
+		//shift nodes to place the new node
+		index parentPathPos = path_pos[p];
+		node temp = paths[parentPath].pathNodes.back();
+		path_pos[temp] = paths[parentPath].length();
+		paths[parentPath].pathNodes.push_back(temp);
+		for(int i = paths[parentPath].length() - 1; i > parentPathPos; i--){
+			temp = paths[parentPath].pathNodes[i-1];
+			path_pos[temp] = i;
+			paths[parentPath].pathNodes[i] = temp;
+		}
+		path_pos[u] = parentPathPos;
+		paths[parentPath].pathNodes[parentPathPos] = u;
+		
+		path_membership[u] = parentPath;
+		
+		//update tree structure
+		index oldTreePos = paths[oldPath].posInParent;
+		roots[oldTreePos] = roots.back();
+		roots.pop_back();
+		paths[roots[oldTreePos]].posInParent = oldTreePos;
+
+		deletePath(oldPath);
+	} else {
+		//if at least one child is not adopted, parent needs to be lower end
+		if(!isLowerEnd(p)){
+			splitPath(parentPath, path_pos[p]);
+			parentPath = path(p);
+		}
+		//if exactly one child is adopted, node can just be added to that path
+		if(adoptedChildren.size() == 1){
+			//update Tree structure
+			index oldTreePos = paths[oldPath].posInParent;
+			roots[oldTreePos] = roots.back();
+			roots.pop_back();
+			paths[roots[oldTreePos]].posInParent = oldTreePos;
+			
+			deletePath(oldPath);
+			
+			addToPath(u, path(adoptedChildren[0]));
+		//otherwise, insert in simple-path tree structure
 		} else {
-			d[c] = 0;
+			setParentPath(oldPath, parentPath);
+			for(node child : adoptedChildren){
+				setParentPath(path(child), path(u));
+			}
 		}
-	}, [](node){});
-	
+	}
+	updateDepthInSubtree(parentPath);
 	assert(pathsValid());
-	
 
 }
 
 
-bool NetworKit::DynamicForest::pathsValid(){
-	//TRACE(printPaths());
-	//checking if tree is acyclic
-	/*for(node u = 0; u < nodes.size(); u++){
-		std::vector<bool> marked(nodes.size(), 0);
-		dfsFrom(u, [&](node c) {
-			if(marked[c] == 1){
-				TRACE(c, " visited two times from ", u);
+bool DynamicForest::pathsValid(){
+	
+	//check that parent/child relations for paths are valid
+	for(pid sp = 0; sp < paths.size(); sp++){
+		std::vector<pid> cps = paths[sp].childPaths;
+		for(index i = 0; i < cps.size(); i++){
+			pid child =  cps[i];
+			assert(paths[child].parent == sp);
+			assert(paths[child].posInParent == i);
+		}
+	}
+	for(index i = 0; i < roots.size(); i++){
+		pid rootPath = roots[i];
+		assert(paths[rootPath].parent == none);
+		assert(paths[rootPath].posInParent == i);
+	}
+	
+	for(node u = 0; u < path_membership.size(); u++){
+		std::vector<node> childNodes = children(u);
+		assert(childNodes.size() == childCount(u));
+		//check that parent/child realtionships for nodes are proper
+		for(index i = 0; i < childCount(u); i++){
+			node c = childNodes[i];
+			assert(u != c);
+			if(i > 0){
+				assert(path(u) != path(c));
 			}
-			assert(marked[c] == 0);
-			marked[c] = 1;
-			}, [](node){});
-	}*/
-
-	for(int i = 0; i < nodes.size(); i++){
-		TreeNode u = nodes[i];
-		for(index j = 0; j < children(i).size(); j++){
-			node c = children(i)[j];
-			assert(parent(c) == i);
-			assert(nodes[c].posInParent == j);
+			assert(posInParent(c) == i);
+			assert(parent(c) == u);
+		}
+		//check that  path_membership and positions for nodes are proper
+		pid sp = path(u);
+		assert(paths[sp].pathNodes[path_pos[u]] == u);
+		for(index i = 0; i < paths[sp].pathNodes.size(); i++){
+			node v = paths[sp].pathNodes[i];
+			assert(path_pos[v] == i);
+			assert(path(v) == sp);
+		}
+		std::vector<pid> cps = paths[sp].childPaths;
+		for(pid i = 0; i < paths.size(); i++){
+			if(paths[i].parent == sp){
+				assert(std::find(cps.begin(), cps.end(), i) != cps.end());
+			}
 		}
 	}
 	
+	//check that depth is proper for paths
+	pathDfsFrom(none, [&](pid sp) {
+		if (sp != none){
+			pid p = paths[sp].parent;
+			if(p != none){
+				assert(paths[sp].depth == paths[p].depth + paths[p].length());
+			} else {
+				assert(paths[sp].depth == 0);
+			}
+		}  
+	}, [](pid){});
+	
+	//check that depth is proper for nodes
 	dfsFrom(none, [&](node c) {
 			if (c != none && parent(c) != none) {
-				assert(d[c] == d[parent(c)] + 1);
-				//node has no siblings
-				if(nodes[parent(c)].children.size() == 1){
-					assert(path_membership[c] == path_membership[parent(c)]);
+				assert(depth(c) == depth(parent(c)) + 1);
+				if(childCount(c) == 1){
+					assert(path_membership[c] == path_membership[children(c)[0]]);
 				}
-			}
+			} 
 		}, [](node){});
-	for (node u = 0; u < nodes.size(); u++){
-		std::vector<node> pNodes = path(u)->pathNodes;
-		assert(pNodes[path_pos[u]] == u);
-		for(int i = 0; i < pNodes.size(); i++){
-			node v = pNodes[i];
-			assert(path_membership[v] == path_membership[u]);
-			assert(path_pos[v] == i);
-			if(i > 0){
-				assert(nodes[v].children.size() == 1 && nodes[v].children[0] == pNodes[i-1]);
-			} else {
-				assert(nodes[v].children.size() != 1);
-			}
-		}
+
+	//check that free list is proper
+	for(pid freePlace : freeList){
+		assert(paths[freePlace].parent == none);
+		assert(paths[freePlace].referenceNode == none);
+		assert(paths[freePlace].pathNodes.size() == 0);
+		assert(paths[freePlace].childPaths.size() == 0);
+		assert(paths[freePlace].neighborCount == 0);
+		assert(paths[freePlace].depth == 0);
 	}
 	return 1;
 }
 
 
-std::string NetworKit::DynamicForest::printPaths(){
+
+
+std::string DynamicForest::printPaths(){
 	std::stringstream ss;
 	for(node u = 0; u < path_membership.size(); u++){
 		ss << "{" << u << " ";
 		ss << "[";
-		std::vector<node> pNodes = path(u)->pathNodes;
+		std::vector<node> pNodes = paths[path(u)].pathNodes;
 		for(node u : pNodes){
 			ss << u << " ";
 		}
@@ -351,3 +466,98 @@ std::string NetworKit::DynamicForest::printPaths(){
 	}
 	return ss.str();
 }
+
+
+Graph DynamicForest::toGraph() const {
+	Graph result(path_membership.size(), false, true);
+
+	for (pid r : roots) {
+		dfsFrom(paths[r].upperEnd(), [](node) {}, [&](node u) {
+			if (parent(u) != none) {
+				result.addEdge(u, parent(u));
+			}
+		});
+	}
+
+	return result;
+}
+
+
+//superfluous?
+pid DynamicForest::path(node u) const{
+	if(u == none){
+		return none;
+	} else {
+		assert(u < path_membership.size());
+		return path_membership[u];
+	}
+}
+
+
+bool DynamicForest::isUpperEnd(node u) const{
+	return (path_pos[u] == paths[path(u)].length() - 1);
+}
+bool DynamicForest::isLowerEnd(node u) const{
+	return (path_pos[u] == 0);
+}
+
+node DynamicForest::nextNodeInPath(node u) const{
+	if(isLowerEnd(u)){
+		return none;
+	} else {
+		return paths[path(u)].pathNodes[path_pos[u] - 1];
+	}
+}
+
+node DynamicForest::previousNodeInPath(node u) const{
+	if(isUpperEnd(u)){
+		return none;
+	} else {
+		return paths[path(u)].pathNodes[path_pos[u] + 1];
+	}
+}
+
+void DynamicForest::deletePath(pid i){
+	//check that path got isolated from tree structure
+	assert(i != none);
+	assert(paths[i].childPaths.size() == 0);
+	for(pid sp = 0; sp < paths.size(); sp++){
+		assert(paths[sp].parent != i);
+		for(pid c : paths[sp].childPaths){
+			assert(c != i);
+		}
+	}
+	assert(std::find(roots.begin(), roots.end(), i) == roots.end());
+	paths[i].reset();
+	freeList.push_back(i);
+}
+
+pid DynamicForest::newPath(){
+	assert(!freeList.empty());
+	pid freePlace = freeList.back();
+	freeList.pop_back();
+	return freePlace;
+}
+
+count DynamicForest::childCount (node u) const{
+	if(u == none){
+		return roots.size();
+	}
+	if(!isLowerEnd(u)){
+		return 1;
+	} else {
+		return paths[path(u)].childPaths.size();
+	}
+}
+
+index NetworKit::DynamicForest::posInParent (node u) const{
+	if(u == none){
+		return none;
+	} else if(!isUpperEnd(u)){
+		return 0;
+	} else {
+		return paths[path(u)].posInParent;
+	}
+}
+
+} //namespace NetworKit

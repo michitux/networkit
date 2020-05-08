@@ -9,46 +9,130 @@
 #include <tlx/counting_ptr.hpp>
 
 namespace NetworKit {
+	
+	typedef long unsigned int pid;
+	
+	struct SimplePath {
+		std::vector<node> pathNodes;
+		count neighborCount;
+		node referenceNode;
+		pid parent;
+		std::vector<pid> childPaths;
+		index posInParent;
+		count depth;
+		
+		void reset(){
+			pathNodes.clear();
+			neighborCount = 0;
+			referenceNode = none;
+			parent = none;
+			childPaths.clear();
+			posInParent = 0;
+			depth = 0;
+			posInParent = 0;
+		};
+		
+		std::string printPathInfo() const{
+			std::stringstream ss;
+			ss << "["<<"\n";
+			ss << "pathNodes:";
+			for(node x : pathNodes) ss << " " << x;
+			ss << "\n";
+			ss << "neighborCount: " << neighborCount << "\n";
+			ss << "referenceNode: " << referenceNode << "\n";
+			ss << "parent: " << parent << "\n";
+			ss << "childPaths:";
+			for(pid x : childPaths) ss << " " << x;
+			ss << "\n";
+			ss << "posInParent: " << posInParent << "\n";
+			ss << "depth: " << depth << "\n";
+			ss << "]" << "\n";			
+			return ss.str();
+		};
+		
+		count length() const {return pathNodes.size();};
+		node upperEnd() const {return pathNodes.back();};
+		node lowerEnd() const {return pathNodes[0];};
+		SimplePath () : neighborCount(0) , referenceNode(none), parent(none), depth(0), posInParent(0){};
+	};	
+	
 
 class DynamicForest {
 public:
 	DynamicForest(const Graph& G);
-	node parent(node u) const { return nodes[u].parent; };
-	count depth(node u) const { return d[u]; };
+	node parent(node u) const;
+	count depth(node u) const;
 	std::vector<node> children(node u) const;
 	Graph toGraph() const;
-
-	void setParent(node u, node p);
 	void isolate(node u);
+	void moveUpNeighbor(node referenceNode, node Neighbor);	
+	void moveToPosition(node u, node p, const std::vector<node> &adoptedChildren);
+
 
 	template <typename F1, typename F2>
 	void dfsFrom(node u, F1 onEnter, F2 onExit) const;
 
-	node nextChild(node child, node parent) const {
-		assert(nodes[child].parent == parent);
+	node nextChild(node child, node p) const {
+		assert(parent(child) == p);
+		if(isLowerEnd(p)){
+			pid nextChildPath = nextPathChild(path(child), path(p));
+			if(nextChildPath != path(p)) return paths[nextChildPath].upperEnd();
+		} 
+		return p;
+	};
+	
+	
+	template <typename F1, typename F2>
+	void pathDfsFrom(pid u, F1 onEnter, F2 onExit) const {
+		struct PathDFSEvent {
+			pid sp;
+			bool isEnter;
+			PathDFSEvent(pid sp, bool isEnter) : sp(sp), isEnter(isEnter) {};
+		};
 
-		index nextPos = nodes[child].posInParent + 1;
-		if (parent == none) {
-			if (nextPos < roots.size()) {
-				return roots[nextPos];
-			}
-		} else {
-			if (nextPos < nodes[parent].children.size()) {
-				return nodes[parent].children[nextPos];
+		std::stack<PathDFSEvent> toProcess;
+		toProcess.emplace(u, false);
+		toProcess.emplace(u, true);
+
+		while (!toProcess.empty()) {
+			
+			PathDFSEvent ev = toProcess.top();
+			toProcess.pop();
+
+			if (ev.isEnter) {
+				onEnter(ev.sp);
+				forPathChildrenOf(ev.sp, [&](pid c) {
+					toProcess.emplace(c, false);
+					toProcess.emplace(c, true);
+				});
+			} else {
+				onExit(ev.sp);
 			}
 		}
+	}
 
-		return parent;
-	};
+	template <typename F>
+	void forPathChildrenOf(pid sp, F handle) const {
+		if (sp == none) {
+			for (pid r : roots) {
+				handle(r);
+			}
+		} else {
+			for (pid c : paths[sp].childPaths) {
+				handle(c);
+			}
+		}
+	}
+	
 
 	node nextDFSNodeOnEnter(node curNode, node basis) const {
 		if (curNode == none) {
 			if (roots.empty()) return none; // forest is empty
-			return roots.front();
+			return paths[roots.front()].upperEnd();
 		}
 
-		if (!nodes[curNode].children.empty()) {
-			return nodes[curNode].children.front();
+		if (childCount(curNode) > 0) {
+			return children(curNode).front();
 		} else if (curNode == basis) {
 			return basis;
 		} else {
@@ -57,18 +141,19 @@ public:
 
 			assert(p == basis || p != none);
 
-			while (p != basis && nodes[u].posInParent == nodes[p].children.size() - 1) {
+			while (p != basis && posInParent(u) == childCount(p) - 1) {
 				u = p;
 				p = parent(p);
 
 				assert(p == basis || p != none);
 			}
 
-			index nextPos = nodes[u].posInParent + 1;
-			if (nextPos == nodes[p].children.size()) {
+			index nextPos = posInParent(u) + 1;
+			if (nextPos == childCount(p)) {
 				return basis;
 			} else {
-				return nodes[p].children[nextPos];
+				assert(isLowerEnd(p));
+				return paths[paths[path(p)].childPaths[nextPos]].upperEnd();
 			}
 		}
 	};
@@ -76,60 +161,81 @@ public:
 	template <typename F>
 	void forChildrenOf(node u, F handle) const;
 	
-	void moveUpNeighbor(node referenceNode, node Neighbor);	
-	void moveToPosition(node u, node p, const std::vector<node> &children);
-	
 private:
-	struct TreeNode {
-		node parent;
-		index posInParent;
-		std::vector<node> children;
-		TreeNode() : parent(none) {};
-	};
 	
-	struct SimplePath {
-		std::vector<node> pathNodes;
-		count neighborCount;
-		node referenceNode;
-		count length(){return pathNodes.size();};
-		SimplePath () : neighborCount(0) , referenceNode(none){};
-	};
+	pid path(node u) const;
 	
-	SimplePath* path(node u){return &paths[path_membership[u]];};
+	bool isUpperEnd (node u) const;
+	bool isLowerEnd (node u) const;
+	node nextNodeInPath(node u) const;
+	node previousNodeInPath(node u) const;
 	
-	void deletePath(index i){
-		SimplePath* sp = &paths[i];
-		sp->pathNodes.clear();
-		sp->referenceNode = none;
-		freeList.push_back(i);
-	};
+	void deletePath(pid i);
+	pid newPath();
 	
-	index newPath(){
-		index freePlace = freeList.back();
-		freeList.pop_back();
-		return freePlace;
-	};
-	
-	void addToPath(node u, index newId);
-	
-	std::vector<SimplePath> paths;
-	std::vector<index> freeList;
-	std::vector<index> path_membership;
-	std::vector<index> path_pos;
+	count childCount (node u) const;
+	index posInParent (node u) const;
 
-	void removeFromPath(node u);
-	void splitPath(node u);
-	void unionPathWith(node moveNode, node keepNode);
+	void setParent(node u, node p);
+	void setParentPath(pid s, pid p);
+	void swapNodesWithinPath(node u, node v);
+	void addToPath(node u, pid newId);
+	void splitPath(pid sp, pid splitPos);
+	void unionPaths(pid upperPath, pid lowerPath);
+	void isolatePath(pid sp);
+	void isolateNode(node u);
+	void updateDepthInSubtree(pid start);
 	
 	bool pathsValid();
 	std::string printPaths();
 	
-	std::vector<node> roots;
-	std::vector<TreeNode> nodes;
+	std::vector<SimplePath> paths;
+	std::vector<pid> freeList;
+	std::vector<pid> path_membership;
+	std::vector<index> path_pos;
+	std::vector<pid> roots;
 	
-	std::vector<count> d;
+	
+	
+	pid nextPathChild(pid child, pid p) const{
+		assert(paths[child].parent == p);
+
+		index nextPos = paths[child].posInParent + 1;
+		if (p == none) {
+			if (nextPos < roots.size()) {
+				return roots[nextPos];
+			}
+		} else {
+			if (nextPos < paths[p].childPaths.size()) {
+				return paths[p].childPaths[nextPos];
+			}
+		}
+		return p;
+	};
 	
 };
+
+
+
+
+
+
+
+
+template <typename F>
+void DynamicForest::forChildrenOf(node u, F handle) const {
+	if(u != none && !isLowerEnd(u)){
+		handle(nextNodeInPath(u));
+	} else {
+		forPathChildrenOf(path(u), [&](pid c) {
+			node child = paths[c].upperEnd();
+			assert(child < path_membership.size());
+			handle(paths[c].upperEnd());
+		});
+	}
+}
+
+
 
 template <typename F1, typename F2>
 void DynamicForest::dfsFrom(node u, F1 onEnter, F2 onExit) const {
@@ -142,33 +248,18 @@ void DynamicForest::dfsFrom(node u, F1 onEnter, F2 onExit) const {
 	std::stack<DFSEvent> toProcess;
 	toProcess.emplace(u, false);
 	toProcess.emplace(u, true);
-
 	while (!toProcess.empty()) {
 		DFSEvent ev = toProcess.top();
 		toProcess.pop();
 
 		if (ev.isEnter) {
 			onEnter(ev.n);
-
 			forChildrenOf(ev.n, [&](node c) {
 				toProcess.emplace(c, false);
 				toProcess.emplace(c, true);
 			});
 		} else {
 			onExit(ev.n);
-		}
-	}
-}
-
-template <typename F>
-void DynamicForest::forChildrenOf(node u, F handle) const {
-	if (u == none) {
-		for (node r : roots) {
-			handle(r);
-		}
-	} else {
-		for (node c : nodes[u].children) {
-			handle(c);
 		}
 	}
 }

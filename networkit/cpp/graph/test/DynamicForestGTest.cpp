@@ -90,9 +90,10 @@ TEST_F(DynamicForestGTest, testPathStructures) {
 	});
 	DynamicForest dynForest(forest);
 	forest.forNodesInRandomOrder ([&](node nodeToMove){
-		TRACE("Node to move ", nodeToMove);
+		TRACE("==================nodeToMove: ", nodeToMove,"=============================");
 		forest.forNodesInRandomOrder([&](node parent){
 			if(nodeToMove != parent){
+				TRACE("==================parent: ", parent,"=============================");
 				std::vector<node> children = dynForest.children(parent);
 				for(int i = 0; i < children.size(); i++){
 					if(children[i] == nodeToMove){
@@ -100,6 +101,7 @@ TEST_F(DynamicForestGTest, testPathStructures) {
 						break;
 					}
 				}
+				//TRACE("==================children: ", children,"=============================");
 				count pow_set_size = pow(2, children.size());
 				count counter, j;
 				std::vector<node> adopted;
@@ -110,6 +112,7 @@ TEST_F(DynamicForestGTest, testPathStructures) {
 							adopted.push_back(children[j]);
 						}
 					}
+					//TRACE("==================adopt: ", adopted,"=============================");
 					dynForest.isolate(nodeToMove);
 					dynForest.moveToPosition(nodeToMove, parent, adopted);
 			}
