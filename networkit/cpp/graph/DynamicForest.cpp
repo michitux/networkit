@@ -108,11 +108,9 @@ void DynamicForest::setParentPath(pid s, pid p){
 	if (p == none) {
 		paths[s].posInParent = roots.size();
 		roots.push_back(s);
-		paths[s].depth = 0;
 	} else {
 		paths[s].posInParent = paths[p].childPaths.size();
 		paths[p].childPaths.push_back(s);
-		paths[s].depth = paths[p].depth + 1;
 	}
 }
 
@@ -180,12 +178,13 @@ void DynamicForest::isolateNode(node u){
 void DynamicForest::moveUpNeighbor(node neighbor, node referenceNode) {
 	pid sp = path(neighbor);
 	if(paths[sp].length() > 1){
-		TRACE("Move up ", neighbor);
+		//TRACE("Move up ", neighbor);
+		//update referenceNode if necessary
 		if(paths[sp].referenceNode != referenceNode){
 			paths[sp].referenceNode = referenceNode;
 			paths[sp].neighborCount = 0;
 		}
-		if(paths[sp].neighborCount >= paths[sp].length()) return;
+		if(paths[sp].neighborCount >= paths[sp].length()) return; //already all neighbors considered
 		index oldPos = path_pos[neighbor];
 		index neighborPos = paths[sp].length() - 1 - paths[sp].neighborCount;
 		if(oldPos > neighborPos) return; //neighbor already considered
@@ -220,11 +219,9 @@ void DynamicForest::addToPath(node u, pid newId){
 
 void DynamicForest::splitPath(pid sp, index splitPos){
 	if(paths[sp].length() <= 1 || splitPos == 0) return; //nothing to split
-	//TRACE("Split path ", sp);
-	
+	assert(splitPos < paths[sp].length());
 	pid oldParent = paths[sp].parent;
 	index oldPosInParent = paths[sp].posInParent;
-	count oldDepth = paths[sp].depth;
 	
 	pid np = newPath();
 	//move upper nodes to new path
@@ -232,7 +229,6 @@ void DynamicForest::splitPath(pid sp, index splitPos){
 		addToPath(paths[sp].pathNodes[i], np);
 	}
 	paths[sp].pathNodes.erase(paths[sp].pathNodes.begin() + splitPos, paths[sp].pathNodes.end());
-	
 	//update tree structure
 	paths[sp].parent = np;
 	paths[sp].posInParent = 0;
@@ -244,7 +240,6 @@ void DynamicForest::splitPath(pid sp, index splitPos){
 		roots[oldPosInParent] = np;
 	}
 	paths[np].childPaths.push_back(sp);
-	
 	//paths[np].depth = oldDepth;
 	//updateDepthInSubtree(np);
 	assert(parent(paths[sp].upperEnd())==paths[np].lowerEnd());
@@ -337,7 +332,7 @@ void DynamicForest::moveToPosition(node u, node p, const std::vector<node> &adop
 		deletePath(oldPath);
 	} else {
 		//if at least one child is not adopted, parent needs to be lower end
-		if(!isLowerEnd(p)){
+		if(p != none && !isLowerEnd(p)){
 			splitPath(parentPath, path_pos[p]);
 			parentPath = path(p);
 		}
