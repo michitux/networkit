@@ -22,11 +22,11 @@ namespace NetworKit {
 		count depth;
 		
 		void reset(){
-			pathNodes.clear();
+			//pathNodes.clear();
 			neighborCount = 0;
 			referenceNode = none;
 			parent = none;
-			childPaths.clear();
+			//childPaths.clear();
 			posInParent = 0;
 			depth = 0;
 			posInParent = 0;
@@ -59,13 +59,21 @@ namespace NetworKit {
 
 class DynamicForest {
 public:
+	//O(n)
 	DynamicForest(const Graph& G);
+	//O(1)
 	node parent(node u) const;
+	//O(1)
 	count depth(node u) const;
+	//O(#children)
 	std::vector<node> children(node u) const;
+	//O(n)
 	Graph toGraph() const;
+	//O(max(#nodes in path of parent, #children))
 	void isolate(node u);
+	//O(1)
 	void moveUpNeighbor(node referenceNode, node Neighbor);	
+	//O(max(#nodes in path of parent, #children))
 	void moveToPosition(node u, node p, const std::vector<node> &adoptedChildren);
 
 

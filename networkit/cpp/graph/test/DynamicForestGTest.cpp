@@ -91,6 +91,16 @@ TEST_F(DynamicForestGTest, testPathStructures) {
 	DynamicForest dynForest(forest);
 	forest.forNodesInRandomOrder ([&](node nodeToMove){
 		TRACE("==================nodeToMove: ", nodeToMove,"=============================");
+		
+		int r = (rand() % karate.upperNodeIdBound()) + 1;
+		for(count j = 0; j < karate.upperNodeIdBound(); j++) {
+			if(r & (1 << j)){
+				dynForest.moveUpNeighbor(j, nodeToMove);
+			}
+		}
+		
+		
+		
 		forest.forNodesInRandomOrder([&](node parent){
 			if(nodeToMove != parent){
 				TRACE("==================parent: ", parent,"=============================");
@@ -121,4 +131,6 @@ TEST_F(DynamicForestGTest, testPathStructures) {
 		});
 	});
 }
+
+
 }
