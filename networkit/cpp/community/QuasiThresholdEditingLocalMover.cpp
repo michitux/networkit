@@ -154,7 +154,6 @@ void NetworKit::QuasiThresholdEditingLocalMover::localMove(node nodeToMove){
 	rootEdits = 0;
 
 	while(!bucketQueue.empty()){
-		TRACE(bucketQueue.printQueue());
 		node u = bucketQueue.next();
 		processNode(u, nodeToMove);
 	}
@@ -177,7 +176,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::localMove(node nodeToMove){
 
 
 #ifndef NDEBUG
-	compareWithQuadratic(nodeToMove);
+	//compareWithQuadratic(nodeToMove);
 #endif
 
 	// calculate the number of saved edits as comparing the absolute number of edits doesn't make sense

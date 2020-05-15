@@ -14,6 +14,7 @@
 #include <networkit/community/EdgeCut.hpp>
 #include <networkit/community/ClusteringGenerator.hpp>
 #include <networkit/io/METISGraphReader.hpp>
+#include <networkit/io/EdgeListReader.hpp>
 #include <networkit/overlap/HashingOverlapper.hpp>
 #include <networkit/community/PLM.hpp>
 #include <networkit/community/GraphClusteringTools.hpp>
@@ -806,6 +807,20 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
 }
 
 
+TEST_F(CommunityGTest, testQuasiHuge) {
+	Graph G = METISGraphReader().read("input/email.graph");
+  //graphio.readMat("input/facebook100/{0}.mat".format(name), key="A")
+  //Graph G = EdgeListReader('\t', 0).read("input/terrorist.edgelist");
+  //Graph G = EdgeListReader('\t', 1).read("input/amazon.edgelist");		
+  std::vector<node> order(G.upperNodeIdBound());
+  std::iota(order.begin(), order.end(), 0);
+	QuasiThresholdEditingLocalMover mover(G, std::vector<node>(), 1, 0, 1, 0, order);
+	mover.run();  
+	INFO("Canonical order: ", mover.getNumberOfEdits(), " edits");
+}
+
+
+
 TEST_F(CommunityGTest, testQuasiThresholdMovingWithRandomness) {
 	Graph karate = METISGraphReader().read("input/karate.graph");
 	karate.indexEdges();
@@ -814,13 +829,79 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithRandomness) {
 	editing.run();
 
 	std::vector<node> parents = editing.getParents();
-	QuasiThresholdEditingLocalMover mover(karate, parents, 2, 0, 1, 0);
+	QuasiThresholdEditingLocalMover mover(karate, parents, 10, 0, 1, 0);
 	mover.run();
 	INFO("Without randomness ", mover.getNumberOfEdits(), " edits");
-	QuasiThresholdEditingLocalMover mover2(karate, parents, 2, 0, 1, 1);
+	QuasiThresholdEditingLocalMover mover2(karate, parents, 10, 0, 1, 1);
 	mover2.run();
 	INFO("With randomness ", mover2.getNumberOfEdits(), " edits");
 }
+
+
+TEST_F(CommunityGTest, testQuasiThresholdMovingCompareOptions) {
+	Graph G = METISGraphReader().read("input/email.graph");
+	G.indexEdges();
+	QuasiThresholdEditingLinear editing(G);
+	editing.run();
+	std::vector<node> editingParents = editing.getParents();
+  std::vector<std::vector<node>> parents;
+  std::vector<std::string> parent_names;
+  parents.push_back(std::vector<node>());
+  parent_names.push_back("Trivial");
+  parents.push_back(editingParents);
+  parent_names.push_back("Editing");
+  
+  std::vector<std::vector<node>> orders;
+  std::vector<std::string> order_names;
+  orders.push_back(std::vector<node>());
+  order_names.push_back("None");
+  std::vector<node> order(G.upperNodeIdBound());
+  std::iota(order.begin(), order.end(), 0);
+  orders.push_back(order);
+  order_names.push_back("By id");
+  std::vector<node> order2;
+  std::vector<std::pair<node, count>> d;
+  for(node u = 0; u < G.upperNodeIdBound(); u++){
+    d.push_back(std::pair<node,count>(u, G.degree(u)));
+  }
+  auto cmp = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
+     return a.second < b.second;
+   };
+  std::sort(d.begin(), d.end(), cmp);
+  order.clear();
+  for(index i = 0; i < d.size(); i++){
+    order2.push_back(d[i].first);
+  }
+  orders.push_back(order2);
+  order_names.push_back("Degree descending");
+  
+  std::vector<count> runs;
+  runs.push_back(2);
+  runs.push_back(5);
+  
+  for(int i = 0; i < parents.size(); i++){
+    for(int j = 0; j < orders.size(); j++){
+      for(count run : runs){
+        bool sortPaths = 0;
+        for(int k = 0; k < 2; k++, sortPaths = !sortPaths){
+          bool randomness = 0;
+          for(int l = 0; l < 2; l++, randomness = !randomness){
+            QuasiThresholdEditingLocalMover mover(G, parents[i], run, 0, sortPaths, randomness, orders[j]);
+            mover.run();
+            INFO( "Parents: ", parent_names[i],
+                  ", Order: ", order_names[j],
+                  ", Runs: ", run,
+                  ", sortPaths: ", sortPaths,
+                  ", randomness: ", randomness,
+                  "----- Edits: ", mover.getNumberOfEdits());
+          }
+        }
+      }
+    }
+  }
+
+}
+
 
 TEST_F(CommunityGTest, testQuasiThresholdGreedyBound) {
 	Graph karate = METISGraphReader().read("input/karate.graph");

@@ -39,7 +39,6 @@ namespace NetworKit {
 			for(int j = elements.size() - 1; j >= 0; j--){
 				node u = elements[j];
 				if(dynamicForest.depth(u) > max_depth){
-					TRACE("Skip ", u);
 					continue;
 				}
 				border[dynamicForest.depth(u)] -= 1;
@@ -48,7 +47,6 @@ namespace NetworKit {
 	  	}
 		
 			if(nextNode == none){
-				TRACE("Bucket queue initially empty");
 				return;
 			} 
 
@@ -75,8 +73,6 @@ namespace NetworKit {
 			nodes[nextNode] = firstOfBucket;
 			nodes[bucketBorder] = p;
 			border[currentBucket] += 1;
-			TRACE("Move ", firstOfBucket, " to ", nextNode);
-			TRACE("Insert ", p, " to Bucket queue at pos ", bucketBorder);
 		}
 		
 		bool empty() {

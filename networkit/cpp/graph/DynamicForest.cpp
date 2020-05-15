@@ -43,7 +43,7 @@ paths(G.upperNodeIdBound(), SimplePath()) {
 	}, [](pid){});
 	updateDepthInSubtree(none);
 	assert(pathsValid());
-	TRACE("Dynamic Forest constructed");
+	//TRACE("Dynamic Forest constructed");
 }
 
 std::vector<node> DynamicForest::children(node u) const {
@@ -128,10 +128,10 @@ void DynamicForest::setParentPath(pid s, pid p){
 void DynamicForest::isolate(node u) {
 	node oldParent = parent(u);
 	if(paths[path(u)].length() == 1){
-		TRACE("Isolate ", u, " as path");
+		//TRACE("Isolate ", u, " as path");
 		isolatePath(path(u));
 	} else {
-		TRACE("Isolate ", u, " from path");
+		//TRACE("Isolate ", u, " from path");
 		isolateNode(u);
 	}
 	assert(pathsValid());
@@ -156,7 +156,6 @@ void DynamicForest::isolatePath(pid sp){
 		}
 	}
 	updateDepthInSubtree(sp);
-	TRACE(oldChildren);
 	
 #ifndef NDEBUG
 	for(pid i = 0; i < paths.size(); i++){
@@ -192,7 +191,7 @@ void DynamicForest::isolateNode(node u){
 void DynamicForest::moveUpNeighbor(node neighbor, node referenceNode) {
 	pid sp = path(neighbor);
 	if(paths[sp].length() > 1){
-		TRACE("Move up ", neighbor);
+		//TRACE("Move up ", neighbor);
 		//update referenceNode if necessary
 		if(paths[sp].referenceNode != referenceNode){
 			paths[sp].referenceNode = referenceNode;
@@ -312,12 +311,12 @@ void DynamicForest::moveToPosition(node u, node p, const std::vector<node> &adop
 	//check that all children are adopted
 	if(p != none){
 		std::vector<node> oldChildren = children(p);
-		TRACE("Move ", u, " below parent ", p, " adopting children ", adoptedChildren, " out of ", oldChildren);
+		//TRACE("Move ", u, " below parent ", p, " adopting children ", adoptedChildren, " out of ", oldChildren);
 		for(node c : adoptedChildren){
 			assert(std::find(oldChildren.begin(), oldChildren.end(), c) != oldChildren.end());
 		}
 	} else {
-		TRACE("Make ", u, " root adopting children ", adoptedChildren);
+		//TRACE("Make ", u, " root adopting children ", adoptedChildren);
 		for(node c : adoptedChildren){
 			assert(std::find(roots.begin(), roots.end(), path(c)) != roots.end());
 		}
@@ -432,12 +431,12 @@ bool DynamicForest::pathsValid(){
 			pid p = paths[sp].parent;
 			if(p != none){
 				if(paths[sp].depth != paths[p].depth + paths[p].length()){
-					TRACE(paths[sp].pathNodes);
+					//TRACE(paths[sp].pathNodes);
 				}
 				assert(paths[sp].depth == paths[p].depth + paths[p].length());
 			} else {
 				if(paths[sp].depth != 0){
-					TRACE(paths[sp].pathNodes);
+					//TRACE(paths[sp].pathNodes);
 				}
 				assert(paths[sp].depth == 0);
 			}
