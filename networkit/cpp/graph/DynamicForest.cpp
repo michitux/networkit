@@ -6,6 +6,8 @@
 #include <set>
 
 namespace NetworKit {
+	
+DynamicForest::DynamicForest(){}
 
 DynamicForest::DynamicForest(const NetworKit::Graph &G) :
 path_membership(G.upperNodeIdBound(), none),
@@ -141,12 +143,9 @@ void DynamicForest::isolatePath(pid sp){
 	std::vector<pid> oldChildren = paths[sp].childPaths;	
 	assert(oldChildren.size() != 1);
 	pid oldParent = paths[sp].parent;
-	count siblings = paths[oldParent].childPaths.size() -1;
-	assert(siblings >= 0);
 	setParentPath(sp, none);
 	//union paths if exactly one sibling is left back
-	if(oldChildren.size() == 0 && siblings == 1){
-		assert(paths[oldParent].childPaths.size() == 1);
+	if(oldChildren.size() == 0 && oldParent != none && paths[oldParent].childPaths.size() == 1){
 		pid child = paths[oldParent].childPaths[0];
 		unionPaths(oldParent, child);
 		updateDepthInSubtree(child);

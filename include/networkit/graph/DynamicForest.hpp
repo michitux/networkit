@@ -59,6 +59,7 @@ namespace NetworKit {
 
 class DynamicForest {
 public:
+	DynamicForest();
 	//O(n)
 	DynamicForest(const Graph& G);
 	//O(1)

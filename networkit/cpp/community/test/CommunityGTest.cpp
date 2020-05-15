@@ -777,6 +777,51 @@ TEST_F(CommunityGTest, testQuasiThresholdEditingLinear) {
 	INFO("Moving improved this to ", mover2.getNumberOfEdits(), " edits");
 }
 
+
+TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
+	Graph karate = METISGraphReader().read("input/karate.graph");
+  std::vector<node> parents(karate.upperNodeIdBound(), none);
+  
+  std::vector<node> order(karate.upperNodeIdBound());
+  std::iota(order.begin(), order.end(), 0);
+	QuasiThresholdEditingLocalMover mover(karate, parents, 1, 0, 1, 0, order);
+	mover.run();  
+	INFO("Canonical order: ", mover.getNumberOfEdits(), " edits");
+  
+  std::vector<std::pair<node, count>> d;
+  for(node u = 0; u < karate.upperNodeIdBound(); u++){
+    d.push_back(std::pair<node,count>(u, karate.degree(u)));
+  }
+  auto cmp = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
+     return a.second < b.second;
+   };
+  std::sort(d.begin(), d.end(), cmp);
+  order.clear();
+  for(index i = 0; i < d.size(); i++){
+    order.push_back(d[i].first);
+  }
+  QuasiThresholdEditingLocalMover mover2(karate, parents, 1, 0, 1, 0, order);
+  mover2.run();  
+  INFO("Large degrees first: ", mover2.getNumberOfEdits(), " edits");
+}
+
+
+TEST_F(CommunityGTest, testQuasiThresholdMovingWithRandomness) {
+	Graph karate = METISGraphReader().read("input/karate.graph");
+	karate.indexEdges();
+
+	QuasiThresholdEditingLinear editing(karate);
+	editing.run();
+
+	std::vector<node> parents = editing.getParents();
+	QuasiThresholdEditingLocalMover mover(karate, parents, 2, 0, 1, 0);
+	mover.run();
+	INFO("Without randomness ", mover.getNumberOfEdits(), " edits");
+	QuasiThresholdEditingLocalMover mover2(karate, parents, 2, 0, 1, 1);
+	mover2.run();
+	INFO("With randomness ", mover2.getNumberOfEdits(), " edits");
+}
+
 TEST_F(CommunityGTest, testQuasiThresholdGreedyBound) {
 	Graph karate = METISGraphReader().read("input/karate.graph");
 
@@ -787,6 +832,8 @@ TEST_F(CommunityGTest, testQuasiThresholdGreedyBound) {
         EXPECT_GT(bound.getMinDistance(), 1);
         EXPECT_LE(bound.getMinDistance(), 21);
 }
+
+
 
 TEST_F(CommunityGTest, benchQuasiThresholdGreedyBound) {
         std::string graphPath;
