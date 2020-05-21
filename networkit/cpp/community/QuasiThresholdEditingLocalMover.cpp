@@ -29,13 +29,16 @@ NetworKit::QuasiThresholdEditingLocalMover::QuasiThresholdEditingLocalMover(
 	order(order) {
 	forest = Graph(GraphTools::copyNodes(G), false, true);
 	if(parent.size() == G.upperNodeIdBound()){
+		//insert Run makes only sense if parents are trivial
+		insertRun = 0;
 		G.forNodes([&](node u) {
 			if (parent[u] != none) {
 				forest.addEdge(u, parent[u]);
 			}
 		});
+	} else {
+		insertRun = (order.size() == G.upperNodeIdBound());
 	}
-	insertRun = (order.size() == G.upperNodeIdBound());
 	dynamicForest = DynamicForest(forest);
 }
 
@@ -86,6 +89,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 	equalBestParents = std::vector<count> (G.upperNodeIdBound(), 0);
 	rootEqualBestParents = 0;
 	
+	
 	count i;
 	if(insertRun){
 		existing = std::vector<bool>(G.upperNodeIdBound(), 0);
@@ -122,6 +126,8 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 }
 
 void NetworKit::QuasiThresholdEditingLocalMover::localMove(node nodeToMove){
+	assert(numEdits == countNumberOfEdits());
+	TRACE("Move node ", nodeToMove);
 	handler.assureRunning();
 	G.forEdgesOf(nodeToMove, [&](node v) {
 		if(existing[v]){
@@ -135,47 +141,57 @@ void NetworKit::QuasiThresholdEditingLocalMover::localMove(node nodeToMove){
 	if(sortPaths) {
 		dynamicForest.moveUpNeighbor(nodeToMove, nodeToMove);
 	}
-	// remove the node from its tree but store the old position.
 	curChildren = dynamicForest.children(nodeToMove);
 	curParent = dynamicForest.parent(nodeToMove);
-	curEdits = G.degree(nodeToMove);
-	dynamicForest.dfsFrom(nodeToMove, [&](node c) {
-		if (c != nodeToMove) {
-			curEdits += 1 - 2 * marker[c];
+	if(insertRun){
+		curEdits = neighbors.size();
+	} else {
+		curEdits = G.degree(nodeToMove);
+		dynamicForest.dfsFrom(nodeToMove, [&](node c) {
+			if (c != nodeToMove) {
+				curEdits += 1 - 2 * marker[c];
+			}
+		}, [](node){});
+		for (node p = dynamicForest.parent(nodeToMove); p != none; p = dynamicForest.parent(p)) {
+			curEdits += 1 - 2 * marker[p];
 		}
-	}, [](node){});
-	for (node p = dynamicForest.parent(nodeToMove); p != none; p = dynamicForest.parent(p)) {
-		curEdits += 1 - 2 * marker[p];
 	}
 	dynamicForest.isolate(nodeToMove);
 	bucketQueue.fill(neighbors, dynamicForest);
+	bestChildren.clear();
 	bestParent = none;
 	rootMaxGain = 0;
 	rootEdits = 0;
-
-	while(!bucketQueue.empty()){
-		node u = bucketQueue.next();
-		processNode(u, nodeToMove);
-	}
-
-	bestEdits = G.degree(nodeToMove) - rootMaxGain;
-
-	if (rootEdits > rootMaxGain) {
+	//all neighbors to deep
+	if(bucketQueue.empty()) {
 		bestParent = none;
-		bestEdits = G.degree(nodeToMove) - rootEdits;
-	}
-
-	bestChildren.clear();
-	for (node u : touchedNodes) {
-		if (u != nodeToMove && dynamicForest.parent(u) == bestParent && editDifference[u] != none) {
-			if(editDifference[u] > 0 || (randomness &&  randomBool(2))){
-				bestChildren.push_back(u);
+		bestEdits = neighbors.size();
+	} else {
+		while(!bucketQueue.empty()){
+			node u = bucketQueue.next();
+			processNode(u, nodeToMove);
+		}
+		
+		bestEdits = neighbors.size() - rootMaxGain;
+		if (rootEdits > rootMaxGain) {
+			bestParent = none;
+			bestEdits = neighbors.size() - rootEdits;
+		}
+		
+		
+		for (node u : touchedNodes) {
+			if (u != nodeToMove && dynamicForest.parent(u) == bestParent && editDifference[u] != none) {
+				if(editDifference[u] > 0 || (randomness &&  randomBool(2))){
+					bestChildren.push_back(u);
+				}
 			}
 		}
 	}
+	
 
 
 #ifndef NDEBUG
+	//not working, as bucket queue does not explore complete depth
 	//compareWithQuadratic(nodeToMove);
 #endif
 
@@ -199,6 +215,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::localMove(node nodeToMove){
 	G.forEdgesOf(nodeToMove, [&](node v) {
 		marker[v] = false;
 	});
+	
 
 	if (savedEdits > 0 || (savedEdits == 0 && randomness && randomBool(2))) {
 		dynamicForest.moveToPosition(nodeToMove, bestParent, bestChildren);
@@ -208,10 +225,22 @@ void NetworKit::QuasiThresholdEditingLocalMover::localMove(node nodeToMove){
 
 #ifndef NDEBUG
 		forest = dynamicForest.toGraph();
+		/*INFO("CurParent ", curParent);
+		INFO("curChildren ", curChildren);
+		INFO("curEdits ", curEdits);
+		INFO("bestParent ", bestParent);
+		INFO("bestChildren ", bestChildren);
+		INFO("savedEdits ", savedEdits);
+		INFO("num ", numEdits);
+		INFO("calc ", countNumberOfEdits());*/
 		assert(numEdits == countNumberOfEdits());
 #endif
 	} else  {
 		dynamicForest.moveToPosition(nodeToMove, curParent, curChildren);
+		#ifndef NDEBUG
+				forest = dynamicForest.toGraph();
+				assert(numEdits == countNumberOfEdits());
+		#endif
 	}
 }
 
@@ -228,7 +257,6 @@ void NetworKit::QuasiThresholdEditingLocalMover::processNode(node u, node nodeTo
 		}
 
 		count sumPositiveEdits = editDifference[u];
-
 		assert(editDifference[u] != none);
 
 		editDifference[u] += marker[u];
@@ -498,7 +526,6 @@ std::vector< NetworKit::node > NetworKit::QuasiThresholdEditingLocalMover::getPa
 NetworKit::Cover NetworKit::QuasiThresholdEditingLocalMover::getCover(index mergeDepth) const {
 	Cover c(G.upperNodeIdBound());
 
-	DynamicForest dynamicForest(forest);
 
 	std::vector<count> depth(G.upperNodeIdBound());
 
@@ -534,6 +561,37 @@ NetworKit::Cover NetworKit::QuasiThresholdEditingLocalMover::getCover(index merg
 
 NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getNumberOfEdits() const {
 	return numEdits;
+}
+
+NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::editsIncidentTo(node u) const {
+	std::vector<bool> visited(G.upperNodeIdBound());
+	count edits = 0;
+	node parent = dynamicForest.parent(u);
+	while(parent != none){
+		visited[parent] = 1;
+		if(!G.hasEdge(parent, u)){
+			edits++;
+		}
+		parent = dynamicForest.parent(parent);
+	}
+	dynamicForest.forChildrenOf(u, [&](node c) {
+		dynamicForest.dfsFrom(c,
+		[&](node w) {
+			visited[w] = 1; 
+			if(!G.hasEdge(w, u)){
+				edits++;
+			}
+		},
+		[&](node w) {});
+	});
+	
+	G.forNeighborsOf(u, [&](node w) {
+		if (!visited[w]) {
+			edits++;
+		}
+	});
+
+	return edits;
 }
 
 NetworKit::Graph NetworKit::QuasiThresholdEditingLocalMover::getQuasiThresholdGraph() const {

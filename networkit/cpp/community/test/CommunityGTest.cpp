@@ -812,11 +812,29 @@ TEST_F(CommunityGTest, testQuasiHuge) {
   //graphio.readMat("input/facebook100/{0}.mat".format(name), key="A")
   //Graph G = EdgeListReader('\t', 0).read("input/terrorist.edgelist");
   //Graph G = EdgeListReader('\t', 1).read("input/amazon.edgelist");		
-  std::vector<node> order(G.upperNodeIdBound());
-  std::iota(order.begin(), order.end(), 0);
-	QuasiThresholdEditingLocalMover mover(G, std::vector<node>(), 1, 0, 1, 0, order);
+	QuasiThresholdEditingLocalMover mover(G, std::vector<node>(), 1, 0, 0, 0);
 	mover.run();  
-	INFO("Canonical order: ", mover.getNumberOfEdits(), " edits");
+	INFO("Basic: ", mover.getNumberOfEdits(), " edits");
+  
+  
+  std::vector<node> order(G.upperNodeIdBound());
+  std::vector<std::pair<node, count>> d;
+  for(node u = 0; u < G.upperNodeIdBound(); u++){
+    d.push_back(std::pair<node,count>(u, G.degree(u)));
+  }
+  auto cmp = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
+     return a.second < b.second;
+   };
+  std::sort(d.begin(), d.end(), cmp);
+  order.clear();
+  for(index i = 0; i < d.size(); i++){
+    order.push_back(d[i].first);
+  }
+  QuasiThresholdEditingLocalMover mover2(G, std::vector<node>(), 1, 0, 1, 1, order);
+  mover2.run();  
+  INFO("With features: ", mover2.getNumberOfEdits(), " edits");
+  
+  
 }
 
 
@@ -839,7 +857,8 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithRandomness) {
 
 
 TEST_F(CommunityGTest, testQuasiThresholdMovingCompareOptions) {
-	Graph G = METISGraphReader().read("input/email.graph");
+  //Graph G = EdgeListReader('\t', 0).read("input/terrorist.edgelist");
+	Graph G = METISGraphReader().read("input/football.graph");
 	G.indexEdges();
 	QuasiThresholdEditingLinear editing(G);
 	editing.run();

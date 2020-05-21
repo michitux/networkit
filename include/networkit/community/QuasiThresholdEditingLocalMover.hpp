@@ -80,6 +80,9 @@ namespace NetworKit {
 		}
 		
 		std::string printQueue(){
+			if(empty()){
+				return "BucketQueue:";
+			}
 			std::stringstream ss;
 			ss << "BucketQueue:";
 			int j = 0;
@@ -115,6 +118,7 @@ public:
 	Cover getCover(NetworKit::index mergeDepth) const;
 private:
 	count countNumberOfEdits() const;
+	count editsIncidentTo(node u) const;
 	void localMove(node nodeToMove);
 	void processNode(node u, node nodeToMove);
 	void compareWithQuadratic(node nodeToMove) const;
@@ -162,7 +166,7 @@ private:
 	std::vector<bool> existing;
 	std::vector<count> equalBestParents;
 	count rootEqualBestParents;
-
+	
 	
 	
 };
