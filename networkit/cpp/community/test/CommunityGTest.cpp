@@ -743,17 +743,10 @@ TEST_F(CommunityGTest, testQuasiThresholdEditingLocalMover) {
 	tester.run();
 	EXPECT_EQ(tester.getNumberOfEdits(), mover.getNumberOfEdits());
 
-	QuasiThresholdEditingLocalMover subtreeMover(karate, parents, 2, true);
-	subtreeMover.run();
-	EXPECT_EQ(21, subtreeMover.getNumberOfEdits());
-
-	QuasiThresholdEditingLocalMover subtreeTester(karate, subtreeMover.getParents(), 0);
-	subtreeTester.run();
-	EXPECT_EQ(subtreeTester.getNumberOfEdits(), subtreeMover.getNumberOfEdits());
 
 	parents.clear();
 	parents.resize(karate.upperNodeIdBound(), none);
-	QuasiThresholdEditingLocalMover noParentsMover(karate, parents, 100, true);
+	QuasiThresholdEditingLocalMover noParentsMover(karate, parents, 100);
 	noParentsMover.run();
 	INFO("Needed ", noParentsMover.getNumberOfEdits(), " edits without pre-initialized parents");
 
@@ -785,7 +778,7 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
   
   std::vector<node> order(karate.upperNodeIdBound());
   std::iota(order.begin(), order.end(), 0);
-	QuasiThresholdEditingLocalMover mover(karate, parents, 1, 0, 1, 0, order);
+	QuasiThresholdEditingLocalMover mover(karate, parents, 1, 1, 0, order);
 	mover.run();  
 	INFO("Canonical order: ", mover.getNumberOfEdits(), " edits");
   
@@ -801,7 +794,7 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
   for(index i = 0; i < d.size(); i++){
     order.push_back(d[i].first);
   }
-  QuasiThresholdEditingLocalMover mover2(karate, parents, 1, 0, 1, 0, order);
+  QuasiThresholdEditingLocalMover mover2(karate, parents, 1, 1, 0, order);
   mover2.run();  
   INFO("Large degrees first: ", mover2.getNumberOfEdits(), " edits");
 }
@@ -812,9 +805,15 @@ TEST_F(CommunityGTest, testQuasiHuge) {
   //graphio.readMat("input/facebook100/{0}.mat".format(name), key="A")
   //Graph G = EdgeListReader('\t', 0).read("input/terrorist.edgelist");
   //Graph G = EdgeListReader('\t', 1).read("input/amazon.edgelist");		
-	QuasiThresholdEditingLocalMover mover(G, std::vector<node>(), 1, 0, 0, 0);
+	QuasiThresholdEditingLocalMover mover(G, std::vector<node>(), 10, 0, 0);
 	mover.run();  
-	INFO("Basic: ", mover.getNumberOfEdits(), " edits");
+  INFO( "Parents: Trivial"
+        ", Order: None",
+        ", Runs: 10",
+        ", sortPaths: 0",
+        ", randomness: 0",
+        "----- Edits: ", mover.getNumberOfEdits(),
+        " used ", mover.getUsedIterations());
   
   
   std::vector<node> order(G.upperNodeIdBound());
@@ -830,10 +829,25 @@ TEST_F(CommunityGTest, testQuasiHuge) {
   for(index i = 0; i < d.size(); i++){
     order.push_back(d[i].first);
   }
-  QuasiThresholdEditingLocalMover mover2(G, std::vector<node>(), 1, 0, 1, 1, order);
+  QuasiThresholdEditingLocalMover mover2(G, std::vector<node>(), 0, 0, 0, order);
   mover2.run();  
-  INFO("With features: ", mover2.getNumberOfEdits(), " edits");
+  INFO( "Parents: Trivial"
+        ", Order: Degree ascending",
+        ", Runs: 0",
+        ", sortPaths: 0",
+        ", randomness: 0",
+        "----- Edits: ", mover2.getNumberOfEdits(),
+        " used ", mover2.getUsedIterations());
   
+    QuasiThresholdEditingLocalMover mover3(G, std::vector<node>(), 10, 1, 1, order);
+    mover3.run();  
+    INFO( "Parents: Trivial"
+          ", Order: Degree ascending",
+          ", Runs: 10",
+          ", sortPaths: 1",
+          ", randomness: 1",
+          "----- Edits: ", mover3.getNumberOfEdits(),
+          " used ", mover3.getUsedIterations());
   
 }
 
@@ -847,18 +861,18 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithRandomness) {
 	editing.run();
 
 	std::vector<node> parents = editing.getParents();
-	QuasiThresholdEditingLocalMover mover(karate, parents, 10, 0, 1, 0);
+	QuasiThresholdEditingLocalMover mover(karate, parents, 10, 1, 0);
 	mover.run();
 	INFO("Without randomness ", mover.getNumberOfEdits(), " edits");
-	QuasiThresholdEditingLocalMover mover2(karate, parents, 10, 0, 1, 1);
+	QuasiThresholdEditingLocalMover mover2(karate, parents, 10, 1, 1);
 	mover2.run();
 	INFO("With randomness ", mover2.getNumberOfEdits(), " edits");
 }
 
 
 TEST_F(CommunityGTest, testQuasiThresholdMovingCompareOptions) {
-  //Graph G = EdgeListReader('\t', 0).read("input/terrorist.edgelist");
-	Graph G = METISGraphReader().read("input/football.graph");
+  Graph G = EdgeListReader('\t', 0).read("input/terrorist.edgelist");
+	//Graph G = METISGraphReader().read("input/adjnoun.graph");
 	G.indexEdges();
 	QuasiThresholdEditingLinear editing(G);
 	editing.run();
@@ -883,36 +897,51 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingCompareOptions) {
   for(node u = 0; u < G.upperNodeIdBound(); u++){
     d.push_back(std::pair<node,count>(u, G.degree(u)));
   }
-  auto cmp = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
+  auto asc = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
      return a.second < b.second;
    };
-  std::sort(d.begin(), d.end(), cmp);
-  order.clear();
+  std::sort(d.begin(), d.end(), asc);
   for(index i = 0; i < d.size(); i++){
     order2.push_back(d[i].first);
   }
   orders.push_back(order2);
-  order_names.push_back("Degree descending");
+  order_names.push_back("Degree ascending");
+  
+  /*order2.clear();
+  auto desc = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
+     return a.second < b.second;
+   };
+   std::sort(d.begin(), d.end(), desc);
+   for(index i = 0; i < d.size(); i++){
+     order2.push_back(d[i].first);
+   }
+   orders.push_back(order2);
+   order_names.push_back("Degree descending");*/
   
   std::vector<count> runs;
+  
+  runs.push_back(0);
   runs.push_back(2);
   runs.push_back(5);
+  runs.push_back(20);
   
   for(int i = 0; i < parents.size(); i++){
     for(int j = 0; j < orders.size(); j++){
+      if(i > 0 && j > 0) break;
       for(count run : runs){
         bool sortPaths = 0;
         for(int k = 0; k < 2; k++, sortPaths = !sortPaths){
           bool randomness = 0;
           for(int l = 0; l < 2; l++, randomness = !randomness){
-            QuasiThresholdEditingLocalMover mover(G, parents[i], run, 0, sortPaths, randomness, orders[j]);
+            QuasiThresholdEditingLocalMover mover(G, parents[i], run, sortPaths, randomness, orders[j]);
             mover.run();
             INFO( "Parents: ", parent_names[i],
                   ", Order: ", order_names[j],
                   ", Runs: ", run,
                   ", sortPaths: ", sortPaths,
                   ", randomness: ", randomness,
-                  "----- Edits: ", mover.getNumberOfEdits());
+                  "----- Edits: ", mover.getNumberOfEdits(),
+                  " used ", mover.getUsedIterations());
           }
         }
       }

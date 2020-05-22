@@ -16,13 +16,11 @@ NetworKit::QuasiThresholdEditingLocalMover::QuasiThresholdEditingLocalMover(
 	const NetworKit::Graph &G, 
 	const std::vector< NetworKit::node > &parent, 
 	NetworKit::count maxIterations, 
-	bool moveSubtrees,
 	bool sortPaths,
 	bool randomness,
 	const std::vector<node> &order)
 : G(G), 
 	maxIterations(maxIterations), 
-	moveSubtrees(moveSubtrees), 
 	numEdits(none), 
 	sortPaths(sortPaths),
 	randomness(randomness),
@@ -88,6 +86,8 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 	
 	equalBestParents = std::vector<count> (G.upperNodeIdBound(), 0);
 	rootEqualBestParents = 0;
+	plateauSize = 0;
+	editsBefore = countNumberOfEdits();
 	
 	
 	count i;
@@ -100,6 +100,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 	}
 
 	for (; hasMoved && i <= maxIterations; ++i) {
+		if(!hasMoved || (randomness && plateauSize > 4)) break;
 		handler.assureRunning();
 		hasMoved = false;
 
@@ -117,7 +118,12 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 		}
 		usedIterations = i;
 
-		
+	if(countNumberOfEdits() == editsBefore){
+		plateauSize++;
+	}	else {
+		plateauSize = 0;
+	}
+	editsBefore = countNumberOfEdits();
 	}
 
 	forest = dynamicForest.toGraph();
@@ -162,6 +168,7 @@ void NetworKit::QuasiThresholdEditingLocalMover::localMove(node nodeToMove){
 	bestParent = none;
 	rootMaxGain = 0;
 	rootEdits = 0;
+	bool coin  = 0;
 	//all neighbors to deep
 	if(bucketQueue.empty()) {
 		bestParent = none;
@@ -176,6 +183,8 @@ void NetworKit::QuasiThresholdEditingLocalMover::localMove(node nodeToMove){
 		if (rootEdits > rootMaxGain) {
 			bestParent = none;
 			bestEdits = neighbors.size() - rootEdits;
+		} else {
+			coin = randomBool(rootEqualBestParents);
 		}
 		
 		
@@ -216,8 +225,10 @@ void NetworKit::QuasiThresholdEditingLocalMover::localMove(node nodeToMove){
 		marker[v] = false;
 	});
 	
+	
+	
 
-	if (savedEdits > 0 || (savedEdits == 0 && randomness && randomBool(2))) {
+	if (savedEdits > 0 || (savedEdits == 0 && randomness && coin)) {
 		dynamicForest.moveToPosition(nodeToMove, bestParent, bestChildren);
 
 		hasMoved = true;
@@ -225,14 +236,6 @@ void NetworKit::QuasiThresholdEditingLocalMover::localMove(node nodeToMove){
 
 #ifndef NDEBUG
 		forest = dynamicForest.toGraph();
-		/*INFO("CurParent ", curParent);
-		INFO("curChildren ", curChildren);
-		INFO("curEdits ", curEdits);
-		INFO("bestParent ", bestParent);
-		INFO("bestChildren ", bestChildren);
-		INFO("savedEdits ", savedEdits);
-		INFO("num ", numEdits);
-		INFO("calc ", countNumberOfEdits());*/
 		assert(numEdits == countNumberOfEdits());
 #endif
 	} else  {
@@ -563,6 +566,11 @@ NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getNumberOfEdits() 
 	return numEdits;
 }
 
+
+NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getPlateauSize() const {
+	return plateauSize;
+}
+
 NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::editsIncidentTo(node u) const {
 	std::vector<bool> visited(G.upperNodeIdBound());
 	count edits = 0;
@@ -605,5 +613,5 @@ NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getUsedIterations()
 }
 
 bool NetworKit::QuasiThresholdEditingLocalMover::randomBool(count options) const {
-	return rand() % options == 0;
+	return options == 0 ? 0 : rand() % options == 0;
 }

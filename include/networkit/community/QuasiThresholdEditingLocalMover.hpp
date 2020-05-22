@@ -103,8 +103,7 @@ class QuasiThresholdEditingLocalMover {
 public:
 	QuasiThresholdEditingLocalMover(const NetworKit::Graph &G, 
 		const std::vector< NetworKit::node > &parent = std::vector<NetworKit::node>(), 
-		NetworKit::count maxIterations = 2, 
-		bool moveSubtrees = false, 
+		NetworKit::count maxIterations = 2,  
 		bool sortPaths = true,
 		bool randomness = false,
 		const std::vector< NetworKit::node > &order = std::vector<NetworKit::node>());
@@ -114,6 +113,7 @@ public:
 	Graph getQuasiThresholdGraph() const;
 	count getNumberOfEdits() const;
 	count getUsedIterations() const;
+	count getPlateauSize() const;
 	std::vector<node> getParents() const;
 	Cover getCover(NetworKit::index mergeDepth) const;
 private:
@@ -128,7 +128,6 @@ private:
 	Graph forest;
 	count maxIterations;
 	count usedIterations;
-	bool moveSubtrees;
 	bool sortPaths;
 	bool randomness;
 	std::vector<NetworKit::node> order;
@@ -166,6 +165,9 @@ private:
 	std::vector<bool> existing;
 	std::vector<count> equalBestParents;
 	count rootEqualBestParents;
+	
+	count editsBefore;
+	count plateauSize;
 	
 	
 	
