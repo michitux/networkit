@@ -106,7 +106,8 @@ public:
 		NetworKit::count maxIterations = 2,  
 		bool sortPaths = true,
 		bool randomness = false,
-		const std::vector< NetworKit::node > &order = std::vector<NetworKit::node>());
+		const std::vector< NetworKit::node > &order = std::vector<NetworKit::node>(),
+		count maxPlateauSize = 4);
 
 	void run();
 
@@ -122,7 +123,7 @@ private:
 	void localMove(node nodeToMove);
 	void processNode(node u, node nodeToMove);
 	void compareWithQuadratic(node nodeToMove) const;
-	bool randomBool(count options) const;
+	bool randomBool(count options);
 	
 	const Graph& G;
 	Graph forest;
@@ -131,6 +132,8 @@ private:
 	bool sortPaths;
 	bool randomness;
 	std::vector<NetworKit::node> order;
+	count maxPlateauSize;
+	
 	bool insertRun;
 	count numEdits;
 	
@@ -169,7 +172,10 @@ private:
 	count editsBefore;
 	count plateauSize;
 	
+	count max_depth;
 	
+	std::mt19937_64& gen = Aux::Random::getURNG();
+	std::uniform_int_distribution<count> dist;
 	
 };
 
