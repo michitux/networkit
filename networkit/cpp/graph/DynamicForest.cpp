@@ -469,7 +469,7 @@ bool DynamicForest::pathsValid(){
 
 
 
-std::string DynamicForest::printPaths(){
+std::string DynamicForest::printPaths() const{
 	std::stringstream ss;
 	for(node u = 0; u < path_membership.size(); u++){
 		ss << "{" << u << " ";

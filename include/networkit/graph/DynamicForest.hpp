@@ -77,6 +77,7 @@ public:
 	//O(max(#nodes in path of parent, #children))
 	void moveToPosition(node u, node p, const std::vector<node> &adoptedChildren);
 
+	std::string printPaths() const;
 
 	template <typename F1, typename F2>
 	void dfsFrom(node u, F1 onEnter, F2 onExit) const;
@@ -196,7 +197,6 @@ private:
 	void updateDepthInSubtree(pid start);
 	
 	bool pathsValid();
-	std::string printPaths();
 	
 	std::vector<SimplePath> paths;
 	std::vector<pid> freeList;
