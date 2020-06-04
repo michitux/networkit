@@ -126,7 +126,7 @@ namespace NetworKit {
 				handler(),
 				dynamicForest(forest),
 				hasMoved(1),		
-				rootEqualBestParents(0),
+				rootEqualBestParents(1),
 				plateauSize(0),
 				dist(){
 				
@@ -145,7 +145,7 @@ namespace NetworKit {
 				scoreMax = std::vector<count> (G.upperNodeIdBound(), 0);
 				childCloseness = std::vector<count> (G.upperNodeIdBound(), 0);
 				nodeTouched  = std::vector<bool>(G.upperNodeIdBound(), false);
-				equalBestParents = std::vector<count> (G.upperNodeIdBound(), 0);
+				equalBestParents = std::vector<count> (G.upperNodeIdBound(), 1);
 				if(insertRun){
 					existing = std::vector<bool>(G.upperNodeIdBound(), 0);
 				} else {
@@ -331,7 +331,6 @@ namespace NetworKit {
 				bestParent = none;
 				rootScoreMax = 0;
 				rootChildCloseness = 0;
-				bool coin  = 0;
 				//all neighbors to deep
 				if(bucketQueue.empty()) {
 					bestParent = none;
@@ -346,9 +345,7 @@ namespace NetworKit {
 					if (rootChildCloseness > rootScoreMax) {
 						bestParent = none;
 						bestEdits = neighbors.size() - rootChildCloseness;
-					} else {
-						coin = randomBool(rootEqualBestParents);
-					}
+					} 
 					
 					
 					for (node u : touchedNodes) {
@@ -371,7 +368,7 @@ namespace NetworKit {
 
 				// cleanup for linear move
 				for (node u : touchedNodes) {
-					equalBestParents[u] = 0;
+					equalBestParents[u] = 1;
 					lastVisitedDFSNode[u] = u;
 					scoreMax[u] = 0;
 					childCloseness[u] = 0;
@@ -390,7 +387,7 @@ namespace NetworKit {
 				
 				
 
-				if (savedEdits > 0 || (savedEdits == 0 && randomness && coin)) {
+				if (savedEdits > 0 || (savedEdits == 0 && randomness)) {
 					dynamicForest.moveToPosition(nodeToMove, bestParent, bestChildren);
 
 					hasMoved = true;
@@ -500,7 +497,7 @@ namespace NetworKit {
 							}
 							bool coin = 0;
 							if(randomness && (scoreMax[u] == scoreMax[p])){
-								equalBestParents[p]++;
+								equalBestParents[p]+=equalBestParents[u];
 								coin = randomBool(equalBestParents[p]);
 							}
 							if (scoreMax[u] > scoreMax[p] || coin) {
@@ -508,12 +505,12 @@ namespace NetworKit {
 								bestParentBelow[p] = bestParentBelow[u];
 							}
 							if (scoreMax[u] > scoreMax[p]){
-								equalBestParents[p] = 1;
+								equalBestParents[p] = equalBestParents[u];
 							}
 						} else {
 							bool coin = 0;
 							if(randomness && (scoreMax[u] == rootScoreMax)){
-								rootEqualBestParents++;
+								rootEqualBestParents+=equalBestParents[u];
 								coin = randomBool(rootEqualBestParents);
 							}
 							if (scoreMax[u] > rootScoreMax || coin) {
@@ -521,7 +518,7 @@ namespace NetworKit {
 								bestParent = bestParentBelow[u];
 							}
 							if (scoreMax[u] > rootScoreMax){
-								rootEqualBestParents = 1;					
+								rootEqualBestParents = equalBestParents[u];					
 							}
 							if (childCloseness[u] != none) {
 								rootChildCloseness += childCloseness[u];
