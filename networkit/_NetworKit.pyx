@@ -6060,10 +6060,11 @@ cdef class CutClustering(CommunityDetector):
 
 cdef extern from "<networkit/community/QuasiThresholdEditingLocalMover.hpp>":
 	cdef cppclass _QuasiThresholdEditingLocalMover "NetworKit::QuasiThresholdEditingLocalMover":
-		_QuasiThresholdEditingLocalMover(_Graph G, vector[node] parents, count maxIterations, bool_t moveSubtrees) except +
+		_QuasiThresholdEditingLocalMover(_Graph G, vector[node] parent, count maxIterations, bool_t sortPaths, bool_t randomness, vector[node] order, count maxPlateauSize) except +
 		void run() except +
 		count getNumberOfEdits() const
 		count getUsedIterations() const
+		count getPlateauSize() const
 		_Graph getQuasiThresholdGraph() except +
 		_Cover getCover(index mergeDepth) except +
 		vector[node] getParents() except +
@@ -6072,9 +6073,9 @@ cdef class QuasiThresholdEditingLocalMover:
 	cdef _QuasiThresholdEditingLocalMover *_this
 	cdef Graph _G
 
-	def __cinit__(self, Graph G, vector[node] parents, count maxIterations, bool_t moveSubtrees = False):
+	def __cinit__(self, Graph G, vector[node] parent, count maxIterations, bool_t sortPaths = True, bool_t randomness = False, vector[node] order = [], count maxPlateauSize = 4):
 		self._G = G
-		self._this = new _QuasiThresholdEditingLocalMover(G._this, parents, maxIterations, moveSubtrees)
+		self._this = new _QuasiThresholdEditingLocalMover(G._this, parent, maxIterations, sortPaths, randomness, order, maxPlateauSize)
 
 	def __dealloc__(self):
 		del self._this
@@ -6088,6 +6089,9 @@ cdef class QuasiThresholdEditingLocalMover:
 
 	def getUsedIterations(self):
 		return self._this.getUsedIterations()
+	
+	def getPlateauSize(self):
+		return self._this.getPlateauSize()
 
 	def getQuasiThresholdGraph(self):
 		return Graph().setThis(self._this.getQuasiThresholdGraph())
