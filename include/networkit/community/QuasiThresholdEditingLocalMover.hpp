@@ -15,17 +15,18 @@ namespace NetworKit {
 	class BucketQueue { 
 		count nextNode;
 		count currentBucket;
+		count n;
 		std::vector<node> nodes;
 		//points to first element in the bucket
 		std::vector<count> border;
 		
 		public :
-		BucketQueue(count n = 0) : nodes(n), border(n), nextNode(none), currentBucket(none){
+		BucketQueue(count n = 0) : n(n), nodes(n), border(n), nextNode(none), currentBucket(none){
 		}
 		
 		
 		void fill(const std::vector<node> &elements, const DynamicForest &dynamicForest){
-			count maxDepth = 2 * elements.size();
+			count maxDepth = std::min(n-1, 2 * elements.size());
 			std::fill(border.begin(), border.begin() + std::min(maxDepth + 1, border.size()), 0);
 			for (node u : elements) {
 				if(dynamicForest.depth(u) > maxDepth) continue;
@@ -48,7 +49,7 @@ namespace NetworKit {
 		
 			if(nextNode == none){
 				return;
-			} 
+			}
 
 				
 		}
@@ -127,6 +128,7 @@ namespace NetworKit {
 				dynamicForest(forest),
 				hasMoved(1),		
 				rootEqualBestParents(1),
+				rootEqualBestParentsCpy(1),
 				plateauSize(0),
 				dist(){
 				
@@ -161,10 +163,9 @@ namespace NetworKit {
 					i = 1;
 				}
 				for (; hasMoved && i <= maxIterations; ++i) {
-					if(!hasMoved || (randomness && plateauSize > maxPlateauSize)) break;
+					if(!hasMoved || (randomness && (plateauSize >= maxPlateauSize))) break;
 					handler.assureRunning();
 					hasMoved = false;
-
 					if(insertRun){
 						for(index j = 0; j < G.upperNodeIdBound();j++){
 							node nodeToMove = order[j];
@@ -191,47 +192,21 @@ namespace NetworKit {
 
 				assert(numEdits == countNumberOfEdits());
 			};
-			
-			NetworKit::Cover getCover(index mergeDepth) const {
-				Cover c(G.upperNodeIdBound());
-
-
-				std::vector<count> depth(G.upperNodeIdBound());
-
-				index curSubset = none;
-
-				dynamicForest.dfsFrom(none, [&](node u) {
-					if (u != none) {
-						if (dynamicForest.parent(u) == none) {
-							depth[u] = 0;
-						} else {
-							depth[u] = depth[dynamicForest.parent(u)] + 1;
-						}
-
-						if (depth[u] == mergeDepth || (depth[u] < mergeDepth && dynamicForest.nextDFSNodeOnEnter(u, u) == u)) {
-							curSubset = c.toSingleton(u);
-
-							node p = dynamicForest.parent(u);
-							while (p != none) {
-								c.addToSubset(curSubset, p);
-								p = dynamicForest.parent(p);
-							}
-						} else if (depth[u] > mergeDepth) {
-							c.addToSubset(curSubset, u);
-						}
-					}
-				}, [&](node) {
-				});
-
-				return c;
-			};
-			
+						
 			count getNumberOfEdits() const {
 				return numEdits;
 			};
 			
 			count getUsedIterations() const {
 				return usedIterations;
+			};
+			
+			count getPlateauSize() const {
+				return plateauSize;
+			};
+			
+			count getRootEqualBestParents() const {
+				return rootEqualBestParentsCpy;
 			};
 			
 			Graph getForest() const {
@@ -283,6 +258,7 @@ namespace NetworKit {
 			std::vector<bool> existing;
 			std::vector<count> equalBestParents;
 			count rootEqualBestParents;
+			count rootEqualBestParentsCpy;
 			
 			count editsBefore;
 			count plateauSize;
@@ -378,18 +354,18 @@ namespace NetworKit {
 
 				neighbors.clear();
 				touchedNodes.clear();
-				rootEqualBestParents = 0;
+				rootEqualBestParentsCpy = rootEqualBestParents;
+				rootEqualBestParents = 1;
+				
 
 				G.forEdgesOf(nodeToMove, [&](node v) {
 					marker[v] = false;
 				});
 				
 				
-				
 
 				if (savedEdits > 0 || (savedEdits == 0 && randomness)) {
 					dynamicForest.moveToPosition(nodeToMove, bestParent, bestChildren);
-
 					hasMoved = true;
 					numEdits -= savedEdits;
 
@@ -407,6 +383,7 @@ namespace NetworKit {
 			};
 			
 			void processNode(node u, node nodeToMove){
+					TRACE("Process ", u);
 					TRACE("Processing node ", u, " of depth ", dynamicForest.depth(u), " (node to move: ", nodeToMove, ")");
 					TRACE("Parent: ", dynamicForest.parent(u), ", children: ", dynamicForest.children(u));
 					assert(u != nodeToMove);
@@ -477,10 +454,9 @@ namespace NetworKit {
 					if (scoreMax[u] > 0) {
 						scoreMax[u] -= 1 - marker[u];
 					}
-
 					TRACE("Maximum gain at ", u, ": ", scoreMax[u]);
+					node p = dynamicForest.parent(u);
 					if (scoreMax[u] > 0 || (childCloseness[u] != none && childCloseness[u] != 0)) {
-						node p = dynamicForest.parent(u);
 						if (p != none) {
 							assert(dynamicForest.depth(p) <= maxDepth);
 							if (!nodeTouched[p]) {
@@ -524,6 +500,10 @@ namespace NetworKit {
 								rootChildCloseness += childCloseness[u];
 							}
 						}
+					} else if(scoreMax[u] == 0 && p ==  none){
+						rootEqualBestParents += equalBestParents[u];
+					} else if(scoreMax[u] == 0 && marker[p]){
+						equalBestParents[p] += equalBestParents[u];
 					}
 
 					if (dynamicForest.children(u).empty()) { assert(childCloseness[u] == 1); }
@@ -743,8 +723,8 @@ public:
 	count getNumberOfEdits() const;
 	count getUsedIterations() const;
 	count getPlateauSize() const;
+	count getRootEqualBestParents() const;
 	std::vector<node> getParents() const;
-	Cover getCover(NetworKit::index mergeDepth) const;
 private:
 
 	const Graph& G;
@@ -758,6 +738,8 @@ private:
 	
 	count usedIterations;
 	count numEdits;
+	count plateauSize;
+	count rootEqualBestParents;
 	
 	EditingRunner* runner;
 

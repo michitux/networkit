@@ -28,13 +28,14 @@ NetworKit::QuasiThresholdEditingLocalMover::QuasiThresholdEditingLocalMover(
 	order(order),
 	maxPlateauSize(maxPlateauSize),
 	numEdits(0),
-	usedIterations(0) {
+	usedIterations(0),
+	rootEqualBestParents(0) {
 	forest = Graph(GraphTools::copyNodes(G), false, true);
 	if(parent.size() == G.upperNodeIdBound()){
 		//insert Run makes only sense if parents are trivial
 		insertRun = 0;
 		G.forNodes([&](node u) {
-			if (parent[u] != none) {
+			if (parent[u] != none && parent[u] != u) {
 				forest.addEdge(u, parent[u]);
 			}
 		});
@@ -70,6 +71,8 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 	forest = runner->getForest();
 	usedIterations =  runner->getUsedIterations();
 	numEdits = runner->getNumberOfEdits();
+	plateauSize = runner->getPlateauSize();
+	rootEqualBestParents = runner->getRootEqualBestParents();
 	delete runner;
 }
 
@@ -107,5 +110,13 @@ NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getNumberOfEdits() 
 
 NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getUsedIterations() const {
 	return usedIterations;
+}
+
+NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getPlateauSize() const {
+	return plateauSize;
+}
+
+NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getRootEqualBestParents() const {
+	return rootEqualBestParents;
 }
 

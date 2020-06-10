@@ -1004,9 +1004,93 @@ TEST_F(CommunityGTest, testInclusionMinimal) {
 }
 
 
+TEST_F(CommunityGTest, testRandomness) {
+  /*  o - x - o
+     | 
+     x 
+     |
+     o - x - o
+     |
+     x
+     |
+     o - x - o
+     |
+     x
+     
+     considering last insert with vm = 12
+     o = non-vm-neighbor, x = vm-neighbor 
+     ensuring that all 7 equal good positions are found
+  */
+  Graph G(13, false, false);
+  G.addEdge(0, 1);
+  G.addEdge(0, 3);
+  G.addEdge(0, 6);
+  G.addEdge(0, 7);
+  G.addEdge(0, 10);
+  G.addEdge(0, 11);
+  G.addEdge(1, 3);
+  G.addEdge(1, 6);
+  G.addEdge(1, 7);
+  G.addEdge(1, 10);
+  G.addEdge(1, 11);
+  G.addEdge(2, 3);
+  G.addEdge(2, 6);
+  G.addEdge(2, 7);
+  G.addEdge(2, 10);
+  G.addEdge(2, 11);
+  G.addEdge(3, 6);
+  G.addEdge(3, 7);
+  G.addEdge(3, 10);
+  G.addEdge(3, 11);
+  G.addEdge(4, 5);
+  G.addEdge(4, 7);
+  G.addEdge(4, 10);
+  G.addEdge(4, 11);
+  G.addEdge(5, 7);
+  G.addEdge(5, 10);
+  G.addEdge(5, 11);
+  G.addEdge(6, 7);
+  G.addEdge(6, 10);
+  G.addEdge(6, 11);
+  G.addEdge(7, 10);
+  G.addEdge(7, 11);
+  G.addEdge(8, 9);
+  G.addEdge(8, 11);
+  G.addEdge(9, 11);
+  G.addEdge(10, 11);
+  
+  G.addEdge(0, 12);
+  G.addEdge(2, 12);
+  G.addEdge(3, 12);
+  G.addEdge(4, 12);
+  G.addEdge(7, 12);
+  G.addEdge(8, 12);
+  
+  std::vector<node> parents(0);
+  std::vector<node> order(G.upperNodeIdBound());
+  std::iota(order.begin(), order.end(), 0);
+	QuasiThresholdEditingLocalMover mover(G, parents, 0, 0, 1, order);
+  mover.run();  
+  Graph Q = mover.getQuasiThresholdGraph();
+  Q.forEdges([&](node u, node v) {
+    if(u != 12 && v != 12){
+      assert(G.hasEdge(u,v));
+    } else {
+      INFO("(", u, ", ", v, ")");
+    }
+  });
+  G.forEdges([&](node u, node v) {
+    if(u != 12 && v != 12){
+      assert(Q.hasEdge(u,v));
+    } 
+  });
+  assert(mover.getRootEqualBestParents() == 7);
+}
+
+
 TEST_F(CommunityGTest, testQuasiThresholdMovingCompareOptions) {
   //Graph G = EdgeListReader('\t', 0).read("input/terrorist.edgelist");
-	Graph G = METISGraphReader().read("input/lesmis.graph");
+	Graph G = METISGraphReader().read("input/karate.graph");
 	G.indexEdges();
 	QuasiThresholdEditingLinear editing(G);
 	editing.run();
