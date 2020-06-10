@@ -6066,7 +6066,6 @@ cdef extern from "<networkit/community/QuasiThresholdEditingLocalMover.hpp>":
 		count getUsedIterations() const
 		count getPlateauSize() const
 		_Graph getQuasiThresholdGraph() except +
-		_Cover getCover(index mergeDepth) except +
 		vector[node] getParents() except +
 
 cdef class QuasiThresholdEditingLocalMover:
@@ -6095,9 +6094,6 @@ cdef class QuasiThresholdEditingLocalMover:
 
 	def getQuasiThresholdGraph(self):
 		return Graph().setThis(self._this.getQuasiThresholdGraph())
-
-	def getCover(self, index mergeDepth):
-		return Cover().setThis(self._this.getCover(mergeDepth))
 
 	def getParents(self):
 		return self._this.getParents()
