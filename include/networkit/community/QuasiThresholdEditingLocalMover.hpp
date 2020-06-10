@@ -500,9 +500,9 @@ namespace NetworKit {
 								rootChildCloseness += childCloseness[u];
 							}
 						}
-					} else if(scoreMax[u] == 0 && p ==  none){
+					} else if(scoreMax[u] == 0 && p ==  none && rootScoreMax == 0){
 						rootEqualBestParents += equalBestParents[u];
-					} else if(scoreMax[u] == 0 && marker[p]){
+					} else if(scoreMax[u] == 0 && marker[p] && scoreMax[p] == 0){
 						equalBestParents[p] += equalBestParents[u];
 					}
 
