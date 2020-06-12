@@ -31,6 +31,7 @@ build_test/*
 include/ttmath/*
 networkit/extlibs/*
 input/facebook100/*
+input/biological/*
 
 ### NetworKit specific
 include/NetworKit
