@@ -1,5 +1,4 @@
 networkit_add_module(graph
-    DynamicForest.cpp
     Graph.cpp
     GraphBuilder.cpp
     GraphTools.cpp

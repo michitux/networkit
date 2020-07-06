@@ -728,45 +728,28 @@ TEST_F(CommunityGTest, testCoverF1Similarity) {
 
 TEST_F(CommunityGTest, testQuasiThresholdEditingLocalMover) {
 	Graph karate = METISGraphReader().read("input/karate.graph");
-
-	karate.indexEdges();
-	QuasiThresholdEditingLinear editing(karate);
-	editing.run();
-
-	std::vector<node> parents = editing.getParents();
-
-	QuasiThresholdEditingLocalMover mover(karate, parents, 2);
+  karate.indexEdges();
+	QuasiThresholdEditingLocalMover mover(karate, EDITING, 2);
 	mover.run();
 	EXPECT_EQ(21, mover.getNumberOfEdits());
-
-	QuasiThresholdEditingLocalMover tester(karate, mover.getParents(), 0);
+	/*QuasiThresholdEditingLocalMover tester(karate, mover.getParents(), 0);
 	tester.run();
-	EXPECT_EQ(tester.getNumberOfEdits(), mover.getNumberOfEdits());
-
-
-	parents.clear();
-	parents.resize(karate.upperNodeIdBound(), none);
-	QuasiThresholdEditingLocalMover noParentsMover(karate, parents, 100);
+	EXPECT_EQ(tester.getNumberOfEdits(), mover.getNumberOfEdits());*/
+	QuasiThresholdEditingLocalMover noParentsMover(karate, TRIVIAL, 100);
 	noParentsMover.run();
 	INFO("Needed ", noParentsMover.getNumberOfEdits(), " edits without pre-initialized parents");
-
-	QuasiThresholdEditingLocalMover noParentsTester(karate, noParentsMover.getParents(), 0);
+	/*QuasiThresholdEditingLocalMover noParentsTester(karate, noParentsMover.getParents(), 0);
 	noParentsTester.run();
-	EXPECT_EQ(noParentsTester.getNumberOfEdits(), noParentsMover.getNumberOfEdits());
+	EXPECT_EQ(noParentsTester.getNumberOfEdits(), noParentsMover.getNumberOfEdits());*/
 }
 
 TEST_F(CommunityGTest, testQuasiThresholdEditingLinear) {
 	Graph karate = METISGraphReader().read("input/karate.graph");
-	karate.indexEdges();
-
-	QuasiThresholdEditingLinear editing(karate);
-	editing.run();
-
-	std::vector<node> parents = editing.getParents();
-	QuasiThresholdEditingLocalMover mover(karate, parents, 0);
+  karate.indexEdges();
+	QuasiThresholdEditingLocalMover mover(karate, EDITING, 0);
 	mover.run();
 	INFO("Linear editing needed ", mover.getNumberOfEdits(), " edits");
-	QuasiThresholdEditingLocalMover mover2(karate, parents, 2);
+	QuasiThresholdEditingLocalMover mover2(karate, EDITING, 2);
 	mover2.run();
 	INFO("Moving improved this to ", mover2.getNumberOfEdits(), " edits");
 }
@@ -774,38 +757,23 @@ TEST_F(CommunityGTest, testQuasiThresholdEditingLinear) {
 
 TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
 	Graph karate = METISGraphReader().read("input/karate.graph");
-  std::vector<node> parents(karate.upperNodeIdBound(), none);
-  
-  std::vector<node> order(karate.upperNodeIdBound());
-  std::iota(order.begin(), order.end(), 0);
-	QuasiThresholdEditingLocalMover mover(karate, parents, 1, 1, 0, order);
+  karate.indexEdges();
+	QuasiThresholdEditingLocalMover mover(karate, RANDOM_INSERT, 1, true, false);
 	mover.run();  
-	INFO("Canonical order: ", mover.getNumberOfEdits(), " edits");
-  
-  std::vector<std::pair<node, count>> d;
-  for(node u = 0; u < karate.upperNodeIdBound(); u++){
-    d.push_back(std::pair<node,count>(u, karate.degree(u)));
-  }
-  auto cmp = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
-     return a.second < b.second;
-   };
-  std::sort(d.begin(), d.end(), cmp);
-  order.clear();
-  for(index i = 0; i < d.size(); i++){
-    order.push_back(d[i].first);
-  }
-  QuasiThresholdEditingLocalMover mover2(karate, parents, 1, 1, 0, order);
+	INFO("Random order: ", mover.getNumberOfEdits(), " edits");
+  QuasiThresholdEditingLocalMover mover2(karate, ASC_DEGREE_INSERT, 1, true, false);
   mover2.run();  
   INFO("Large degrees first: ", mover2.getNumberOfEdits(), " edits");
 }
 
 
-TEST_F(CommunityGTest, testQuasiHuge) {
+/*TEST_F(CommunityGTest, testQuasiHuge) {
 	Graph G = METISGraphReader().read("input/email.graph");
   //graphio.readMat("input/facebook100/{0}.mat".format(name), key="A")
   //Graph G = EdgeListReader('\t', 0).read("input/terrorist.edgelist");
-  //Graph G = EdgeListReader('\t', 1).read("input/amazon.edgelist");		
-	QuasiThresholdEditingLocalMover mover(G, std::vector<node>(), 10, 0, 0);
+  //Graph G = EdgeListReader('\t', 1).read("input/amazon.edgelist");
+  G.indexEdges();		
+	QuasiThresholdEditingLocalMover mover(G, TRIVIAL, 10, false, false);
 	mover.run();  
   INFO( "Parents: Trivial"
         ", Order: None",
@@ -814,22 +782,7 @@ TEST_F(CommunityGTest, testQuasiHuge) {
         ", randomness: 0",
         "----- Edits: ", mover.getNumberOfEdits(),
         " used ", mover.getUsedIterations());
-  
-  
-  std::vector<node> order(G.upperNodeIdBound());
-  std::vector<std::pair<node, count>> d;
-  for(node u = 0; u < G.upperNodeIdBound(); u++){
-    d.push_back(std::pair<node,count>(u, G.degree(u)));
-  }
-  auto cmp = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
-     return a.second < b.second;
-   };
-  std::sort(d.begin(), d.end(), cmp);
-  order.clear();
-  for(index i = 0; i < d.size(); i++){
-    order.push_back(d[i].first);
-  }
-  QuasiThresholdEditingLocalMover mover2(G, std::vector<node>(), 0, 0, 0, order);
+  QuasiThresholdEditingLocalMover mover2(G, ASC_DEGREE_INSERT, 0, false, false);
   mover2.run();  
   INFO( "Parents: Trivial"
         ", Order: Degree ascending",
@@ -839,7 +792,7 @@ TEST_F(CommunityGTest, testQuasiHuge) {
         "----- Edits: ", mover2.getNumberOfEdits(),
         " used ", mover2.getUsedIterations());
   
-    QuasiThresholdEditingLocalMover mover3(G, std::vector<node>(), 10, 1, 1, order);
+    QuasiThresholdEditingLocalMover mover3(G, ASC_DEGREE_INSERT, 10, true, true);
     mover3.run();  
     INFO( "Parents: Trivial"
           ", Order: Degree ascending",
@@ -849,58 +802,28 @@ TEST_F(CommunityGTest, testQuasiHuge) {
           "----- Edits: ", mover3.getNumberOfEdits(),
           " used ", mover3.getUsedIterations());
   
-}
+}*/
 
 
 
 TEST_F(CommunityGTest, testQuasiInputOutput) {
-	Graph karate = METISGraphReader().read("input/email.graph");
-	karate.indexEdges();
-
-	QuasiThresholdEditingLinear editing(karate);
-	editing.run();
-
-	std::vector<node> parents = editing.getParents();
-	QuasiThresholdEditingLocalMover mover(karate, parents, 10, 1, 0);
+	Graph karate = METISGraphReader().read("input/karate.graph");
+  karate.indexEdges();
+	QuasiThresholdEditingLocalMover mover(karate, EDITING, 10, true, false);
 	mover.run();
-  
   Graph G = mover.getQuasiThresholdGraph();
+  G.indexEdges();
+  std::vector<Initialization> initializations{TRIVIAL, EDITING, RANDOM_INSERT, ASC_DEGREE_INSERT};
   
-  std::vector<std::vector<node>> orders;
-  std::vector<std::string> order_names;
-  /*orders.push_back(std::vector<node>());
-  order_names.push_back("None");*/
-  std::vector<node> order(G.upperNodeIdBound());
-  std::iota(order.begin(), order.end(), 0);
-  orders.push_back(order);
-  order_names.push_back("By id");
-  std::vector<node> order2;
-  std::vector<std::pair<node, count>> d;
-  for(node u = 0; u < G.upperNodeIdBound(); u++){
-    d.push_back(std::pair<node,count>(u, G.degree(u)));
-  }
-  auto asc = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
-     return a.second < b.second;
-   };
-  std::sort(d.begin(), d.end(), asc);
-  for(index i = 0; i < d.size(); i++){
-    order2.push_back(d[i].first);
-  }
-  orders.push_back(order2);
-  order_names.push_back("Degree ascending");
-  
-  
-
-  
-    for(int j = 0; j < orders.size(); j++){
+    for(Initialization initialization : initializations){
       bool sortPaths = 1;
         for(int k = 0; k < 1; k++, sortPaths = !sortPaths){
           bool randomness = 1;
           for(int l = 0; l < 1; l++, randomness = !randomness){
-            QuasiThresholdEditingLocalMover mover(G, std::vector<node>(), 0, sortPaths, randomness, orders[j]);
+            QuasiThresholdEditingLocalMover mover(G, initialization, 0, sortPaths, randomness);
             mover.run();
             INFO( "Parents: Trivial",
-                  ", Order: ", order_names[j],
+                  ", Intialization: ", initialization,
                   ", Runs: 0",
                   ", sortPaths: ", sortPaths,
                   ", randomness: ", randomness,
@@ -918,28 +841,9 @@ TEST_F(CommunityGTest, testQuasiInputOutput) {
 
 TEST_F(CommunityGTest, testInclusionMinimal) {
   count minimum = 60;
-	Graph karate = METISGraphReader().read("input/lesmis.graph");
-  std::vector<std::vector<node>> orders;
-
-  std::vector<node> order(karate.upperNodeIdBound());
-  std::iota(order.begin(), order.end(), 0);
-  orders.push_back(order);
-  std::vector<node> order2;
-  std::vector<std::pair<node, count>> d;
-  for(node u = 0; u < karate.upperNodeIdBound(); u++){
-    d.push_back(std::pair<node,count>(u, karate.degree(u)));
-  }
-  auto asc = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
-     return a.second < b.second;
-   };
-  std::sort(d.begin(), d.end(), asc);
-  for(index i = 0; i < d.size(); i++){
-    order2.push_back(d[i].first);
-  }
-  orders.push_back(order2);
-  
-  
-  QuasiThresholdEditingLocalMover mover(karate, std::vector<node>(), 0, 1, 0, orders[0]);
+	Graph karate = METISGraphReader().read("input/lesmis.graph");  
+  karate.indexEdges();
+  QuasiThresholdEditingLocalMover mover(karate, RANDOM_INSERT, 0, true, false);
   mover.run();
   Graph Q = mover.getQuasiThresholdGraph();
   count used = mover.getNumberOfEdits();
@@ -994,13 +898,6 @@ TEST_F(CommunityGTest, testInclusionMinimal) {
     INFO("OK ---- Removing edits broke QTG property");
     
   }
-    //check that 
-  
-  
-  
-  
-  
-  
 }
 
 
@@ -1066,10 +963,11 @@ TEST_F(CommunityGTest, testRandomness) {
   G.addEdge(7, 12);
   G.addEdge(8, 12);
   
-  std::vector<node> parents(0);
+
+	QuasiThresholdEditingLocalMover mover(G, USER_DEFINED_INSERT, 0, false, true);
   std::vector<node> order(G.upperNodeIdBound());
   std::iota(order.begin(), order.end(), 0);
-	QuasiThresholdEditingLocalMover mover(G, parents, 0, 0, 1, order);
+  mover.setInsertionOrder(order);
   mover.run();  
   Graph Q = mover.getQuasiThresholdGraph();
   Q.forEdges([&](node u, node v) {
@@ -1090,52 +988,8 @@ TEST_F(CommunityGTest, testRandomness) {
 
 TEST_F(CommunityGTest, testQuasiThresholdMovingCompareOptions) {
   //Graph G = EdgeListReader('\t', 0).read("input/terrorist.edgelist");
-	Graph G = METISGraphReader().read("input/karate.graph");
-	G.indexEdges();
-	QuasiThresholdEditingLinear editing(G);
-	editing.run();
-	std::vector<node> editingParents = editing.getParents();
-  std::vector<std::vector<node>> parents;
-  std::vector<std::string> parent_names;
-  parents.push_back(std::vector<node>());
-  parent_names.push_back("Trivial");
-  parents.push_back(editingParents);
-  parent_names.push_back("Editing");
-  
-  std::vector<std::vector<node>> orders;
-  std::vector<std::string> order_names;
-  orders.push_back(std::vector<node>());
-  order_names.push_back("None");
-  std::vector<node> order(G.upperNodeIdBound());
-  std::iota(order.begin(), order.end(), 0);
-  orders.push_back(order);
-  order_names.push_back("By id");
-  std::vector<node> order2;
-  std::vector<std::pair<node, count>> d;
-  for(node u = 0; u < G.upperNodeIdBound(); u++){
-    d.push_back(std::pair<node,count>(u, G.degree(u)));
-  }
-  auto asc = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
-     return a.second < b.second;
-   };
-  std::sort(d.begin(), d.end(), asc);
-  for(index i = 0; i < d.size(); i++){
-    order2.push_back(d[i].first);
-  }
-  orders.push_back(order2);
-  order_names.push_back("Degree ascending");
-  
-  /*order2.clear();
-  auto desc = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
-     return a.second < b.second;
-   };
-   std::sort(d.begin(), d.end(), desc);
-   for(index i = 0; i < d.size(); i++){
-     order2.push_back(d[i].first);
-   }
-   orders.push_back(order2);
-   order_names.push_back("Degree descending");*/
-  
+	Graph G = METISGraphReader().read("input/karate.graph"); 
+  G.indexEdges(); 
   std::vector<count> runs;
   
   runs.push_back(0);
@@ -1143,29 +997,26 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingCompareOptions) {
   runs.push_back(5);
   runs.push_back(20);
   
-  for(int i = 0; i < parents.size(); i++){
-    for(int j = 0; j < orders.size(); j++){
-      if(i > 0 && j > 0) break;
-      for(count run : runs){
-        bool sortPaths = 0;
-        for(int k = 0; k < 2; k++, sortPaths = !sortPaths){
-          bool randomness = 0;
-          for(int l = 0; l < 2; l++, randomness = !randomness){
-            QuasiThresholdEditingLocalMover mover(G, parents[i], run, sortPaths, randomness, orders[j]);
-            mover.run();
-            INFO( "Parents: ", parent_names[i],
-                  ", Order: ", order_names[j],
-                  ", Runs: ", run,
-                  ", sortPaths: ", sortPaths,
-                  ", randomness: ", randomness,
-                  "----- Edits: ", mover.getNumberOfEdits(),
-                  " used ", mover.getUsedIterations());
-          }
+  std::vector<Initialization> initializations{TRIVIAL, EDITING, RANDOM_INSERT, ASC_DEGREE_INSERT};
+  
+  for (Initialization initialization : initializations){
+    for(count run : runs){
+      bool sortPaths = 0;
+      for(int k = 0; k < 2; k++, sortPaths = !sortPaths){
+        bool randomness = 0;
+        for(int l = 0; l < 2; l++, randomness = !randomness){
+          QuasiThresholdEditingLocalMover mover(G, initialization, run, sortPaths, randomness);
+          mover.run();
+          INFO( "Intialization: ", initialization,
+                ", Runs: ", run,
+                ", sortPaths: ", sortPaths,
+                ", randomness: ", randomness,
+                "----- Edits: ", mover.getNumberOfEdits(),
+                " used ", mover.getUsedIterations());
         }
       }
     }
   }
-
 }
 
 

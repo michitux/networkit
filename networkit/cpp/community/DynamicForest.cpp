@@ -2,7 +2,7 @@
  *
  */
 
-#include <networkit/graph/DynamicForest.hpp>
+#include <networkit/community/DynamicForest.hpp>
 #include <set>
 
 namespace NetworKit {
@@ -31,6 +31,43 @@ paths(G.upperNodeIdBound(), SimplePath()) {
 			paths[path(v)].childPaths.push_back(path(u));
 		});
 	});
+	//union nodes in simple paths by dfs
+	pathDfsFrom(none, [&](pid subtreePath) {
+		if(subtreePath != none){
+			pid p = paths[subtreePath].parent;
+			if(p != none && paths[p].childPaths.size() == 1){
+				unionPaths(p, subtreePath);
+			}
+		}
+	}, [](pid){});
+	updateDepthInSubtree(none);
+	assert(pathsValid());
+	//TRACE("Dynamic Forest constructed");
+}
+
+
+DynamicForest::DynamicForest(std::vector<node> parents) :
+path_membership(parents.size(), none),
+path_pos(parents.size(), 0),
+freeList(),
+paths(parents.size(), SimplePath()) {
+	//at first every node is in its own path
+	std::iota(path_membership.begin(), path_membership.end(), 0);
+	
+	//build up parent/child relations
+	for(node u = 0; u < parents.size(); u++) {
+		paths[path(u)].pathNodes.push_back(u);
+		node p = parents[u];
+		if (p == none || p == u) {
+			paths[path(u)].posInParent = roots.size();
+			roots.push_back(path(u));
+			paths[path(u)].depth = 0;
+		} else {
+			paths[path(u)].parent = path(p);
+			paths[path(u)].posInParent = paths[path(p)].childPaths.size();
+			paths[path(p)].childPaths.push_back(path(u));
+		}
+	}
 	
 	//union nodes in simple paths by dfs
 	pathDfsFrom(none, [&](pid subtreePath) {
@@ -43,6 +80,7 @@ paths(G.upperNodeIdBound(), SimplePath()) {
 	}, [](pid){});
 	updateDepthInSubtree(none);
 	assert(pathsValid());
+	INFO(children(0));
 	//TRACE("Dynamic Forest constructed");
 }
 
@@ -380,7 +418,7 @@ void DynamicForest::moveToPosition(node u, node p, const std::vector<node> &adop
 
 
 bool DynamicForest::pathsValid(){
-	
+	//INFO(printPaths());
 	//check that parent/child relations for paths are valid
 	for(pid sp = 0; sp < paths.size(); sp++){
 		std::vector<pid> cps = paths[sp].childPaths;
@@ -494,6 +532,8 @@ Graph DynamicForest::toGraph() const {
 	for (pid r : roots) {
 		dfsFrom(paths[r].upperEnd(), [](node) {}, [&](node u) {
 			if (parent(u) != none) {
+				assert(u < path_membership.size());
+				assert(parent(u) < path_membership.size());
 				result.addEdge(u, parent(u));
 			}
 		});

@@ -62,6 +62,7 @@ public:
 	DynamicForest();
 	//O(n)
 	DynamicForest(const Graph& G);
+	DynamicForest(std::vector<node> parents);
 	//O(1)
 	node parent(node u) const;
 	//O(1)
@@ -105,7 +106,6 @@ public:
 		toProcess.emplace(u, true);
 
 		while (!toProcess.empty()) {
-			
 			PathDFSEvent ev = toProcess.top();
 			toProcess.pop();
 

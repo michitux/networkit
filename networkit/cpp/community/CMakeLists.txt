@@ -1,4 +1,5 @@
 networkit_add_module(community
+    DynamicForest.cpp
     AdjustedRandMeasure.cpp
     ClusteringGenerator.cpp
     CommunityDetectionAlgorithm.cpp

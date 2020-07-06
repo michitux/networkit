@@ -6057,24 +6057,41 @@ cdef class CutClustering(CommunityDetector):
 		for res in result:
 			pyResult[res.first] = Partition().setThis(res.second)
 		return pyResult
+		
+cdef extern from "<networkit/community/QuasiThresholdEditingLocalMover.hpp>" namespace "NetworKit":
+
+	cdef enum Initialization:
+		TRIVIAL = 0
+		EDITING = 1
+		RANDOM_INSERT = 2 
+		ASC_DEGREE_INSERT = 3
+		USER_DEFINED_INSERT = 4
+
+class _Initialization(object):
+	Trivial = TRIVIAL
+	Editing = EDITING
+	RandomInsert = RANDOM_INSERT
+	AscDegreeInsert = ASC_DEGREE_INSERT
+	UserDefindedInsert = USER_DEFINED_INSERT
 
 cdef extern from "<networkit/community/QuasiThresholdEditingLocalMover.hpp>":
+
 	cdef cppclass _QuasiThresholdEditingLocalMover "NetworKit::QuasiThresholdEditingLocalMover":
-		_QuasiThresholdEditingLocalMover(_Graph G, vector[node] parent, count maxIterations, bool_t sortPaths, bool_t randomness, vector[node] order, count maxPlateauSize) except +
+		_QuasiThresholdEditingLocalMover(_Graph G, Initialization initialization, count maxIterations, bool_t sortPaths, bool_t randomness, count maxPlateauSize, bool_t useBucketQueue) except +
 		void run() except +
 		count getNumberOfEdits() const
 		count getUsedIterations() const
 		count getPlateauSize() const
 		_Graph getQuasiThresholdGraph() except +
-		vector[node] getParents() except +
+		void setInsertionOrder(vector[node] order) except +
 
 cdef class QuasiThresholdEditingLocalMover:
 	cdef _QuasiThresholdEditingLocalMover *_this
 	cdef Graph _G
 
-	def __cinit__(self, Graph G, vector[node] parent, count maxIterations, bool_t sortPaths = True, bool_t randomness = False, vector[node] order = [], count maxPlateauSize = 4):
+	def __cinit__(self, Graph G, Initialization initialization = _Initialization.Trivial, count maxIterations = 5, bool_t sortPaths = True, bool_t randomness = False, count maxPlateauSize = 4, bool_t useBucketQueue = True):
 		self._G = G
-		self._this = new _QuasiThresholdEditingLocalMover(G._this, parent, maxIterations, sortPaths, randomness, order, maxPlateauSize)
+		self._this = new _QuasiThresholdEditingLocalMover(G._this, initialization, maxIterations, sortPaths, randomness, maxPlateauSize, useBucketQueue)
 
 	def __dealloc__(self):
 		del self._this
@@ -6095,41 +6112,12 @@ cdef class QuasiThresholdEditingLocalMover:
 	def getQuasiThresholdGraph(self):
 		return Graph().setThis(self._this.getQuasiThresholdGraph())
 
-	def getParents(self):
-		return self._this.getParents()
-
-
-cdef extern from "<networkit/community/QuasiThresholdEditingLinear.hpp>":
-	cdef cppclass _QuasiThresholdEditingLinear "NetworKit::QuasiThresholdEditingLinear":
-		_QuasiThresholdEditingLinear(_Graph G) except +
-		void run() except +
-		vector[node] getParents() except +
-		_Graph getDefiningForest() except +
-		_Graph getQuasiThresholdGraph() except +
-
-cdef class QuasiThresholdEditingLinear:
-	cdef _QuasiThresholdEditingLinear *_this
-	cdef Graph _G
-
-	def __cinit__(self, Graph G):
-		self._G = G
-		self._this = new _QuasiThresholdEditingLinear(G._this)
-
-	def __dealloc__(self):
-		del self._this
-
-	def run(self):
-		self._this.run()
+		
+	def setInsertionOrder(self, vector[node] order):
+		self._this.setInsertionOrder(order)
 		return self
 
-	def getParents(self):
-		return self._this.getParents()
 
-	def getDefiningForest(self):
-		return Graph().setThis(self._this.getDefiningForest())
-
-	def getQuasiThresholdGraph(self):
-		return Graph().setThis(self._this.getQuasiThresholdGraph())
 
 cdef extern from "<networkit/community/QuasiThresholdGreedyBound.hpp>":
 	cdef cppclass _QuasiThresholdGreedyBound "NetworKit::QuasiThresholdGreedyBound"(_Algorithm):

@@ -1,17 +1,20 @@
 #ifndef QUASITHRESHOLDEDITINGLOCALMOVER_H
 #define QUASITHRESHOLDEDITINGLOCALMOVER_H
 
+#include <networkit/community/QuasiThresholdEditingLinear.hpp>
 #include <networkit/graph/Graph.hpp>
-#include <networkit/graph/DynamicForest.hpp>
+#include <networkit/community/DynamicForest.hpp>
 #include <networkit/structures/Cover.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
+#include <networkit/generators/TreeReachabilityGraphGenerator.hpp>
 #include <networkit/auxiliary/Log.hpp>
+#include <networkit/graph/GraphTools.hpp>
 
 namespace NetworKit {
 	
+	enum Initialization {TRIVIAL, EDITING, RANDOM_INSERT, ASC_DEGREE_INSERT, USER_DEFINED_INSERT};
 	
-
-
+	
 	class BucketQueue { 
 		count nextNode;
 		count currentBucket;
@@ -108,32 +111,89 @@ namespace NetworKit {
 			};*/
 			EditingRunner(
 				const Graph& G, 
-				Graph forest, 
+				Initialization initialization, 
 				count maxIterations,
 				bool sortPaths,
 				bool randomness,
-				std::vector<NetworKit::node> order,
 				count maxPlateauSize,
-				bool insertRun) :
+				bool useBucketQueue,
+				std::vector<node> order) :
 				G(G),
-				forest(forest),
 				maxIterations(maxIterations),
 				usedIterations(0),
 				sortPaths(sortPaths),
 				randomness(randomness),
-				order(order),
 				maxPlateauSize(maxPlateauSize),
-				insertRun(insertRun),
+				useBucketQueue(useBucketQueue),
 				handler(),
-				dynamicForest(forest),
 				hasMoved(1),		
 				rootEqualBestParents(1),
 				rootEqualBestParentsCpy(1),
-				plateauSize(0),
+				currentPlateau(0),
+				actualMaximumPlateau(0),
 				dist(){
 				
+				switch(initialization){
+					case TRIVIAL:
+					{
+						dynamicForest = DynamicForest(std::vector<node>(G.upperNodeIdBound(), none));
+						insertRun = false;
+						break;
+					}
+					case EDITING:
+					{
+						QuasiThresholdEditingLinear editing(G);
+						editing.run();
+						dynamicForest = DynamicForest(editing.getParents());
+						insertRun = false;
+						break;
+					}
+					case RANDOM_INSERT:
+					{
+						insertRun = true;
+						dynamicForest = DynamicForest(std::vector<node>(G.upperNodeIdBound(), none));
+						//dynamicForest = DynamicForest(Graph(G.upperNodeIdBound()));
+						G.forNodesInRandomOrder([&](node u) {
+							this->order.push_back(u);
+						});
+						break;
+					}
+					case ASC_DEGREE_INSERT:
+					{
+						insertRun =  true;
+						dynamicForest = DynamicForest(std::vector<node>(G.upperNodeIdBound(), none));
+						//dynamicForest = DynamicForest(Graph(G.upperNodeIdBound()));
+						std::vector<std::pair<node, count>> d;
+						G.forNodes([&](node u) {
+							d.push_back(std::pair<node,count>(u, G.degree(u)));
+						});
+						auto cmp = [](std::pair<node, count> const & a, std::pair<node, count> const & b) { 
+							 return a.second < b.second;
+						 };
+						std::sort(d.begin(), d.end(), cmp);
+						for(index i = 0; i < d.size(); i++){
+							this->order.push_back(d[i].first);
+						}
+						break;
+					}
+					case USER_DEFINED_INSERT:
+					{	
+						insertRun =  true;
+						dynamicForest = DynamicForest(std::vector<node>(G.upperNodeIdBound(), none));
+						this->order = order;
+						INFO(this->order);
+					}
+					default:
+						break;
+				}
+				
 				handler.assureRunning();
-				bucketQueue = BucketQueue(G.upperNodeIdBound());
+				if(useBucketQueue){
+					bucketQueue = BucketQueue(G.upperNodeIdBound());
+				} else {
+					level = 0;
+				}
+				
 				
 				numEdits = countNumberOfEdits();
 				editsBefore = countNumberOfEdits();
@@ -163,7 +223,7 @@ namespace NetworKit {
 					i = 1;
 				}
 				for (; hasMoved && i <= maxIterations; ++i) {
-					if(!hasMoved || (randomness && (plateauSize >= maxPlateauSize))) break;
+					if(!hasMoved || (randomness && (currentPlateau >= maxPlateauSize))) break;
 					handler.assureRunning();
 					hasMoved = false;
 					if(insertRun){
@@ -181,15 +241,15 @@ namespace NetworKit {
 					usedIterations = i;
 
 				if(countNumberOfEdits() == editsBefore){
-					plateauSize++;
+					currentPlateau++;
 				}	else {
-					plateauSize = 0;
+					if(currentPlateau > actualMaximumPlateau){
+						actualMaximumPlateau = currentPlateau;
+					}
+					currentPlateau = 0;
 				}
 				editsBefore = countNumberOfEdits();
 				}
-
-				forest = dynamicForest.toGraph();
-
 				assert(numEdits == countNumberOfEdits());
 			};
 						
@@ -202,23 +262,24 @@ namespace NetworKit {
 			};
 			
 			count getPlateauSize() const {
-				return plateauSize;
+				return actualMaximumPlateau;
 			};
 			
 			count getRootEqualBestParents() const {
 				return rootEqualBestParentsCpy;
 			};
 			
-			Graph getForest() const {
-				return forest;
+			
+			Graph getQuasiThresholdGraph() const {
+				Graph forest = dynamicForest.toGraph();
+				TreeReachabilityGraphGenerator gen(forest);
+				gen.run();
+				return gen.getGraph();
 			};
-			
-			
 			
 			
 		private:			
 			const Graph& G;
-			Graph forest;
 			count maxIterations;
 			count usedIterations;
 			bool sortPaths;
@@ -227,13 +288,19 @@ namespace NetworKit {
 			count maxPlateauSize;
 			
 			bool insertRun;
+			bool useBucketQueue;
+			
 			count numEdits;
-			
-			
+						
 			Aux::SignalHandler handler;
 			DynamicForest dynamicForest;
 			bool hasMoved;
 			std::vector<bool> marker;
+			
+			count level;
+			std::vector<node> neighborQueue;
+			std::vector<node> currentLevel;
+			std::vector<node> nextLevel;
 
 			NetworKit::BucketQueue bucketQueue;
 			std::vector<node> neighbors;
@@ -261,7 +328,8 @@ namespace NetworKit {
 			count rootEqualBestParentsCpy;
 			
 			count editsBefore;
-			count plateauSize;
+			count currentPlateau;
+			count actualMaximumPlateau;
 			
 			count maxDepth;
 			
@@ -302,21 +370,64 @@ namespace NetworKit {
 					}
 				}
 				dynamicForest.isolate(nodeToMove);
-				bucketQueue.fill(neighbors, dynamicForest);
+				if(useBucketQueue){
+					bucketQueue.fill(neighbors, dynamicForest);
+				} else {
+					for(node v : neighbors){
+						neighborQueue.emplace_back(v);
+					}
+
+					std::stable_sort(neighborQueue.begin(), neighborQueue.end(), [&](node u, node v) {return dynamicForest.depth(u) < dynamicForest.depth(v);}); // the queue shall be used from the end
+
+					count level = 0;
+					if (!neighborQueue.empty()) {
+						level = dynamicForest.depth(neighborQueue.back());
+					}
+				}
+				
+				
 				bestChildren.clear();
 				bestParent = none;
 				rootScoreMax = 0;
 				rootChildCloseness = 0;
 				//all neighbors to deep
-				if(bucketQueue.empty()) {
+				if(useBucketQueue && bucketQueue.empty() || !useBucketQueue && neighborQueue.empty()) {
 					bestParent = none;
 					bestEdits = neighbors.size();
 					TRACE("Isolate");
 				} else {
-					while(!bucketQueue.empty()){
-						node u = bucketQueue.next();
-						processNode(u, nodeToMove);
+					if(useBucketQueue){
+						while(!bucketQueue.empty()){
+							node u = bucketQueue.next();
+							processNode(u, nodeToMove);
+						}
+					} else {
+						while (!currentLevel.empty() || !neighborQueue.empty()) {
+							if (currentLevel.empty()) {
+								level = dynamicForest.depth(neighborQueue.back());
+							}
+
+							for (node u : currentLevel) {
+								assert(dynamicForest.depth(u) == level);
+								processNode(u, nodeToMove);
+							}
+
+							while (!neighborQueue.empty() && dynamicForest.depth(neighborQueue.back()) == level) {
+								node u = neighborQueue.back();
+								neighborQueue.pop_back();
+								assert(dynamicForest.depth(u) == level);
+
+								if (nodeTouched[u]) continue; // if the node was touched in the previous level, it was in currentLevel and thus has already been processed
+
+								processNode(u, nodeToMove);
+							}
+
+							--level;
+							currentLevel.clear();
+							currentLevel.swap(nextLevel);
+						}
 					}
+
 					bestEdits = neighbors.size() - rootScoreMax;
 					if (rootChildCloseness > rootScoreMax) {
 						bestParent = none;
@@ -352,16 +463,16 @@ namespace NetworKit {
 					bestParentBelow[u] = none;
 				}
 
+
 				neighbors.clear();
 				touchedNodes.clear();
 				rootEqualBestParentsCpy = rootEqualBestParents;
 				rootEqualBestParents = 1;
 				
-
+			
 				G.forEdgesOf(nodeToMove, [&](node v) {
 					marker[v] = false;
 				});
-				
 				
 
 				if (savedEdits > 0 || (savedEdits == 0 && randomness)) {
@@ -370,13 +481,11 @@ namespace NetworKit {
 					numEdits -= savedEdits;
 
 			#ifndef NDEBUG
-					forest = dynamicForest.toGraph();
 					assert(numEdits == countNumberOfEdits());
 			#endif
 				} else  {
 					dynamicForest.moveToPosition(nodeToMove, curParent, curChildren);
 					#ifndef NDEBUG
-							forest = dynamicForest.toGraph();
 							assert(numEdits == countNumberOfEdits());
 					#endif
 				}
@@ -387,7 +496,9 @@ namespace NetworKit {
 					TRACE("Processing node ", u, " of depth ", dynamicForest.depth(u), " (node to move: ", nodeToMove, ")");
 					TRACE("Parent: ", dynamicForest.parent(u), ", children: ", dynamicForest.children(u));
 					assert(u != nodeToMove);
-					assert(dynamicForest.depth(u) <= maxDepth);
+					if(useBucketQueue){
+						assert(dynamicForest.depth(u) <= maxDepth);
+					}
 					if (!nodeTouched[u]) {
 						nodeTouched[u] = true;
 						touchedNodes.emplace_back(u);
@@ -458,15 +569,18 @@ namespace NetworKit {
 					node p = dynamicForest.parent(u);
 					if (scoreMax[u] > 0 || (childCloseness[u] != none && childCloseness[u] != 0)) {
 						if (p != none) {
-							assert(dynamicForest.depth(p) <= maxDepth);
+							if(useBucketQueue){
+								assert(dynamicForest.depth(p) <= maxDepth);
+							}
 							if (!nodeTouched[p]) {
 								nodeTouched[p] = true;
 								touchedNodes.push_back(p);
-								if(!marker[p]){ //neighbors already in queue
+								if(!useBucketQueue){
+									nextLevel.push_back(p);
+								}else if(!marker[p]){ //neighbors already in queue
 									bucketQueue.insertParent(p);
 								} 
 							}
-
 							if (childCloseness[u] != none) {
 								assert(childCloseness[u] <= scoreMax[u]);
 								childCloseness[p] += childCloseness[u];
@@ -502,7 +616,7 @@ namespace NetworKit {
 						}
 					} else if(scoreMax[u] == 0 && p ==  none && rootScoreMax == 0){
 						rootEqualBestParents += equalBestParents[u];
-					} else if(scoreMax[u] == 0 && marker[p] && scoreMax[p] == 0){
+					} else if(scoreMax[u] == 0 && p!= none && marker[p] && scoreMax[p] == 0){
 						equalBestParents[p] += equalBestParents[u];
 					}
 
@@ -516,7 +630,6 @@ namespace NetworKit {
 							existingBelow.resize(G.upperNodeIdBound(), 0);
 							existingAbove.resize(G.upperNodeIdBound(), 0);
 							std::vector<bool> usingDeepNeighbors(G.upperNodeIdBound(), false);
-
 							dynamicForest.forChildrenOf(none, [&](node r) {
 								if(existing[r]){
 									dynamicForest.dfsFrom(r,
@@ -542,6 +655,7 @@ namespace NetworKit {
 										});
 								}
 							});
+							
 
 							assert(missingBelow[nodeToMove] == 0);
 							assert(existingBelow[nodeToMove] == 0);
@@ -561,6 +675,7 @@ namespace NetworKit {
 						if(exactValue){
 							assert(curEdits == neighbors.size() - existingAbove[nodeToMove] - existingBelow[nodeToMove] + missingAbove[nodeToMove] + missingBelow[nodeToMove]);
 						}
+						
 
 						count minEdits = curEdits;
 						std::vector<node> minChildren;
@@ -710,12 +825,12 @@ namespace NetworKit {
 class QuasiThresholdEditingLocalMover {
 public:
 	QuasiThresholdEditingLocalMover(const NetworKit::Graph &G, 
-		const std::vector< NetworKit::node > &parent = std::vector<NetworKit::node>(), 
-		NetworKit::count maxIterations = 2,  
+		Initialization initializarion = TRIVIAL, 
+		NetworKit::count maxIterations = 5,  
 		bool sortPaths = true,
 		bool randomness = false,
-		const std::vector< NetworKit::node > &order = std::vector<NetworKit::node>(),
-		count maxPlateauSize = 4);
+		count maxPlateauSize = 4,
+		bool useBucketQueue = true);
 
 	void run();
 
@@ -724,22 +839,27 @@ public:
 	count getUsedIterations() const;
 	count getPlateauSize() const;
 	count getRootEqualBestParents() const;
-	std::vector<node> getParents() const;
+	
+	void setInsertionOrder(std::vector<node> order);
 private:
 
 	const Graph& G;
-	Graph forest;
+	Initialization initialization;
 	count maxIterations;
 	bool sortPaths;
 	bool randomness;
-	std::vector<NetworKit::node> order;
 	count maxPlateauSize;
 	bool insertRun;
+	bool useBucketQueue;
+	
+	std::vector<node> order;
 	
 	count usedIterations;
 	count numEdits;
 	count plateauSize;
 	count rootEqualBestParents;
+	
+	Graph quasiThresholdGraph;
 	
 	EditingRunner* runner;
 

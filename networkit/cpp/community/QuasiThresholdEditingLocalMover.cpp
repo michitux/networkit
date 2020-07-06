@@ -5,8 +5,7 @@
 #include <unordered_set>
 
 #include <networkit/community/QuasiThresholdEditingLocalMover.hpp>
-#include <networkit/generators/TreeReachabilityGraphGenerator.hpp>
-#include <networkit/graph/DynamicForest.hpp>
+#include <networkit/community/DynamicForest.hpp>
 #include <networkit/graph/GraphTools.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
 #include <networkit/auxiliary/Log.hpp>
@@ -15,33 +14,22 @@
 
 NetworKit::QuasiThresholdEditingLocalMover::QuasiThresholdEditingLocalMover(
 	const NetworKit::Graph &G, 
-	const std::vector< NetworKit::node > &parent, 
+	Initialization initialization, 
 	NetworKit::count maxIterations, 
 	bool sortPaths,
 	bool randomness,
-	const std::vector<node> &order,
-	count maxPlateauSize)
+	count maxPlateauSize,
+	bool useBucketQueue)
 : G(G), 
+	initialization(initialization),
 	maxIterations(maxIterations), 
 	sortPaths(sortPaths),
 	randomness(randomness),
-	order(order),
 	maxPlateauSize(maxPlateauSize),
+	useBucketQueue(useBucketQueue),
 	numEdits(0),
 	usedIterations(0),
 	rootEqualBestParents(0) {
-	forest = Graph(GraphTools::copyNodes(G), false, true);
-	if(parent.size() == G.upperNodeIdBound()){
-		//insert Run makes only sense if parents are trivial
-		insertRun = 0;
-		G.forNodes([&](node u) {
-			if (parent[u] != none && parent[u] != u) {
-				forest.addEdge(u, parent[u]);
-			}
-		});
-	} else {
-		insertRun = (order.size() == G.upperNodeIdBound());
-	}
 	runner = nullptr;
 }
 
@@ -65,38 +53,19 @@ void NetworKit::QuasiThresholdEditingLocalMover::run() {
 	them again whenever we delete a node as we iterate over its neighbors anyway and we can in the same turn also iterate over the tree and determine which neighbors were there
 	and which were not by checking for marked nodes.
 	*/
-	
-	runner = new EditingRunner(G, forest, maxIterations, sortPaths, randomness, order, maxPlateauSize, insertRun);
+	runner = new EditingRunner(G, initialization, maxIterations, sortPaths, randomness, maxPlateauSize, useBucketQueue, order);
 	runner->runLocalMover();
-	forest = runner->getForest();
 	usedIterations =  runner->getUsedIterations();
 	numEdits = runner->getNumberOfEdits();
 	plateauSize = runner->getPlateauSize();
 	rootEqualBestParents = runner->getRootEqualBestParents();
+	quasiThresholdGraph = runner->getQuasiThresholdGraph();
 	delete runner;
 }
 
 
-
-std::vector< NetworKit::node > NetworKit::QuasiThresholdEditingLocalMover::getParents() const {
-	std::vector<node> parents(G.upperNodeIdBound());
-
-	G.forNodes([&](node u) {
-		node p = none;
-		forest.forNeighborsOf(u, [&](node v) {
-			p = v;
-		});
-
-		parents[u] = p;
-	});
-
-	return parents;
-}
-
 NetworKit::Graph NetworKit::QuasiThresholdEditingLocalMover::getQuasiThresholdGraph() const {
-	TreeReachabilityGraphGenerator gen(forest);
-	gen.run();
-	return gen.getGraph();
+	return quasiThresholdGraph;
 }
 
 
@@ -119,4 +88,9 @@ NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getPlateauSize() co
 NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getRootEqualBestParents() const {
 	return rootEqualBestParents;
 }
+
+void NetworKit::QuasiThresholdEditingLocalMover::setInsertionOrder(std::vector<node> order) {
+	this->order = order;
+}
+
 

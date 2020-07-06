@@ -3,7 +3,7 @@
  */
 
 #include "DynamicForestGTest.h"
-#include <networkit/graph/DynamicForest.hpp>
+#include <networkit/community/DynamicForest.hpp>
 #include <networkit/io/METISGraphReader.hpp>
 #include <networkit/components/RandomSpanningForest.hpp>
 #include <networkit/community/QuasiThresholdEditingLinear.hpp>
