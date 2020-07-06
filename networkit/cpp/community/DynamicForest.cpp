@@ -3,12 +3,12 @@
  */
 
 #include <networkit/community/DynamicForest.hpp>
-#include <set>
 
 namespace NetworKit {
 	
 DynamicForest::DynamicForest(){}
 
+//deprecated
 DynamicForest::DynamicForest(const NetworKit::Graph &G) :
 path_membership(G.upperNodeIdBound(), none),
 path_pos(G.upperNodeIdBound(), 0),
@@ -86,7 +86,6 @@ paths(parents.size(), SimplePath()) {
 
 std::vector<node> DynamicForest::children(node u) const {
 	std::vector<node> result;
-
 	forChildrenOf(u, [&](node c) {
 		result.emplace_back(c);
 	});
@@ -166,14 +165,11 @@ void DynamicForest::setParentPath(pid s, pid p){
 void DynamicForest::isolate(node u) {
 	node oldParent = parent(u);
 	if(paths[path(u)].length() == 1){
-		//TRACE("Isolate ", u, " as path");
 		isolatePath(path(u));
 	} else {
-		//TRACE("Isolate ", u, " from path");
 		isolateNode(u);
 	}
 	assert(pathsValid());
-	
 }
 
 //isolate complete simple path
@@ -243,7 +239,7 @@ void DynamicForest::moveUpNeighbor(node neighbor, node referenceNode) {
 		if(oldPos ==  neighborPos) return; //neighbor was not considered but is at right position
 		node firstNonNeighbor = paths[sp].pathNodes[neighborPos];
 		swapNodesWithinPath(firstNonNeighbor, neighbor);
-		}
+	}
 	assert(pathsValid());		
 }
 
@@ -293,7 +289,6 @@ void DynamicForest::splitPath(pid sp, index splitPos){
 	paths[np].childPaths.push_back(sp);
 	paths[np].depth = oldDepth;
 	paths[sp].depth = oldDepth + paths[np].length();
-	//updateDepthInSubtree(np);
 	assert(parent(paths[sp].upperEnd())==paths[np].lowerEnd());
 	assert(children(paths[np].lowerEnd()).size() == 1);
 	assert(children(paths[np].lowerEnd())[0]==paths[sp].upperEnd());
@@ -304,7 +299,6 @@ void DynamicForest::unionPaths(pid upperPath, pid lowerPath){
 	if(upperPath == lowerPath){
 		return;
 	}
-	//TRACE("Union upper path ", upperPath, " with above path ", lowerPath);
 	assert(paths[upperPath].childPaths.size() == 1);
 	assert(paths[upperPath].childPaths[0] == lowerPath);
 	
@@ -349,12 +343,10 @@ void DynamicForest::moveToPosition(node u, node p, const std::vector<node> &adop
 	//check that all children are adopted
 	if(p != none){
 		std::vector<node> oldChildren = children(p);
-		//TRACE("Move ", u, " below parent ", p, " adopting children ", adoptedChildren, " out of ", oldChildren);
 		for(node c : adoptedChildren){
 			assert(std::find(oldChildren.begin(), oldChildren.end(), c) != oldChildren.end());
 		}
 	} else {
-		//TRACE("Make ", u, " root adopting children ", adoptedChildren);
 		for(node c : adoptedChildren){
 			assert(std::find(roots.begin(), roots.end(), path(c)) != roots.end());
 		}
@@ -418,7 +410,6 @@ void DynamicForest::moveToPosition(node u, node p, const std::vector<node> &adop
 
 
 bool DynamicForest::pathsValid(){
-	//INFO(printPaths());
 	//check that parent/child relations for paths are valid
 	for(pid sp = 0; sp < paths.size(); sp++){
 		std::vector<pid> cps = paths[sp].childPaths;
@@ -543,7 +534,6 @@ Graph DynamicForest::toGraph() const {
 }
 
 
-//superfluous?
 pid DynamicForest::path(node u) const{
 	if(u == none){
 		return none;

@@ -4,10 +4,8 @@
 #include <networkit/community/QuasiThresholdEditingLinear.hpp>
 #include <networkit/graph/Graph.hpp>
 #include <networkit/community/DynamicForest.hpp>
-#include <networkit/structures/Cover.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
 #include <networkit/generators/TreeReachabilityGraphGenerator.hpp>
-#include <networkit/auxiliary/Log.hpp>
 #include <networkit/graph/GraphTools.hpp>
 
 namespace NetworKit {
@@ -24,12 +22,10 @@ namespace NetworKit {
 		std::vector<count> border;
 		
 		public :
-		BucketQueue(count n = 0) : n(n), nodes(n), border(n), nextNode(none), currentBucket(none){
-		}
-		
+		BucketQueue(count n = 0) : n(n), nodes(n), border(n), nextNode(none), currentBucket(none){}		
 		
 		void fill(const std::vector<node> &elements, const DynamicForest &dynamicForest){
-			count maxDepth = std::min(n-1, 2 * elements.size());
+			count maxDepth = std::min(n - 1, 2 * elements.size());
 			std::fill(border.begin(), border.begin() + std::min(maxDepth + 1, border.size()), 0);
 			for (node u : elements) {
 				if(dynamicForest.depth(u) > maxDepth) continue;
@@ -99,16 +95,12 @@ namespace NetworKit {
 			}
 			return ss.str();
 		}
-		
-		
 	}; 
 
 
 
 	class EditingRunner {
 		public:
-			/*~EditingRunner(){
-			};*/
 			EditingRunner(
 				const Graph& G, 
 				Initialization initialization, 
@@ -152,7 +144,6 @@ namespace NetworKit {
 					{
 						insertRun = true;
 						dynamicForest = DynamicForest(std::vector<node>(G.upperNodeIdBound(), none));
-						//dynamicForest = DynamicForest(Graph(G.upperNodeIdBound()));
 						G.forNodesInRandomOrder([&](node u) {
 							this->order.push_back(u);
 						});
@@ -162,7 +153,6 @@ namespace NetworKit {
 					{
 						insertRun =  true;
 						dynamicForest = DynamicForest(std::vector<node>(G.upperNodeIdBound(), none));
-						//dynamicForest = DynamicForest(Graph(G.upperNodeIdBound()));
 						std::vector<std::pair<node, count>> d;
 						G.forNodes([&](node u) {
 							d.push_back(std::pair<node,count>(u, G.degree(u)));
@@ -214,15 +204,11 @@ namespace NetworKit {
 					existing = std::vector<bool>(G.upperNodeIdBound(), 1);
 				}
 			};
+			
+			
 			void runLocalMover(){
 				handler.assureRunning();
-				count i;
-				if(insertRun){
-					i = 0;
-				} else {
-					i = 1;
-				}
-				for (; hasMoved && i <= maxIterations; ++i) {
+				for (count i = insertRun ? 0 : 1; hasMoved && i <= maxIterations; ++i) {
 					if(!hasMoved || (randomness && (currentPlateau >= maxPlateauSize))) break;
 					handler.assureRunning();
 					hasMoved = false;
@@ -240,17 +226,17 @@ namespace NetworKit {
 					}
 					usedIterations = i;
 
-				if(countNumberOfEdits() == editsBefore){
-					currentPlateau++;
-				}	else {
-					if(currentPlateau > actualMaximumPlateau){
-						actualMaximumPlateau = currentPlateau;
+					if(countNumberOfEdits() == editsBefore){
+						currentPlateau++;
+					}	else {
+						if(currentPlateau > actualMaximumPlateau){
+							actualMaximumPlateau = currentPlateau;
+						}
+						currentPlateau = 0;
 					}
-					currentPlateau = 0;
+					editsBefore = countNumberOfEdits();
 				}
-				editsBefore = countNumberOfEdits();
-				}
-				assert(numEdits == countNumberOfEdits());
+			  assert(numEdits == countNumberOfEdits());
 			};
 						
 			count getNumberOfEdits() const {
@@ -344,14 +330,10 @@ namespace NetworKit {
 					if(existing[v]){
 						marker[v] = true;
 						neighbors.push_back(v);
-						if(sortPaths) {
-							dynamicForest.moveUpNeighbor(v, nodeToMove);
-						}
+						if(sortPaths) dynamicForest.moveUpNeighbor(v, nodeToMove);
 					}
 				});
-				if(sortPaths) {
-					dynamicForest.moveUpNeighbor(nodeToMove, nodeToMove);
-				}
+				if(sortPaths) dynamicForest.moveUpNeighbor(nodeToMove, nodeToMove);
 				curChildren = dynamicForest.children(nodeToMove);
 				curParent = dynamicForest.parent(nodeToMove);
 				if(insertRun){
@@ -376,15 +358,12 @@ namespace NetworKit {
 					for(node v : neighbors){
 						neighborQueue.emplace_back(v);
 					}
-
-					std::stable_sort(neighborQueue.begin(), neighborQueue.end(), [&](node u, node v) {return dynamicForest.depth(u) < dynamicForest.depth(v);}); // the queue shall be used from the end
-
+					std::stable_sort(neighborQueue.begin(), neighborQueue.end(), [&](node u, node v) {return dynamicForest.depth(u) < dynamicForest.depth(v);});
 					count level = 0;
 					if (!neighborQueue.empty()) {
 						level = dynamicForest.depth(neighborQueue.back());
 					}
 				}
-				
 				
 				bestChildren.clear();
 				bestParent = none;
@@ -406,22 +385,17 @@ namespace NetworKit {
 							if (currentLevel.empty()) {
 								level = dynamicForest.depth(neighborQueue.back());
 							}
-
 							for (node u : currentLevel) {
 								assert(dynamicForest.depth(u) == level);
 								processNode(u, nodeToMove);
 							}
-
 							while (!neighborQueue.empty() && dynamicForest.depth(neighborQueue.back()) == level) {
 								node u = neighborQueue.back();
 								neighborQueue.pop_back();
 								assert(dynamicForest.depth(u) == level);
-
 								if (nodeTouched[u]) continue; // if the node was touched in the previous level, it was in currentLevel and thus has already been processed
-
 								processNode(u, nodeToMove);
 							}
-
 							--level;
 							currentLevel.clear();
 							currentLevel.swap(nextLevel);
@@ -443,12 +417,10 @@ namespace NetworKit {
 						}
 					}
 				}
-				
 
-
-			#ifndef NDEBUG
-				compareWithQuadratic(nodeToMove);
-			#endif
+				#ifndef NDEBUG
+					compareWithQuadratic(nodeToMove);
+				#endif
 
 				// calculate the number of saved edits as comparing the absolute number of edits doesn't make sense
 				count savedEdits = curEdits - bestEdits;
@@ -479,10 +451,9 @@ namespace NetworKit {
 					dynamicForest.moveToPosition(nodeToMove, bestParent, bestChildren);
 					hasMoved = true;
 					numEdits -= savedEdits;
-
-			#ifndef NDEBUG
-					assert(numEdits == countNumberOfEdits());
-			#endif
+					#ifndef NDEBUG
+						assert(numEdits == countNumberOfEdits());
+					#endif
 				} else  {
 					dynamicForest.moveToPosition(nodeToMove, curParent, curChildren);
 					#ifndef NDEBUG
@@ -625,122 +596,118 @@ namespace NetworKit {
 			
 			void compareWithQuadratic(node nodeToMove) const {
 				std::vector<count> missingBelow, missingAbove, existingBelow, existingAbove;
-							missingBelow.resize(G.upperNodeIdBound(), 0);
-							missingAbove.resize(G.upperNodeIdBound(), 0);
-							existingBelow.resize(G.upperNodeIdBound(), 0);
-							existingAbove.resize(G.upperNodeIdBound(), 0);
-							std::vector<bool> usingDeepNeighbors(G.upperNodeIdBound(), false);
-							dynamicForest.forChildrenOf(none, [&](node r) {
-								if(existing[r]){
-									dynamicForest.dfsFrom(r,
-										[&](node u) {
-											if(dynamicForest.depth(u) > maxDepth) usingDeepNeighbors[u] = true;
-											if (u != nodeToMove) {
-												missingBelow[u] = missingAbove[u] = 1 - marker[u];
-												existingBelow[u] = existingAbove[u] = marker[u];
-											}
-											node p = dynamicForest.parent(u);
-											if (p != none) {
-												missingAbove[u] += missingAbove[p];
-												existingAbove[u] += existingAbove[p];
-											}
-										},
-										[&](node u) {
-											node p = dynamicForest.parent(u);
-											if (p != none) {
-												missingBelow[p] += missingBelow[u];
-												existingBelow[p] += existingBelow[u];
-												if(usingDeepNeighbors[u]) usingDeepNeighbors[p] = true;
-											}
-										});
-								}
-							});
-							
-
-							assert(missingBelow[nodeToMove] == 0);
-							assert(existingBelow[nodeToMove] == 0);
-
-							bool exactValue = true;
-							for (node c : curChildren) {
-								missingBelow[nodeToMove] += missingBelow[c];
-								existingBelow[nodeToMove] += existingBelow[c];
-								if(usingDeepNeighbors[c]) exactValue = false;
+				missingBelow.resize(G.upperNodeIdBound(), 0);
+				missingAbove.resize(G.upperNodeIdBound(), 0);
+				existingBelow.resize(G.upperNodeIdBound(), 0);
+				existingAbove.resize(G.upperNodeIdBound(), 0);
+				std::vector<bool> usingDeepNeighbors(G.upperNodeIdBound(), false);
+				dynamicForest.forChildrenOf(none, [&](node r) {
+					if(existing[r]){
+						dynamicForest.dfsFrom(r, [&](node u) {
+							if(dynamicForest.depth(u) > maxDepth) usingDeepNeighbors[u] = true;
+							if (u != nodeToMove) {
+								missingBelow[u] = missingAbove[u] = 1 - marker[u];
+								existingBelow[u] = existingAbove[u] = marker[u];
 							}
-
-							if (curParent != none) {
-								missingAbove[nodeToMove] = missingAbove[curParent];
-								existingAbove[nodeToMove] = existingAbove[curParent];
-								if(usingDeepNeighbors[curParent]) exactValue = false;
-							}
-						if(exactValue){
-							assert(curEdits == neighbors.size() - existingAbove[nodeToMove] - existingBelow[nodeToMove] + missingAbove[nodeToMove] + missingBelow[nodeToMove]);
-						}
-						
-
-						count minEdits = curEdits;
-						std::vector<node> minChildren;
-						node minParent = curParent;
-						G.forNodes([&](node u) {
-							if (u == nodeToMove || usingDeepNeighbors[u] || !existing[u]) return;
-							if (existingBelow[u] >= missingBelow[u] || (childCloseness[u] > 0 && childCloseness[u] != none)) {
-								assert(childCloseness[u] == existingBelow[u] - missingBelow[u]);
-							} else if (nodeTouched[u]) {
-								assert(childCloseness[u] == none);
-							}
-						});
-
-						G.forNodes([&](node u) {
-							if (dynamicForest.children(u).empty() && marker[u] && !usingDeepNeighbors[u] &&  existing[u]) {
-								assert(childCloseness[u] == 1);
-							}
-						});
-
-						auto tryEditBelow = [&](node p) {
-							if (p == nodeToMove) return;
-
-							count edits = neighbors.size();
+							node p = dynamicForest.parent(u);
 							if (p != none) {
-								edits += missingAbove[p];
-								edits -= existingAbove[p];
+								missingAbove[u] += missingAbove[p];
+								existingAbove[u] += existingAbove[p];
 							}
-
-							std::vector<node> children;
-							dynamicForest.forChildrenOf(p, [&](node c) {
-								if (c == nodeToMove || usingDeepNeighbors[c] || !existing[c]) return;
-								if (existingBelow[c] > missingBelow[c]) { // TODO try >= (more children...)
-									if (dynamicForest.children(c).empty() && marker[c]) {
-										assert(childCloseness[c] == 1);
-									}
-									assert(childCloseness[c] == existingBelow[c] - missingBelow[c]);
-
-									children.emplace_back(c);
-									edits -= existingBelow[c] - missingBelow[c];
-								}
-							});
-
-							if (edits < minEdits) {
-								minEdits = edits;
-								minChildren = std::move(children);
-								minParent = p;
+						},	[&](node u) {
+							node p = dynamicForest.parent(u);
+							if (p != none) {
+								missingBelow[p] += missingBelow[u];
+								existingBelow[p] += existingBelow[u];
+								if(usingDeepNeighbors[u]) usingDeepNeighbors[p] = true;
 							}
-						};
+						});
+					}
+				});
+							
+				assert(missingBelow[nodeToMove] == 0);
+				assert(existingBelow[nodeToMove] == 0);
 
-						dynamicForest.dfsFrom(none, [](node){}, tryEditBelow);
-						tryEditBelow(none);
+				bool exactValue = true;
+				for (node c : curChildren) {
+					missingBelow[nodeToMove] += missingBelow[c];
+					existingBelow[nodeToMove] += existingBelow[c];
+					if(usingDeepNeighbors[c]) exactValue = false;
+				}
 
-						assert(minEdits >= bestEdits);
+				if (curParent != none) {
+					missingAbove[nodeToMove] = missingAbove[curParent];
+					existingAbove[nodeToMove] = existingAbove[curParent];
+					if(usingDeepNeighbors[curParent]) exactValue = false;
+				}
+				if(exactValue){
+					assert(curEdits == neighbors.size() - existingAbove[nodeToMove] - existingBelow[nodeToMove] + missingAbove[nodeToMove] + missingBelow[nodeToMove]);
+				}
 
-						count childClosenessControl = neighbors.size();
-						if (bestParent != none) {
-							childClosenessControl -= (existingAbove[bestParent] - missingAbove[bestParent]);
+				count minEdits = curEdits;
+				std::vector<node> minChildren;
+				node minParent = curParent;
+				G.forNodes([&](node u) {
+					if (u == nodeToMove || usingDeepNeighbors[u] || !existing[u]) return;
+					if (existingBelow[u] >= missingBelow[u] || (childCloseness[u] > 0 && childCloseness[u] != none)) {
+						assert(childCloseness[u] == existingBelow[u] - missingBelow[u]);
+					} else if (nodeTouched[u]) {
+						assert(childCloseness[u] == none);
+					}
+				});
+
+				G.forNodes([&](node u) {
+					if (dynamicForest.children(u).empty() && marker[u] && !usingDeepNeighbors[u] &&  existing[u]) {
+						assert(childCloseness[u] == 1);
+					}
+				});
+
+				auto tryEditBelow = [&](node p) {
+					if (p == nodeToMove) return;
+
+					count edits = neighbors.size();
+					if (p != none) {
+						edits += missingAbove[p];
+						edits -= existingAbove[p];
+					}
+
+					std::vector<node> children;
+					dynamicForest.forChildrenOf(p, [&](node c) {
+						if (c == nodeToMove || usingDeepNeighbors[c] || !existing[c]) return;
+						if (existingBelow[c] > missingBelow[c]) { // TODO try >= (more children...)
+							if (dynamicForest.children(c).empty() && marker[c]) {
+								assert(childCloseness[c] == 1);
+							}
+							assert(childCloseness[c] == existingBelow[c] - missingBelow[c]);
+
+							children.emplace_back(c);
+							edits -= existingBelow[c] - missingBelow[c];
 						}
-						for (node u : bestChildren) {
-							childClosenessControl -= (existingBelow[u] - missingBelow[u]);
-						}
-						TRACE("Current edits: ", curEdits, " (with parent ", curParent, " and current children ", curChildren, "), minimum edits: ", minEdits);
-						TRACE("Quadratic algorithm wants to have new parent ", minParent, " and new children ", minChildren);
-						TRACE("Linear algorithm wants to have new parent ", bestParent, " and new children ", bestChildren, " edits: ", childClosenessControl);
-						assert(minEdits >= childClosenessControl);
+					});
+
+					if (edits < minEdits) {
+						minEdits = edits;
+						minChildren = std::move(children);
+						minParent = p;
+					}
+				};
+
+				dynamicForest.dfsFrom(none, [](node){}, tryEditBelow);
+				tryEditBelow(none);
+
+				assert(minEdits >= bestEdits);
+
+				count childClosenessControl = neighbors.size();
+				if (bestParent != none) {
+					childClosenessControl -= (existingAbove[bestParent] - missingAbove[bestParent]);
+				}
+				for (node u : bestChildren) {
+					childClosenessControl -= (existingBelow[u] - missingBelow[u]);
+				}
+				TRACE("Current edits: ", curEdits, " (with parent ", curParent, " and current children ", curChildren, "), minimum edits: ", minEdits);
+				TRACE("Quadratic algorithm wants to have new parent ", minParent, " and new children ", minChildren);
+				TRACE("Linear algorithm wants to have new parent ", bestParent, " and new children ", bestChildren, " edits: ", childClosenessControl);
+				assert(minEdits >= childClosenessControl);
 			};
 			
 			NetworKit::count countNumberOfEdits() const {
@@ -756,14 +723,11 @@ namespace NetworKit {
 						count upperNeighbors = 0;
 
 						G.forNeighborsOf(u, [&](node v) {
-							if (marker[v]) {
-								++upperNeighbors;
-							}
+							if (marker[v]) ++upperNeighbors;
 						});
 
 						numExistingEdges += upperNeighbors;
 						numMissingEdges += depth - upperNeighbors;
-
 						marker[u] = true;
 						depth += 1;
 					},
@@ -783,42 +747,29 @@ namespace NetworKit {
 				node parent = dynamicForest.parent(u);
 				while(parent != none){
 					visited[parent] = 1;
-					if(!G.hasEdge(parent, u)){
-						edits++;
-					}
+					if(!G.hasEdge(parent, u))	edits++;
 					parent = dynamicForest.parent(parent);
 				}
 				dynamicForest.forChildrenOf(u, [&](node c) {
 					dynamicForest.dfsFrom(c,
 					[&](node w) {
 						visited[w] = 1; 
-						if(!G.hasEdge(w, u)){
-							edits++;
-						}
+						if(!G.hasEdge(w, u)) edits++;
 					},
 					[&](node w) {});
 				});
 				
 				G.forNeighborsOf(u, [&](node w) {
-					if (!visited[w]) {
-						edits++;
-					}
+					if (!visited[w]) edits++;
 				});
 
 				return edits;
 			};
 			
 			bool randomBool(count options) {
-				//count x = dist(gen);
 				count x = dist(gen, std::uniform_int_distribution<count>::param_type(0, options-1));
 				return options == 0 ? 0 : rand() % options == 0;
 			};
-			
-			
-			
-
-			
-		
 	};
 	
 
@@ -863,7 +814,6 @@ private:
 	
 	EditingRunner* runner;
 
-	
 };
 
 

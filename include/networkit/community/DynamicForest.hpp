@@ -1,12 +1,9 @@
 #ifndef DYNAMICFOREST_H
 #define DYNAMICFOREST_H
 
-#include <unordered_set>
-#include <stack>
 
 #include <networkit/Globals.hpp>
 #include <networkit/graph/Graph.hpp>
-#include <tlx/counting_ptr.hpp>
 
 namespace NetworKit {
 	
@@ -21,12 +18,16 @@ namespace NetworKit {
 		index posInParent;
 		count depth;
 		
+		SimplePath () : neighborCount(0) , referenceNode(none), parent(none), depth(0), posInParent(0){};
+		
+		count length() const {return pathNodes.size();};
+		node upperEnd() const {return pathNodes.back();};
+		node lowerEnd() const {return pathNodes[0];};
+		
 		void reset(){
-			//pathNodes.clear();
 			neighborCount = 0;
 			referenceNode = none;
 			parent = none;
-			//childPaths.clear();
 			posInParent = 0;
 			depth = 0;
 			posInParent = 0;
@@ -49,39 +50,25 @@ namespace NetworKit {
 			ss << "]" << "\n";			
 			return ss.str();
 		};
+
 		
-		count length() const {return pathNodes.size();};
-		node upperEnd() const {return pathNodes.back();};
-		node lowerEnd() const {return pathNodes[0];};
-		SimplePath () : neighborCount(0) , referenceNode(none), parent(none), depth(0), posInParent(0){};
 	};	
 	
 
 class DynamicForest {
 public:
 	DynamicForest();
-	//O(n)
 	DynamicForest(const Graph& G);
 	DynamicForest(std::vector<node> parents);
-	//O(1)
 	node parent(node u) const;
-	//O(1)
 	count depth(node u) const;
-	//O(#children)
 	std::vector<node> children(node u) const;
-	//O(n)
 	Graph toGraph() const;
-	//O(max(#nodes in path of parent, #children))
 	void isolate(node u);
-	//O(1)
 	void moveUpNeighbor(node referenceNode, node Neighbor);	
-	//O(max(#nodes in path of parent, #children))
 	void moveToPosition(node u, node p, const std::vector<node> &adoptedChildren);
-
 	std::string printPaths() const;
-
-	template <typename F1, typename F2>
-	void dfsFrom(node u, F1 onEnter, F2 onExit) const;
+	
 
 	node nextChild(node child, node p) const {
 		assert(parent(child) == p);
@@ -92,48 +79,7 @@ public:
 		return p;
 	};
 	
-	
-	template <typename F1, typename F2>
-	void pathDfsFrom(pid u, F1 onEnter, F2 onExit) const {
-		struct PathDFSEvent {
-			pid sp;
-			bool isEnter;
-			PathDFSEvent(pid sp, bool isEnter) : sp(sp), isEnter(isEnter) {};
-		};
-
-		std::stack<PathDFSEvent> toProcess;
-		toProcess.emplace(u, false);
-		toProcess.emplace(u, true);
-
-		while (!toProcess.empty()) {
-			PathDFSEvent ev = toProcess.top();
-			toProcess.pop();
-
-			if (ev.isEnter) {
-				onEnter(ev.sp);
-				forPathChildrenOf(ev.sp, [&](pid c) {
-					toProcess.emplace(c, false);
-					toProcess.emplace(c, true);
-				});
-			} else {
-				onExit(ev.sp);
-			}
-		}
-	}
-
-	template <typename F>
-	void forPathChildrenOf(pid sp, F handle) const {
-		if (sp == none) {
-			for (pid r : roots) {
-				handle(r);
-			}
-		} else {
-			for (pid c : paths[sp].childPaths) {
-				handle(c);
-			}
-		}
-	}
-	
+		
 
 	node nextDFSNodeOnEnter(node curNode, node basis) const {
 		if (curNode == none) {
@@ -167,9 +113,50 @@ public:
 			}
 		}
 	};
-
+	
+	
 	template <typename F>
-	void forChildrenOf(node u, F handle) const;
+	void forChildrenOf(node u, F handle) const {
+		if(u != none && !isLowerEnd(u)){
+			handle(nextNodeInPath(u));
+		} else {
+			forPathChildrenOf(path(u), [&](pid c) {
+				node child = paths[c].upperEnd();
+				assert(child < path_membership.size());
+				handle(paths[c].upperEnd());
+			});
+		}
+	}
+
+
+
+	template <typename F1, typename F2>
+	void dfsFrom(node u, F1 onEnter, F2 onExit) const {
+		struct DFSEvent {
+			node n;
+			bool isEnter;
+			DFSEvent(node n, bool isEnter) : n(n), isEnter(isEnter) {};
+		};
+
+		std::stack<DFSEvent> toProcess;
+		toProcess.emplace(u, false);
+		toProcess.emplace(u, true);
+		while (!toProcess.empty()) {
+			DFSEvent ev = toProcess.top();
+			toProcess.pop();
+
+			if (ev.isEnter) {
+				onEnter(ev.n);
+				forChildrenOf(ev.n, [&](node c) {
+					toProcess.emplace(c, false);
+					toProcess.emplace(c, true);
+				});
+			} else {
+				onExit(ev.n);
+			}
+		}
+	}
+
 	
 private:
 	
@@ -222,56 +209,53 @@ private:
 		return p;
 	};
 	
+	
+	template <typename F1, typename F2>
+	void pathDfsFrom(pid u, F1 onEnter, F2 onExit) const {
+		struct PathDFSEvent {
+			pid sp;
+			bool isEnter;
+			PathDFSEvent(pid sp, bool isEnter) : sp(sp), isEnter(isEnter) {};
+		};
+
+		std::stack<PathDFSEvent> toProcess;
+		toProcess.emplace(u, false);
+		toProcess.emplace(u, true);
+
+		while (!toProcess.empty()) {
+			PathDFSEvent ev = toProcess.top();
+			toProcess.pop();
+
+			if (ev.isEnter) {
+				onEnter(ev.sp);
+				forPathChildrenOf(ev.sp, [&](pid c) {
+					toProcess.emplace(c, false);
+					toProcess.emplace(c, true);
+				});
+			} else {
+				onExit(ev.sp);
+			}
+		}
+	}
+
+	template <typename F>
+	void forPathChildrenOf(pid sp, F handle) const {
+		if (sp == none) {
+			for (pid r : roots) {
+				handle(r);
+			}
+		} else {
+			for (pid c : paths[sp].childPaths) {
+				handle(c);
+			}
+		}
+	}
+	
 };
 
 
 
 
-
-
-
-
-template <typename F>
-void DynamicForest::forChildrenOf(node u, F handle) const {
-	if(u != none && !isLowerEnd(u)){
-		handle(nextNodeInPath(u));
-	} else {
-		forPathChildrenOf(path(u), [&](pid c) {
-			node child = paths[c].upperEnd();
-			assert(child < path_membership.size());
-			handle(paths[c].upperEnd());
-		});
-	}
-}
-
-
-
-template <typename F1, typename F2>
-void DynamicForest::dfsFrom(node u, F1 onEnter, F2 onExit) const {
-	struct DFSEvent {
-		node n;
-		bool isEnter;
-		DFSEvent(node n, bool isEnter) : n(n), isEnter(isEnter) {};
-	};
-
-	std::stack<DFSEvent> toProcess;
-	toProcess.emplace(u, false);
-	toProcess.emplace(u, true);
-	while (!toProcess.empty()) {
-		DFSEvent ev = toProcess.top();
-		toProcess.pop();
-
-		if (ev.isEnter) {
-			onEnter(ev.n);
-			forChildrenOf(ev.n, [&](node c) {
-				toProcess.emplace(c, false);
-				toProcess.emplace(c, true);
-			});
-		} else {
-			onExit(ev.n);
-		}
-	}
-}
 
 
 
