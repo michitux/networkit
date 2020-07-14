@@ -19,19 +19,16 @@ NetworKit::QuasiThresholdEditingLocalMover::QuasiThresholdEditingLocalMover(
 	useBucketQueue(useBucketQueue),
 	numEdits(0),
 	usedIterations(0),
-	rootEqualBestParents(0) {
-	runner = nullptr;
-}
+	rootEqualBestParents(0) {}
 
 void NetworKit::QuasiThresholdEditingLocalMover::run() {
-	runner = new EditingRunner(G, initialization, maxIterations, sortPaths, randomness, maxPlateauSize, useBucketQueue, order);
-	runner->runLocalMover();
-	usedIterations =  runner->getUsedIterations();
-	numEdits = runner->getNumberOfEdits();
-	plateauSize = runner->getPlateauSize();
-	rootEqualBestParents = runner->getRootEqualBestParents();
-	quasiThresholdGraph = runner->getQuasiThresholdGraph();
-	delete runner;
+	EditingRunner runner = EditingRunner(G, initialization, maxIterations, sortPaths, randomness, maxPlateauSize, useBucketQueue, order);
+	runner.runLocalMover();
+	usedIterations =  runner.getUsedIterations();
+	numEdits = runner.getNumberOfEdits();
+	plateauSize = runner.getPlateauSize();
+	rootEqualBestParents = runner.getRootEqualBestParents();
+	quasiThresholdGraph = runner.getQuasiThresholdGraph();
 }
 
 

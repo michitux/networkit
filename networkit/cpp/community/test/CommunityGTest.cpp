@@ -41,7 +41,7 @@
 #include <networkit/generators/ErdosRenyiGenerator.hpp>
 #include <networkit/community/CoverF1Similarity.hpp>
 #include <networkit/community/QuasiThresholdEditingLocalMover.hpp>
-#include <networkit/community/QuasiThresholdEditingLinear.hpp>
+#include <networkit/community/QuasiThresholdMover/QuasiThresholdEditingLinear.hpp>
 #include <networkit/community/QuasiThresholdGreedyBound.hpp>
 
 #include <tlx/unused.hpp>

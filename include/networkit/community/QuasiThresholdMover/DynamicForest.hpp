@@ -6,60 +6,15 @@
 #include <networkit/graph/Graph.hpp>
 
 namespace NetworKit {
-	
-	typedef long unsigned int pid;
-	
-	struct SimplePath {
-		std::vector<node> pathNodes;
-		count neighborCount;
-		node referenceNode;
-		pid parent;
-		std::vector<pid> childPaths;
-		index posInParent;
-		count depth;
-		
-		SimplePath () : neighborCount(0) , referenceNode(none), parent(none), depth(0), posInParent(0){};
-		
-		count length() const {return pathNodes.size();};
-		node upperEnd() const {return pathNodes.back();};
-		node lowerEnd() const {return pathNodes[0];};
-		
-		void reset(){
-			neighborCount = 0;
-			referenceNode = none;
-			parent = none;
-			posInParent = 0;
-			depth = 0;
-			posInParent = 0;
-		};
-		
-		std::string printPathInfo() const{
-			std::stringstream ss;
-			ss << "["<<"\n";
-			ss << "pathNodes:";
-			for(node x : pathNodes) ss << " " << x;
-			ss << "\n";
-			ss << "neighborCount: " << neighborCount << "\n";
-			ss << "referenceNode: " << referenceNode << "\n";
-			ss << "parent: " << parent << "\n";
-			ss << "childPaths:";
-			for(pid x : childPaths) ss << " " << x;
-			ss << "\n";
-			ss << "posInParent: " << posInParent << "\n";
-			ss << "depth: " << depth << "\n";
-			ss << "]" << "\n";			
-			return ss.str();
-		};
 
-		
-	};	
-	
 
 class DynamicForest {
+	
+	
 public:
 	DynamicForest();
 	DynamicForest(const Graph& G);
-	DynamicForest(std::vector<node> parents);
+	DynamicForest(const std::vector<node>& parents);
 	node parent(node u) const;
 	count depth(node u) const;
 	std::vector<node> children(node u) const;
@@ -86,10 +41,13 @@ public:
 			if (roots.empty()) return none; // forest is empty
 			return paths[roots.front()].upperEnd();
 		}
-
-		if (childCount(curNode) > 0) {
-			return children(curNode).front();
-		} else if (curNode == basis) {
+		if(!isLowerEnd(curNode)){
+			return nextNodeInPath(curNode);
+		} 
+		if(paths[path(curNode)].childPaths.size() > 0){
+			return paths[paths[path(curNode)].childPaths.front()].upperEnd();
+		} 
+ 		if (curNode == basis) {
 			return basis;
 		} else {
 			node u = curNode;
@@ -159,6 +117,51 @@ public:
 
 	
 private:
+	using pid = index;
+	
+	class SimplePath {
+	public:
+		SimplePath () : neighborCount(0) , referenceNode(none), parent(none), depth(0), posInParent(0){};
+		count length() const {return pathNodes.size();};
+		node upperEnd() const {return pathNodes.size() == 0 ? none : pathNodes.back();};
+		node lowerEnd() const {return pathNodes.size() == 0 ? none : pathNodes[0];};
+		void reset(){
+			neighborCount = 0;
+			referenceNode = none;
+			parent = none;
+			posInParent = 0;
+			depth = 0;
+			posInParent = 0;
+		};
+		
+		
+		pid parent;
+		std::vector<pid> childPaths;
+		index posInParent;
+		std::vector<node> pathNodes;
+		count neighborCount;
+		node referenceNode;
+		count depth;
+		
+		std::string printPathInfo() const{
+			std::stringstream ss;
+			ss << "["<<"\n";
+			ss << "pathNodes:";
+			for(node x : pathNodes) ss << " " << x;
+			ss << "\n";
+			ss << "neighborCount: " << neighborCount << "\n";
+			ss << "referenceNode: " << referenceNode << "\n";
+			ss << "parent: " << parent << "\n";
+			ss << "childPaths:";
+			for(pid x : childPaths) ss << " " << x;
+			ss << "\n";
+			ss << "posInParent: " << posInParent << "\n";
+			ss << "depth: " << depth << "\n";
+			ss << "]" << "\n";			
+			return ss.str();
+		};
+		
+	};
 	
 	pid path(node u) const;
 	
@@ -250,6 +253,8 @@ private:
 			}
 		}
 	}
+	
+	
 	
 };
 

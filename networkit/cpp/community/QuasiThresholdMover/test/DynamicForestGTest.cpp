@@ -1,16 +1,17 @@
 /*
  *
  */
-
-#include "DynamicForestGTest.h"
-#include <networkit/community/DynamicForest.hpp>
+#include <gtest/gtest.h>
+#include <networkit/community/QuasiThresholdMover/DynamicForest.hpp>
 #include <networkit/io/METISGraphReader.hpp>
 #include <networkit/components/RandomSpanningForest.hpp>
-#include <networkit/community/QuasiThresholdEditingLinear.hpp>
+#include <networkit/community/QuasiThresholdMover/QuasiThresholdEditingLinear.hpp>
 #include <networkit/graph/GraphTools.hpp>
 
 
 namespace NetworKit {
+
+class DynamicForestGTest : public testing::Test {};
 
 TEST_F(DynamicForestGTest, testConstruction) {
 	Graph G(3, false, true);

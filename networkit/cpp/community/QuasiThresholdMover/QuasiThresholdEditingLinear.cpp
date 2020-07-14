@@ -4,7 +4,7 @@
 
 #include <unordered_map>
 
-#include <networkit/community/QuasiThresholdEditingLinear.hpp>
+#include <networkit/community/QuasiThresholdMover/QuasiThresholdEditingLinear.hpp>
 #include <networkit/edgescores/TriangleEdgeScore.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
 #include <networkit/graph/GraphTools.hpp>
