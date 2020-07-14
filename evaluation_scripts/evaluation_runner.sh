@@ -10,13 +10,16 @@ scenarios='full plateauBound withoutBucketQueue'
 #  done
 #done
 
-python3 evaluation.py -g small_graphs -s full
-python3 evaluation.py -g small_graphs -s plateauBound
-python3 evaluation.py -g small_graphs -s withoutBucketQueue
-python3 evaluation.py -g social_network -s full
-python3 evaluation.py -g social_network -s plateauBound
-python3 evaluation.py -g social_network -s withoutBucketQueue
-python3 evaluation.py -g web -s full
-python3 evaluation.py -g web -s plateauBound
-python3 evaluation.py -g biological -s full
-python3 evaluation.py -g biological -s plateauBound
+python3 evaluation.py -g small_graphs -s full -o  || true
+python3 evaluation.py -g small_graphs -s plateauBound -o || true
+python3 evaluation.py -g small_graphs -s withoutBucketQueue -o || true
+
+python3 evaluation.py -g biological -s full -o || true
+python3 evaluation.py -g biological -s withoutBucketQueue -o || true
+
+python3 evaluation.py -g web -s full -o || true
+
+python3 evaluation.py -g social_network -s full -o || true
+
+python3 evaluation.py -g biological -s plateauBound -o || true
+

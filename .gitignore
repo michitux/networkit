@@ -37,7 +37,7 @@ input/biological/*
 input/lj.edgelist
 input/eu-2005.graph
 input/in-2004.graph
-input/youtube.egdelist
+input/youtube.edgelist
 input/cnr-2000.graph
 input/dblp.edgelist
 input/amazon.edgelist
