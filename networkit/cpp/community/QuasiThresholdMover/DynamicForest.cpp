@@ -53,7 +53,6 @@ freeList(),
 paths(parents.size(), SimplePath()) {
 	//at first every node is in its own path
 	std::iota(path_membership.begin(), path_membership.end(), 0);
-	
 	//build up parent/child relations
 	for(node u = 0; u < parents.size(); u++) {
 		paths[path(u)].pathNodes.push_back(u);
@@ -80,7 +79,6 @@ paths(parents.size(), SimplePath()) {
 	}, [](pid){});
 	updateDepthInSubtree(none);
 	assert(pathsValid());
-	INFO(children(0));
 	TRACE("Dynamic Forest constructed");
 }
 

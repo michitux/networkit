@@ -1046,4 +1046,19 @@ TEST_F(CommunityGTest, benchQuasiThresholdGreedyBound) {
         EXPECT_GT(bound.getMinDistance(), 1);
         EXPECT_LE(bound.getMinDistance(), G.numberOfEdges() / 3);
 }
+
+TEST_F(CommunityGTest, testQuasiThresholdDeletedNodes) {
+  Graph karate = METISGraphReader().read("input/karate.graph");
+  karate.removeNode(2);
+  karate.removeNode(5);
+  karate.removeNode(7);
+  karate.removeNode(8);
+  karate.removeNode(9);
+  karate.removeNode(17);
+  karate.removeNode(31);
+  karate.indexEdges();
+  QuasiThresholdEditingLocalMover mover(karate, TRIVIAL, 5, true, false);
+  mover.run();
+
+}
 } /* namespace NetworKit */

@@ -78,10 +78,8 @@ namespace NetworKit {
       }
       case USER_DEFINED_INSERT:
       {	
-        insertRun =  true;
         dynamicForest = DynamicForest(std::vector<node>(G.upperNodeIdBound(), none));
         this->order = order;
-        INFO(this->order);
       }
       default:
         break;
@@ -113,7 +111,7 @@ namespace NetworKit {
       handler.assureRunning();
       hasMoved = false;
       if(insertRun){
-        for(index j = 0; j < G.upperNodeIdBound();j++){
+        for(index j = 0; j < G.numberOfNodes(); j++){
           node nodeToMove = order[j];
           localMove(nodeToMove);
           existing[nodeToMove] = 1;
