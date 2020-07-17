@@ -1,58 +1,65 @@
 
 #include <networkit/community/QuasiThresholdEditingLocalMover.hpp>
+#include <networkit/community/QuasiThresholdMover/EditingRunner.hpp>
+
+namespace NetworKit {
+	namespace QuasiThresholdMoving {
+		QuasiThresholdEditingLocalMover::QuasiThresholdEditingLocalMover(
+			const Graph &G, 
+			Initialization initialization, 
+			count maxIterations, 
+			bool sortPaths,
+			bool randomness,
+			count maxPlateauSize,
+			bool useBucketQueue)
+			: G(G), 
+			initialization(initialization),
+			maxIterations(maxIterations), 
+			sortPaths(sortPaths),
+			randomness(randomness),
+			maxPlateauSize(maxPlateauSize),
+			useBucketQueue(useBucketQueue),
+			numEdits(0),
+			usedIterations(0),
+			rootEqualBestParents(0) {}
+			
+			void QuasiThresholdEditingLocalMover::run() {
+				EditingRunner runner = EditingRunner(G, initialization, maxIterations, sortPaths, randomness, maxPlateauSize, useBucketQueue, order);
+				runner.runLocalMover();
+				usedIterations =  runner.getUsedIterations();
+				numEdits = runner.getNumberOfEdits();
+				plateauSize = runner.getPlateauSize();
+				rootEqualBestParents = runner.getRootEqualBestParents();
+				quasiThresholdGraph = runner.getQuasiThresholdGraph();
+			}
+			
+			
+			Graph QuasiThresholdEditingLocalMover::getQuasiThresholdGraph() const {
+				return quasiThresholdGraph;
+			}
+			
+			count QuasiThresholdEditingLocalMover::getNumberOfEdits() const {
+				return numEdits;
+			}
+			
+			count QuasiThresholdEditingLocalMover::getUsedIterations() const {
+				return usedIterations;
+			}
+			
+			count QuasiThresholdEditingLocalMover::getPlateauSize() const {
+				return plateauSize;
+			}
+			
+			count QuasiThresholdEditingLocalMover::getRootEqualBestParents() const {
+				return rootEqualBestParents;
+			}
+			
+			void QuasiThresholdEditingLocalMover::setInsertionOrder(std::vector<node> order) {
+				this->order = order;
+			}
+			
+		} //namespace QuasiThresholdMoving
+} //namespace NetworKit
 
 
-NetworKit::QuasiThresholdEditingLocalMover::QuasiThresholdEditingLocalMover(
-	const NetworKit::Graph &G, 
-	Initialization initialization, 
-	NetworKit::count maxIterations, 
-	bool sortPaths,
-	bool randomness,
-	count maxPlateauSize,
-	bool useBucketQueue)
-: G(G), 
-	initialization(initialization),
-	maxIterations(maxIterations), 
-	sortPaths(sortPaths),
-	randomness(randomness),
-	maxPlateauSize(maxPlateauSize),
-	useBucketQueue(useBucketQueue),
-	numEdits(0),
-	usedIterations(0),
-	rootEqualBestParents(0) {}
-
-void NetworKit::QuasiThresholdEditingLocalMover::run() {
-	EditingRunner runner = EditingRunner(G, initialization, maxIterations, sortPaths, randomness, maxPlateauSize, useBucketQueue, order);
-	runner.runLocalMover();
-	usedIterations =  runner.getUsedIterations();
-	numEdits = runner.getNumberOfEdits();
-	plateauSize = runner.getPlateauSize();
-	rootEqualBestParents = runner.getRootEqualBestParents();
-	quasiThresholdGraph = runner.getQuasiThresholdGraph();
-}
-
-
-NetworKit::Graph NetworKit::QuasiThresholdEditingLocalMover::getQuasiThresholdGraph() const {
-	return quasiThresholdGraph;
-}
-
-NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getNumberOfEdits() const {
-	return numEdits;
-}
-
-NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getUsedIterations() const {
-	return usedIterations;
-}
-
-NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getPlateauSize() const {
-	return plateauSize;
-}
-
-NetworKit::count NetworKit::QuasiThresholdEditingLocalMover::getRootEqualBestParents() const {
-	return rootEqualBestParents;
-}
-
-void NetworKit::QuasiThresholdEditingLocalMover::setInsertionOrder(std::vector<node> order) {
-	this->order = order;
-}
 

@@ -729,16 +729,16 @@ TEST_F(CommunityGTest, testCoverF1Similarity) {
 TEST_F(CommunityGTest, testQuasiThresholdEditingLocalMover) {
 	Graph karate = METISGraphReader().read("input/karate.graph");
   karate.indexEdges();
-	QuasiThresholdEditingLocalMover mover(karate, EDITING, 2);
+	QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(karate, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::EDITING, 2);
 	mover.run();
 	EXPECT_EQ(21, mover.getNumberOfEdits());
-	/*QuasiThresholdEditingLocalMover tester(karate, mover.getParents(), 0);
+	/*QuasiThresholdMoving::QuasiThresholdEditingLocalMover tester(karate, mover.getParents(), 0);
 	tester.run();
 	EXPECT_EQ(tester.getNumberOfEdits(), mover.getNumberOfEdits());*/
-	QuasiThresholdEditingLocalMover noParentsMover(karate, TRIVIAL, 100);
+	QuasiThresholdMoving::QuasiThresholdEditingLocalMover noParentsMover(karate, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::TRIVIAL, 100);
 	noParentsMover.run();
 	INFO("Needed ", noParentsMover.getNumberOfEdits(), " edits without pre-initialized parents");
-	/*QuasiThresholdEditingLocalMover noParentsTester(karate, noParentsMover.getParents(), 0);
+	/*QuasiThresholdMoving::QuasiThresholdEditingLocalMover noParentsTester(karate, noParentsMover.getParents(), 0);
 	noParentsTester.run();
 	EXPECT_EQ(noParentsTester.getNumberOfEdits(), noParentsMover.getNumberOfEdits());*/
 }
@@ -746,10 +746,10 @@ TEST_F(CommunityGTest, testQuasiThresholdEditingLocalMover) {
 TEST_F(CommunityGTest, testQuasiThresholdEditingLinear) {
 	Graph karate = METISGraphReader().read("input/karate.graph");
   karate.indexEdges();
-	QuasiThresholdEditingLocalMover mover(karate, EDITING, 0);
+	QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(karate, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::EDITING, 0);
 	mover.run();
 	INFO("Linear editing needed ", mover.getNumberOfEdits(), " edits");
-	QuasiThresholdEditingLocalMover mover2(karate, EDITING, 2);
+	QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover2(karate, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::EDITING, 2);
 	mover2.run();
 	INFO("Moving improved this to ", mover2.getNumberOfEdits(), " edits");
 }
@@ -758,10 +758,10 @@ TEST_F(CommunityGTest, testQuasiThresholdEditingLinear) {
 TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
 	Graph karate = METISGraphReader().read("input/karate.graph");
   karate.indexEdges();
-	QuasiThresholdEditingLocalMover mover(karate, RANDOM_INSERT, 1, true, false);
+	QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(karate, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::RANDOM_INSERT, 1, true, false);
 	mover.run();  
 	INFO("Random order: ", mover.getNumberOfEdits(), " edits");
-  QuasiThresholdEditingLocalMover mover2(karate, ASC_DEGREE_INSERT, 1, true, false);
+  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover2(karate, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::ASC_DEGREE_INSERT, 1, true, false);
   mover2.run();  
   INFO("Large degrees first: ", mover2.getNumberOfEdits(), " edits");
 }
@@ -773,7 +773,7 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
   //Graph G = EdgeListReader('\t', 0).read("input/terrorist.edgelist");
   //Graph G = EdgeListReader('\t', 1).read("input/amazon.edgelist");
   G.indexEdges();		
-	QuasiThresholdEditingLocalMover mover(G, TRIVIAL, 10, false, false);
+	QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::TRIVIAL, 10, false, false);
 	mover.run();  
   INFO( "Parents: Trivial"
         ", Order: None",
@@ -782,7 +782,7 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
         ", randomness: 0",
         "----- Edits: ", mover.getNumberOfEdits(),
         " used ", mover.getUsedIterations());
-  QuasiThresholdEditingLocalMover mover2(G, ASC_DEGREE_INSERT, 0, false, false);
+  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover2(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::ASC_DEGREE_INSERT, 0, false, false);
   mover2.run();  
   INFO( "Parents: Trivial"
         ", Order: Degree ascending",
@@ -792,7 +792,7 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
         "----- Edits: ", mover2.getNumberOfEdits(),
         " used ", mover2.getUsedIterations());
   
-    QuasiThresholdEditingLocalMover mover3(G, ASC_DEGREE_INSERT, 10, true, true);
+    QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover3(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::ASC_DEGREE_INSERT, 10, true, true);
     mover3.run();  
     INFO( "Parents: Trivial"
           ", Order: Degree ascending",
@@ -809,18 +809,22 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
 TEST_F(CommunityGTest, testQuasiInputOutput) {
 	Graph karate = METISGraphReader().read("input/karate.graph");
   karate.indexEdges();
-	QuasiThresholdEditingLocalMover mover(karate, EDITING, 10, true, false);
+	QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(karate, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::EDITING, 10, true, false);
 	mover.run();
   Graph G = mover.getQuasiThresholdGraph();
   G.indexEdges();
-  std::vector<Initialization> initializations{TRIVIAL, EDITING, RANDOM_INSERT, ASC_DEGREE_INSERT};
+  std::vector<QuasiThresholdMoving::QuasiThresholdEditingLocalMover::Initialization> initializations{
+    QuasiThresholdMoving::QuasiThresholdEditingLocalMover::TRIVIAL, 
+    QuasiThresholdMoving::QuasiThresholdEditingLocalMover::EDITING, 
+    QuasiThresholdMoving::QuasiThresholdEditingLocalMover::RANDOM_INSERT, 
+    QuasiThresholdMoving::QuasiThresholdEditingLocalMover::ASC_DEGREE_INSERT};
   
-    for(Initialization initialization : initializations){
+    for(QuasiThresholdMoving::QuasiThresholdEditingLocalMover::Initialization initialization : initializations){
       bool sortPaths = 1;
         for(int k = 0; k < 1; k++, sortPaths = !sortPaths){
           bool randomness = 1;
           for(int l = 0; l < 1; l++, randomness = !randomness){
-            QuasiThresholdEditingLocalMover mover(G, initialization, 0, sortPaths, randomness);
+            QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(G, initialization, 0, sortPaths, randomness);
             mover.run();
             INFO( "Parents: Trivial",
                   ", Intialization: ", initialization,
@@ -843,7 +847,7 @@ TEST_F(CommunityGTest, testInclusionMinimal) {
   count minimum = 60;
 	Graph karate = METISGraphReader().read("input/lesmis.graph");  
   karate.indexEdges();
-  QuasiThresholdEditingLocalMover mover(karate, RANDOM_INSERT, 0, true, false);
+  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(karate, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::RANDOM_INSERT, 0, true, false);
   mover.run();
   Graph Q = mover.getQuasiThresholdGraph();
   count used = mover.getNumberOfEdits();
@@ -882,7 +886,7 @@ TEST_F(CommunityGTest, testInclusionMinimal) {
     }
     G.indexEdges();
 
-    QuasiThresholdEditingLinear editing(G);
+    QuasiThresholdMoving::QuasiThresholdEditingLinear editing(G);
     editing.run();
     Graph G1 = editing.getQuasiThresholdGraph();
     bool difference = false;
@@ -956,17 +960,18 @@ TEST_F(CommunityGTest, testRandomness) {
   G.addEdge(9, 11);
   G.addEdge(10, 11);
   
-  G.addEdge(0, 12);
   G.addEdge(2, 12);
-  G.addEdge(3, 12);
-  G.addEdge(4, 12);
-  G.addEdge(7, 12);
-  G.addEdge(8, 12);
+  G.addEdge(6, 12);
+  G.addEdge(10, 12);
+  G.addEdge(1, 12);
+  G.addEdge(5, 12);
+  G.addEdge(9, 12);
   
 
-	QuasiThresholdEditingLocalMover mover(G, USER_DEFINED_INSERT, 0, false, true);
+  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::USER_DEFINED_INSERT, 0, false, true);
   std::vector<node> order(G.upperNodeIdBound());
   std::iota(order.begin(), order.end(), 0);
+  //order = [0, 1, 3, 2, 4, 5, 7, 6, 8, 9, 11, 10]
   mover.setInsertionOrder(order);
   mover.run();  
   Graph Q = mover.getQuasiThresholdGraph();
@@ -982,6 +987,7 @@ TEST_F(CommunityGTest, testRandomness) {
       assert(Q.hasEdge(u,v));
     } 
   });
+  INFO(mover.getRootEqualBestParents());
   assert(mover.getRootEqualBestParents() == 7);
 }
 
@@ -997,15 +1003,19 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingCompareOptions) {
   runs.push_back(5);
   runs.push_back(20);
   
-  std::vector<Initialization> initializations{TRIVIAL, EDITING, RANDOM_INSERT, ASC_DEGREE_INSERT};
+  std::vector<QuasiThresholdMoving::QuasiThresholdEditingLocalMover::Initialization> initializations{
+    QuasiThresholdMoving::QuasiThresholdEditingLocalMover::TRIVIAL, 
+    QuasiThresholdMoving::QuasiThresholdEditingLocalMover::EDITING, 
+    QuasiThresholdMoving::QuasiThresholdEditingLocalMover::RANDOM_INSERT, 
+    QuasiThresholdMoving::QuasiThresholdEditingLocalMover::ASC_DEGREE_INSERT};
   
-  for (Initialization initialization : initializations){
+  for (QuasiThresholdMoving::QuasiThresholdEditingLocalMover::Initialization initialization : initializations){
     for(count run : runs){
       bool sortPaths = 0;
       for(int k = 0; k < 2; k++, sortPaths = !sortPaths){
         bool randomness = 0;
         for(int l = 0; l < 2; l++, randomness = !randomness){
-          QuasiThresholdEditingLocalMover mover(G, initialization, run, sortPaths, randomness);
+          QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(G, initialization, run, sortPaths, randomness);
           mover.run();
           INFO( "Intialization: ", initialization,
                 ", Runs: ", run,
@@ -1057,8 +1067,35 @@ TEST_F(CommunityGTest, testQuasiThresholdDeletedNodes) {
   karate.removeNode(17);
   karate.removeNode(31);
   karate.indexEdges();
-  QuasiThresholdEditingLocalMover mover(karate, TRIVIAL, 5, true, false);
+  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(karate, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::EDITING, 5, true, false);
   mover.run();
+  
+  Graph G(7, false, false);
+  G.addEdge(0, 3);
+  G.addEdge(0, 5);
+  G.addEdge(0, 6);
+  G.addEdge(1, 3);
+  G.addEdge(3, 5);
+  G.addEdge(3, 6);
+  
+  G.removeNode(1);
+  G.removeNode(4);
+  G.indexEdges();
+  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover2(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::TRIVIAL, 5, true, false);
+  mover2.run();
+  EXPECT_EQ(0, mover2.getNumberOfEdits());
+  
+  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover3(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::ASC_DEGREE_INSERT, 5, true, false);
+  mover3.run();
+  EXPECT_EQ(0, mover3.getNumberOfEdits());
+  
+  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover4(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::RANDOM_INSERT, 5, true, false);
+  mover4.run();
+  EXPECT_EQ(0, mover4.getNumberOfEdits());
+  
+  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover5(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::TRIVIAL, 5, true, false);
+  mover5.run();
+  EXPECT_EQ(0, mover5.getNumberOfEdits());
 
 }
 } /* namespace NetworKit */

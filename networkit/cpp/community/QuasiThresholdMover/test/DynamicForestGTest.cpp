@@ -18,7 +18,7 @@ TEST_F(DynamicForestGTest, testConstruction) {
 	G.addEdge(1, 0);
 	G.addEdge(2, 0);
 
-	DynamicForest dynForest(G);
+	QuasiThresholdMoving::DynamicForest dynForest(G);
 
 	EXPECT_EQ(0, dynForest.parent(1));
 	EXPECT_EQ(0, dynForest.parent(2));
@@ -36,7 +36,7 @@ TEST_F(DynamicForestGTest, testNextChild) {
 		G.addEdge(c, 0);
 	}
 
-	DynamicForest dynForest(G);
+	QuasiThresholdMoving::DynamicForest dynForest(G);
 
 	EXPECT_EQ(0, dynForest.nextDFSNodeOnEnter(none, none));
 	EXPECT_EQ(1, dynForest.nextDFSNodeOnEnter(0, none));
@@ -60,7 +60,7 @@ TEST_F(DynamicForestGTest, testIsolate) {
 	G.addEdge(3, 1);
 	G.addEdge(4, 1);
 
-	DynamicForest dynForest(G);
+	QuasiThresholdMoving::DynamicForest dynForest(G);
 
 	dynForest.isolate(1);
 
@@ -79,7 +79,7 @@ TEST_F(DynamicForestGTest, testPathStructures) {
 	Graph karate = METISGraphReader().read("input/karate.graph");
 	
 	karate.indexEdges();
-	QuasiThresholdEditingLinear editing(karate);
+	QuasiThresholdMoving::QuasiThresholdEditingLinear editing(karate);
 	editing.run();
 	std::vector<node> parent = editing.getParents();
 	
@@ -89,7 +89,7 @@ TEST_F(DynamicForestGTest, testPathStructures) {
 			forest.addEdge(u, parent[u]);
 		}
 	});
-	DynamicForest dynForest(forest);
+	QuasiThresholdMoving::DynamicForest dynForest(forest);
 	forest.forNodesInRandomOrder ([&](node nodeToMove){
 		TRACE("==================nodeToMove: ", nodeToMove,"=============================");
 		
