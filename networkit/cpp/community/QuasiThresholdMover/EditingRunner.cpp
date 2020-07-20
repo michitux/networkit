@@ -385,15 +385,15 @@ namespace NetworKit {
             } 
           }
         }
-        if (traversalData[u].scoreMax > parentData.scoreMax){
-          INFO("Parent count ", traversalData[u].equalBestParents, " propagated to ", p, " for ", nodeToMove);
-          parentData.equalBestParents = traversalData[u].equalBestParents;
-        }
         bool coin = 0;
-        if((traversalData[u].scoreMax == parentData.scoreMax) && (traversalData[u].scoreMax != none) &&  randomness){
-          INFO("Equal good parent propagated to ", p, " for ", nodeToMove);
-          parentData.equalBestParents+=traversalData[u].equalBestParents;
-          coin = randomBool(((double)traversalData[u].equalBestParents)/parentData.equalBestParents);
+        if (randomness) {
+          if (traversalData[u].scoreMax > parentData.scoreMax){
+            parentData.equalBestParents = traversalData[u].equalBestParents;
+          }
+          if(traversalData[u].scoreMax == parentData.scoreMax){
+            parentData.equalBestParents+=traversalData[u].equalBestParents;
+            coin = randomBool(((double)traversalData[u].equalBestParents)/parentData.equalBestParents);
+          }
         }
         if (traversalData[u].scoreMax > parentData.scoreMax || coin) {
           parentData.scoreMax = traversalData[u].scoreMax;
