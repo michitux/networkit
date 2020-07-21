@@ -391,8 +391,10 @@ namespace NetworKit {
             parentData.equalBestParents = traversalData[u].equalBestParents;
           }
           if(traversalData[u].scoreMax == parentData.scoreMax){
-            parentData.equalBestParents+=traversalData[u].equalBestParents;
-            coin = randomBool(((double)traversalData[u].equalBestParents)/parentData.equalBestParents);
+            if(parentData.scoreMax > 0 || p == none || marker[p]){
+              parentData.equalBestParents+=traversalData[u].equalBestParents;
+              coin = randomBool(((double)traversalData[u].equalBestParents)/parentData.equalBestParents);
+            }
           }
         }
         if (traversalData[u].scoreMax > parentData.scoreMax || coin) {
