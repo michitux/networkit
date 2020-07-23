@@ -54,7 +54,7 @@ namespace NetworKit {
 				}
 			}, [](pid){});
 			updateDepthInSubtree(none);
-			assert(pathsValid());
+			//assert(pathsValid());
 			TRACE("Dynamic Forest constructed");
 		}
 		
@@ -91,7 +91,7 @@ namespace NetworKit {
 				}
 			}, [](pid){});
 			updateDepthInSubtree(none);
-			assert(pathsValid());
+			//assert(pathsValid());
 			TRACE("Dynamic Forest constructed");
 		}
 		
@@ -172,7 +172,7 @@ namespace NetworKit {
 			} else {
 				isolateNode(u);
 			}
-			assert(pathsValid());
+			//assert(pathsValid());
 		}
 		
 		//isolate complete simple path
@@ -241,7 +241,7 @@ namespace NetworKit {
 				node firstNonNeighbor = paths[sp].pathNodes[neighborPos];
 				swapNodesWithinPath(firstNonNeighbor, neighbor);
 			}
-			assert(pathsValid());		
+			//assert(pathsValid());		
 		}
 		
 		
@@ -390,7 +390,7 @@ namespace NetworKit {
 				}
 			}
 			updateDepthInSubtree(path(u));
-			assert(pathsValid());
+			//assert(pathsValid());
 			
 		}
 		

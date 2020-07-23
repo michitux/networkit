@@ -39,17 +39,7 @@ for graph in $social_network1; do
 done
 python3 means.py -p "../output/QTM/${graph_set}/temp_${scenario}/"
 
-
-graph_set='social_network'
-scenario='init'
-for graph in $social_network1; do
-  for seed in $seeds; do
-    python3 evaluation.py -g ${graph} -p "../output/QTM/${graph_set}/temp_${scenario}/" -s ${scenario} -r ${seed} &
-  done
-  wait
-done
-python3 means.py -p "../output/QTM/${graph_set}/temp_${scenario}/"
-      
+    
 
 graph_set='social_network'
 scenario='full'

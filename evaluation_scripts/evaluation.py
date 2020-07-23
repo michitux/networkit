@@ -50,6 +50,7 @@ def executeMover (G, graph_name, init, m, s, r, p = 0, b_queue = True):
             edits, usedIterations, actualPlateau, time]
             
 def runOnGraph(graph_name, df):
+    print("starting")
     name = graph_name.split('/')[-1].split('.')[0]
     i = len(df.index)
     graph_path = input_path + graph_name
@@ -58,9 +59,10 @@ def runOnGraph(graph_name, df):
     if(graph_name.split('.')[1] == "graph"):
         G = nk.readGraph(graph_path, nk.Format.METIS)
     if(graph_name.split('.')[1] == "edgelist"):
-        G = nk.readGraph(graph_path, nk.Format.SNAP)
+        G = nk.readGraph(graph_path, nk.Format.SNAP, continuous=False, directed=False)
     if(graph_name.split('.')[1] == "pairs"):
         G = nk.readGraph(graph_path, nk.Format.SNAP)
+    print("graph read")
     G.indexEdges()    
     for init in initializations:
         for m in maxIterations:
@@ -68,9 +70,11 @@ def runOnGraph(graph_name, df):
                 for r in randomness:
                     if(r):
                         for p in plateauSize:
+                            print("executeMover(G, " + name + ", " + str(init) + ", " + str(m) + ", " + str(s) + ", " + str(r) + ", " + str(p) + ", b_queue)")
                             df.loc[i] = executeMover(G, name, init, m, s, r, p, b_queue)
                             i += 1
                     else:
+                        print("executeMover(G, " + name + ", " + str(init) + ", " + str(m) + ", " + str(s) + ", " + str(r) + ", " + str(0) + ", b_queue)")
                         df.loc[i] = executeMover(G, name, init, m, s, r, 0, b_queue)
                         i+=1
     return df
@@ -85,8 +89,8 @@ if(scenario == 'init'):
     plateauSize = [0]
     b_queue = True
 if(scenario == 'simple'):
-    maxIterations = [5]
-    initializations = [3]
+    maxIterations = [0]
+    initializations = [0]
     sortPaths = [True]
     randomness = [False]
     plateauSize = [0]

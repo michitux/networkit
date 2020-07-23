@@ -15,6 +15,7 @@
 #include <networkit/community/ClusteringGenerator.hpp>
 #include <networkit/io/METISGraphReader.hpp>
 #include <networkit/io/EdgeListReader.hpp>
+#include <networkit/io/SNAPGraphReader.hpp>
 #include <networkit/overlap/HashingOverlapper.hpp>
 #include <networkit/community/PLM.hpp>
 #include <networkit/community/GraphClusteringTools.hpp>
@@ -767,12 +768,14 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
 }
 
 
-/*TEST_F(CommunityGTest, testQuasiHuge) {
-	Graph G = METISGraphReader().read("input/email.graph");
+TEST_F(CommunityGTest, testQuasiHuge) {
+	//Graph G = METISGraphReader().read("input/email.graph");
   //graphio.readMat("input/facebook100/{0}.mat".format(name), key="A")
   //Graph G = EdgeListReader('\t', 0).read("input/terrorist.edgelist");
-  //Graph G = EdgeListReader('\t', 1).read("input/amazon.edgelist");
-  G.indexEdges();		
+  Graph G = SNAPGraphReader(false, true).read("input/amazon.edgelist");
+  TRACE("Graph read");
+  G.indexEdges();
+  TRACE("Indexing done");		
 	QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::TRIVIAL, 10, false, false);
 	mover.run();  
   INFO( "Parents: Trivial"
@@ -802,7 +805,7 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
           "----- Edits: ", mover3.getNumberOfEdits(),
           " used ", mover3.getUsedIterations());
   
-}*/
+}
 
 
 

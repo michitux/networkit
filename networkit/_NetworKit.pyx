@@ -6058,7 +6058,7 @@ cdef class CutClustering(CommunityDetector):
 			pyResult[res.first] = Partition().setThis(res.second)
 		return pyResult
 		
-cdef extern from "<networkit/community/QuasiThresholdEditingLocalMover.hpp>" namespace "NetworKit":
+cdef extern from "<networkit/community/QuasiThresholdEditingLocalMover.hpp>" namespace "NetworKit::QuasiThresholdMoving::QuasiThresholdEditingLocalMover":
 
 	cdef enum Initialization:
 		TRIVIAL = 0
@@ -6076,7 +6076,7 @@ class _Initialization(object):
 
 cdef extern from "<networkit/community/QuasiThresholdEditingLocalMover.hpp>":
 
-	cdef cppclass _QuasiThresholdEditingLocalMover "NetworKit::QuasiThresholdEditingLocalMover":
+	cdef cppclass _QuasiThresholdEditingLocalMover "NetworKit::QuasiThresholdMoving::QuasiThresholdEditingLocalMover":
 		_QuasiThresholdEditingLocalMover(_Graph G, Initialization initialization, count maxIterations, bool_t sortPaths, bool_t randomness, count maxPlateauSize, bool_t useBucketQueue) except +
 		void run() except +
 		count getNumberOfEdits() const
