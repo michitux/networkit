@@ -89,8 +89,8 @@ if(scenario == 'init'):
     plateauSize = [0]
     b_queue = True
 if(scenario == 'simple'):
-    maxIterations = [0]
-    initializations = [0]
+    maxIterations = [2]
+    initializations = [1]
     sortPaths = [True]
     randomness = [False]
     plateauSize = [0]

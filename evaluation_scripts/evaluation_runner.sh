@@ -16,6 +16,45 @@ social_network2='dblp.edgelist facebook100/Penn94.mat youtube.edgelist'
 #web='cnr-2000.graph in-2004.graph eu-2005.graph uk-2002.graph'
 web='cnr-2000.graph in-2004.graph eu-2005.graph'
 
+graph_set='facebook'
+scenario='simple'
+input="facebooknames.txt"
+while IFS= read -r graph
+do
+  for seed in $seeds; do
+    python3 evaluation.py -g ${graph} -p "../output/QTM/${graph_set}/temp_${scenario}/" -s ${scenario} -r ${seed} &
+  done
+  wait
+done < "$input"
+python3 means.py -p "../output/QTM/${graph_set}/temp_${scenario}/"
+
+graph_set='facebook'
+scenario='full'
+input="facebooknames.txt"
+while IFS= read -r graph
+do
+  for seed in $seeds; do
+    python3 evaluation.py -g ${graph} -p "../output/QTM/${graph_set}/temp_${scenario}/" -s ${scenario} -r ${seed} &
+  done
+  wait
+done < "$input"
+python3 means.py -p "../output/QTM/${graph_set}/temp_${scenario}/"
+
+
+graph_set='facebook'
+scenario='plateauBound'
+input="facebooknames.txt"
+while IFS= read -r graph
+do
+  for seed in $seeds; do
+    python3 evaluation.py -g ${graph} -p "../output/QTM/${graph_set}/temp_${scenario}/" -s ${scenario} -r ${seed} &
+  done
+  wait
+done < "$input"
+python3 means.py -p "../output/QTM/${graph_set}/temp_${scenario}/"
+
+
+
 #python3 bionames.py -l ${limit}
 #input="bio${limit}.txt"
 #while IFS= read -r graph
@@ -29,27 +68,27 @@ web='cnr-2000.graph in-2004.graph eu-2005.graph'
 #rm ${input}
 
 
-graph_set='social_network'
-scenario='simple'
-for graph in $social_network1; do
-  for seed in $seeds; do
-    python3 evaluation.py -g ${graph} -p "../output/QTM/${graph_set}/temp_${scenario}/" -s ${scenario} -r ${seed} &
-  done
-  wait
-done
-python3 means.py -p "../output/QTM/${graph_set}/temp_${scenario}/"
+#graph_set='social_network'
+#scenario='simple'
+#for graph in $social_network1; do
+#  for seed in $seeds; do
+#    python3 evaluation.py -g ${graph} -p "../output/QTM/${graph_set}/temp_${scenario}/" -s ${scenario} -r ${seed} &
+#  done
+#  wait
+#done
+#python3 means.py -p "../output/QTM/${graph_set}/temp_${scenario}/"
 
     
 
-graph_set='social_network'
-scenario='full'
-for graph in $social_network1; do
-  for seed in $seeds; do
-    python3 evaluation.py -g ${graph} -p "../output/QTM/${graph_set}/temp_${scenario}/" -s ${scenario} -r ${seed} &
-  done
-  wait
-done
-python3 means.py -p "../output/QTM/${graph_set}/temp_${scenario}/"
+#graph_set='social_network'
+#scenario='full'
+#for graph in $social_network1; do
+#  for seed in $seeds; do
+#    python3 evaluation.py -g ${graph} -p "../output/QTM/${graph_set}/temp_${scenario}/" -s ${scenario} -r ${seed} &
+#  done
+#  wait
+#done
+#python3 means.py -p "../output/QTM/${graph_set}/temp_${scenario}/"
 
 
 
