@@ -10,7 +10,7 @@ import argparse
 parser = argparse.ArgumentParser(prog='evaluation.py')
 parser.add_argument('-g', '--graph_name')
 parser.add_argument('-p', '--path')
-parser.add_argument('-s', '--scenario', choices=['full', 'plateauBound', 'withoutBucketQueue'])
+parser.add_argument('-s', '--scenario', choices=['full', 'plateauBound', 'withoutBucketQueue', 'simple', 'init'])
 parser.add_argument('-r', '--random_seed', type=int)
 parser.add_argument('-o', '--overwrite', action='store_true')
 
