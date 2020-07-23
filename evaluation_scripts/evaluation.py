@@ -77,7 +77,20 @@ def runOnGraph(graph_name, df):
 
 
 
-
+if(scenario == 'init'):
+    maxIterations = [0]
+    initializations = [0, 1, 2, 3]
+    sortPaths = [True]
+    randomness = [False]
+    plateauSize = [0]
+    b_queue = True
+if(scenario == 'simple'):
+    maxIterations = [5]
+    initializations = [3]
+    sortPaths = [True]
+    randomness = [False]
+    plateauSize = [0]
+    b_queue = True
 if(scenario == 'full'):
     maxIterations = [0, 5, 100]
     initializations = [0, 1, 2, 3]
