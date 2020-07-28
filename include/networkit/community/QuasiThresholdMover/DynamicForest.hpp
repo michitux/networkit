@@ -15,8 +15,23 @@ namespace QuasiThresholdMoving {
 		DynamicForest();
 		DynamicForest(const Graph& G, const std::vector<node>& parents = std::vector<node>());
 		DynamicForest(const std::vector<node>& parents);
-		node parent(node u) const;
-		count depth(node u) const;
+		node parent(node u) const {
+			if(u == none){
+				return none;
+			} else if(isUpperEnd(u)){
+				pid p = paths[path(u)].parent;
+				return (p == none) ? none : paths[p].lowerEnd();
+			} else {
+				return previousNodeInPath(u);
+			}
+		};
+		count depth(node u) const {
+			if(u ==  none){
+				return none;
+			} else {
+				return paths[path(u)].depth + paths[path(u)].length() - 1 - path_pos[u];
+			}
+		};
 		std::vector<node> children(node u) const;
 		Graph toGraph() const;
 		void isolate(node u);
@@ -162,14 +177,37 @@ namespace QuasiThresholdMoving {
 			};
 			
 		};
-		
-		pid path(node u) const;
-		
-		bool isUpperEnd (node u) const;
-		bool isLowerEnd (node u) const;
-		node nextNodeInPath(node u) const;
-		node previousNodeInPath(node u) const;
-		
+
+		pid path(node u) const {
+			if(u == none){
+				return none;
+			} else {
+				assert(u < path_membership.size());
+				return path_membership[u];
+			}
+		};
+
+		bool isUpperEnd(node u) const {
+			return (path_pos[u] == paths[path(u)].length() - 1);
+		};
+		bool isLowerEnd(node u) const {
+			return (path_pos[u] == 0);
+		};
+		node nextNodeInPath(node u) const {
+			if(isLowerEnd(u)){
+				return none;
+			} else {
+				return paths[path(u)].pathNodes[path_pos[u] - 1];
+			}
+		};
+		node previousNodeInPath(node u) const {
+			if(isUpperEnd(u)){
+				return none;
+			} else {
+				return paths[path(u)].pathNodes[path_pos[u] + 1];
+			}
+		};
+
 		void deletePath(pid i);
 		pid newPath();
 		
