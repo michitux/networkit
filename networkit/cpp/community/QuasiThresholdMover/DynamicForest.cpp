@@ -339,10 +339,12 @@ namespace NetworKit {
 			assert(paths[path(u)].length() == 1);
 			//check that all children are adopted ones
 			if(p != none){
+				#ifndef NDEBUG
 				std::vector<node> oldChildren = children(p);
 				for(node c : adoptedChildren){
 					assert(std::find(oldChildren.begin(), oldChildren.end(), c) != oldChildren.end());
 				}
+				#endif
 			} else {
 				for(node c : adoptedChildren){
 					assert(std::find(roots.begin(), roots.end(), path(c)) != roots.end());

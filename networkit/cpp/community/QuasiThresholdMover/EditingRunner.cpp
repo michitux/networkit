@@ -411,7 +411,7 @@ namespace NetworKit {
           traversalData[p] = parentData;
         }
         
-        if (dynamicForest.children(u).empty()) { assert(traversalData[u].childCloseness == 1); }
+        assert(!dynamicForest.children(u).empty() || traversalData[u].childCloseness == 1);
       }
       
       void EditingRunner::compareWithQuadratic(node nodeToMove) const {
