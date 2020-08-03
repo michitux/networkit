@@ -104,26 +104,6 @@ namespace NetworKit {
 			return result;
 		}
 		
-		node DynamicForest::parent(node u) const { 
-			if(u == none){
-				return none;
-			} else if(isUpperEnd(u)){
-				pid p = paths[path(u)].parent;
-				return (p == none) ? none : paths[p].lowerEnd();
-			} else {
-				return previousNodeInPath(u);
-			} 
-		}
-		
-		count DynamicForest::depth(node u) const { 
-			if(u ==  none){
-				return none;
-			} else {
-				return paths[path(u)].depth + paths[path(u)].length() - 1 - path_pos[u];
-			}
-		}
-		
-		
 		void DynamicForest::updateDepthInSubtree(pid start){
 			pathDfsFrom(start, [&](pid sp) {
 				if (sp != none){
@@ -339,10 +319,12 @@ namespace NetworKit {
 			assert(paths[path(u)].length() == 1);
 			//check that all children are adopted ones
 			if(p != none){
+				#ifndef NDEBUG
 				std::vector<node> oldChildren = children(p);
 				for(node c : adoptedChildren){
 					assert(std::find(oldChildren.begin(), oldChildren.end(), c) != oldChildren.end());
 				}
+				#endif
 			} else {
 				for(node c : adoptedChildren){
 					assert(std::find(roots.begin(), roots.end(), path(c)) != roots.end());
@@ -521,39 +503,6 @@ namespace NetworKit {
 			return result;
 		}
 		
-		
-		DynamicForest::pid DynamicForest::path(node u) const{
-			if(u == none){
-				return none;
-			} else {
-				assert(u < path_membership.size());
-				return path_membership[u];
-			}
-		}
-		
-		
-		bool DynamicForest::isUpperEnd(node u) const{
-			return (path_pos[u] == paths[path(u)].length() - 1);
-		}
-		bool DynamicForest::isLowerEnd(node u) const{
-			return (path_pos[u] == 0);
-		}
-		
-		node DynamicForest::nextNodeInPath(node u) const{
-			if(isLowerEnd(u)){
-				return none;
-			} else {
-				return paths[path(u)].pathNodes[path_pos[u] - 1];
-			}
-		}
-		
-		node DynamicForest::previousNodeInPath(node u) const{
-			if(isUpperEnd(u)){
-				return none;
-			} else {
-				return paths[path(u)].pathNodes[path_pos[u] + 1];
-			}
-		}
 		
 		void DynamicForest::deletePath(DynamicForest::pid i){
 			//check that path got isolated from tree structure

@@ -12,12 +12,13 @@ namespace NetworKit {
     
     void BucketQueue::fill(const std::vector<node> &elements, const DynamicForest &dynamicForest){
       count maxDepth = std::min(n - 1, 2 * elements.size());
-      std::fill(border.begin(), border.begin() + std::min(maxDepth + 1, border.size()), 0);
+      auto borderEnd = border.begin() + std::min(maxDepth + 1, border.size());
+      std::fill(border.begin(), borderEnd, 0);
       for (node u : elements) {
         if(dynamicForest.depth(u) > maxDepth) continue;
         border[dynamicForest.depth(u)] += 1;
       }
-      std::partial_sum(border.begin(), border.end(), border.begin());
+      std::partial_sum(border.begin(), borderEnd, border.begin());
       currentBucket = maxDepth;
       nextNode = none;
       std::vector<node>::const_reverse_iterator rit = elements.rbegin();
