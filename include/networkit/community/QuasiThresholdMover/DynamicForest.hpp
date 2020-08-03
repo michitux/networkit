@@ -15,6 +15,13 @@ namespace QuasiThresholdMoving {
 		DynamicForest();
 		DynamicForest(const Graph& G, const std::vector<node>& parents = std::vector<node>());
 		DynamicForest(const std::vector<node>& parents);
+		
+		void isolate(node u);
+		void moveUpNeighbor(node referenceNode, node Neighbor);	
+		void moveToPosition(node u, node p, const std::vector<node> &adoptedChildren);
+		Graph toGraph() const;
+		std::string printPaths() const;
+		
 		node parent(node u) const {
 			if(u == none){
 				return none;
@@ -32,12 +39,16 @@ namespace QuasiThresholdMoving {
 				return paths[path(u)].depth + paths[path(u)].length() - 1 - path_pos[u];
 			}
 		};
-		std::vector<node> children(node u) const;
-		Graph toGraph() const;
-		void isolate(node u);
-		void moveUpNeighbor(node referenceNode, node Neighbor);	
-		void moveToPosition(node u, node p, const std::vector<node> &adoptedChildren);
-		std::string printPaths() const;
+		
+		std::vector<node> children(node u) const {
+			std::vector<node> result;
+			forChildrenOf(u, [&](node c) {
+				result.emplace_back(c);
+			});
+			
+			return result;
+		};
+		
 		
 		
 		node nextChild(node child, node p) const {
@@ -207,6 +218,38 @@ namespace QuasiThresholdMoving {
 				return paths[path(u)].pathNodes[path_pos[u] + 1];
 			}
 		};
+		
+		void addToPath(node u, pid newId){
+			path_membership[u] = newId;
+			path_pos[u] = paths[newId].length();
+			paths[newId].pathNodes.push_back(u);
+		};
+		
+		void setParentPath(pid s, pid p){
+			pid oldP = paths[s].parent;
+			if (oldP == p || s == p) return;
+			index oldPos = paths[s].posInParent;
+			//tidy up at old position
+			if (oldP != none) {
+				paths[oldP].childPaths[oldPos] = paths[oldP].childPaths.back();
+				paths[oldP].childPaths.pop_back();
+				paths[paths[oldP].childPaths[oldPos]].posInParent = oldPos;
+			} else {
+				roots[oldPos] = roots.back();
+				roots.pop_back();
+				paths[roots[oldPos]].posInParent = oldPos;
+			}
+			
+			//place at new position
+			paths[s].parent = p;
+			if (p == none) {
+				paths[s].posInParent = roots.size();
+				roots.push_back(s);
+			} else {
+				paths[s].posInParent = paths[p].childPaths.size();
+				paths[p].childPaths.push_back(s);
+			}
+		};
 
 		void deletePath(pid i);
 		pid newPath();
@@ -215,9 +258,6 @@ namespace QuasiThresholdMoving {
 		index posInParent (node u) const;
 		
 		void setParent(node u, node p);
-		void setParentPath(pid s, pid p);
-		void swapNodesWithinPath(node u, node v);
-		void addToPath(node u, pid newId);
 		void splitPath(pid sp, pid splitPos);
 		void unionPaths(pid upperPath, pid lowerPath);
 		void isolatePath(pid sp);

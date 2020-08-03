@@ -54,7 +54,7 @@ namespace NetworKit {
 				}
 			}, [](pid){});
 			updateDepthInSubtree(none);
-			//assert(pathsValid());
+			assert(pathsValid());
 			TRACE("Dynamic Forest constructed");
 		}
 		
@@ -91,18 +91,11 @@ namespace NetworKit {
 				}
 			}, [](pid){});
 			updateDepthInSubtree(none);
-			//assert(pathsValid());
+			assert(pathsValid());
 			TRACE("Dynamic Forest constructed");
 		}
 		
-		std::vector<node> DynamicForest::children(node u) const {
-			std::vector<node> result;
-			forChildrenOf(u, [&](node c) {
-				result.emplace_back(c);
-			});
-			
-			return result;
-		}
+		
 		
 		void DynamicForest::updateDepthInSubtree(pid start){
 			pathDfsFrom(start, [&](pid sp) {
@@ -118,31 +111,7 @@ namespace NetworKit {
 		}
 		
 		
-		void DynamicForest::setParentPath(pid s, pid p){
-			pid oldP = paths[s].parent;
-			if (oldP == p || s == p) return;
-			index oldPos = paths[s].posInParent;
-			//tidy up at old position
-			if (oldP != none) {
-				paths[oldP].childPaths[oldPos] = paths[oldP].childPaths.back();
-				paths[oldP].childPaths.pop_back();
-				paths[paths[oldP].childPaths[oldPos]].posInParent = oldPos;
-			} else {
-				roots[oldPos] = roots.back();
-				roots.pop_back();
-				paths[roots[oldPos]].posInParent = oldPos;
-			}
-			
-			//place at new position
-			paths[s].parent = p;
-			if (p == none) {
-				paths[s].posInParent = roots.size();
-				roots.push_back(s);
-			} else {
-				paths[s].posInParent = paths[p].childPaths.size();
-				paths[p].childPaths.push_back(s);
-			}
-		}
+
 		
 		
 		void DynamicForest::isolate(node u) {
@@ -152,7 +121,7 @@ namespace NetworKit {
 			} else {
 				isolateNode(u);
 			}
-			//assert(pathsValid());
+			assert(pathsValid());
 		}
 		
 		//isolate complete simple path
@@ -219,27 +188,15 @@ namespace NetworKit {
 				paths[sp].neighborCount++;
 				if(oldPos ==  neighborPos) return; //neighbor was not considered but is at right position
 				node firstNonNeighbor = paths[sp].pathNodes[neighborPos];
-				swapNodesWithinPath(firstNonNeighbor, neighbor);
+				std::swap(paths[sp].pathNodes[path_pos[firstNonNeighbor]], paths[sp].pathNodes[path_pos[neighbor]]);
+				std::swap(path_pos[firstNonNeighbor], path_pos[neighbor]);
 			}
-			//assert(pathsValid());		
+			assert(pathsValid());		
 		}
 		
 		
-		void DynamicForest::swapNodesWithinPath(node u, node v){
-			pid sp = path(u);
-			assert(path(v) == sp);
-			if(u == v){
-				return;
-			}
-			std::swap(paths[sp].pathNodes[path_pos[u]], paths[sp].pathNodes[path_pos[v]]);
-			std::swap(path_pos[u], path_pos[v]);
-		}
 		
-		void DynamicForest::addToPath(node u, pid newId){
-			path_membership[u] = newId;
-			path_pos[u] = paths[newId].length();
-			paths[newId].pathNodes.push_back(u);
-		}
+
 		
 		void DynamicForest::splitPath(pid sp, index splitPos){
 			if(paths[sp].length() <= 1 || splitPos == 0) return; //nothing to split
@@ -372,7 +329,7 @@ namespace NetworKit {
 				}
 			}
 			updateDepthInSubtree(path(u));
-			//assert(pathsValid());
+			assert(pathsValid());
 			
 		}
 		

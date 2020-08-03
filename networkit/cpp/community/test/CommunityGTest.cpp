@@ -1060,6 +1060,7 @@ TEST_F(CommunityGTest, benchQuasiThresholdGreedyBound) {
         EXPECT_LE(bound.getMinDistance(), G.numberOfEdges() / 3);
 }
 
+
 TEST_F(CommunityGTest, testQuasiThresholdDeletedNodes) {
   Graph karate = METISGraphReader().read("input/karate.graph");
   karate.removeNode(2);
@@ -1100,5 +1101,12 @@ TEST_F(CommunityGTest, testQuasiThresholdDeletedNodes) {
   mover5.run();
   EXPECT_EQ(0, mover5.getNumberOfEdits());
 
+}
+
+TEST_F(CommunityGTest, benchQuasiThresholdMover) {
+  Graph G = SNAPGraphReader(false, true).read("input/amazon.edgelist");
+  G.indexEdges();
+  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::ASC_DEGREE_INSERT, 100, true, false);
+  mover.run();  
 }
 } /* namespace NetworKit */
