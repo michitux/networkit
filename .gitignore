@@ -34,6 +34,7 @@ input/orkut.edgelist
 input/facebook100/*
 input/uk-2002.graph
 input/biological/*
+input/generated/*
 input/lj.edgelist
 input/eu-2005.graph
 input/in-2004.graph
