@@ -31,6 +31,7 @@ namespace NetworKit {
 				plateauSize = runner.getPlateauSize();
 				rootEqualBestParents = runner.getRootEqualBestParents();
 				quasiThresholdGraph = runner.getQuasiThresholdGraph();
+				runningInfo = runner.getRunningInfo();
 			}
 			
 			
@@ -52,6 +53,10 @@ namespace NetworKit {
 			
 			count QuasiThresholdEditingLocalMover::getRootEqualBestParents() const {
 				return rootEqualBestParents;
+			}
+			
+			std::map<std::string, std::vector<count>> QuasiThresholdEditingLocalMover::getRunningInfo() const {
+				return runningInfo;
 			}
 			
 			void QuasiThresholdEditingLocalMover::setInsertionOrder(std::vector<node> order) {

@@ -40,6 +40,11 @@ namespace NetworKit {
       dist(),
       gen(Aux::Random::getURNG()){
         
+        runningInfo["time"] = std::vector<count>();
+        runningInfo["edits"] = std::vector<count>();
+        
+        
+        timer.start();
         switch(initialization){
           case QuasiThresholdEditingLocalMover::TRIVIAL:
           {
@@ -94,6 +99,8 @@ namespace NetworKit {
           default:
           break;
         }
+        timer.stop();
+        runningInfo["time"].push_back(timer.elapsedMilliseconds());
         
         
         handler.assureRunning();
@@ -112,14 +119,20 @@ namespace NetworKit {
           lastVisitedDFSNode[u] = u;
         });
         
+
+        
       }
       
       void EditingRunner::runLocalMover(){
         handler.assureRunning();
+        if(!insertRun) {
+          runningInfo["edits"].push_back(numEdits);
+        }
         for (count i = insertRun ? 0 : 1; hasMoved && i <= maxIterations; ++i) {
           if(!hasMoved || (randomness && (currentPlateau >= maxPlateauSize))) break;
           handler.assureRunning();
           hasMoved = false;
+          timer.start();
           if(insertRun){
             for(index j = 0; j < G.numberOfNodes(); j++){
               node nodeToMove = order[j];
@@ -132,6 +145,15 @@ namespace NetworKit {
               localMove(nodeToMove);
             });
           }
+          
+
+          timer.stop();
+          if(i == 0){
+            runningInfo["time"][0] += timer.elapsedMilliseconds();
+          } else {
+            runningInfo["time"].push_back(timer.elapsedMilliseconds());
+          }
+          runningInfo["edits"].push_back(numEdits);
           usedIterations = i;
           
           assert(numEdits == countNumberOfEdits());

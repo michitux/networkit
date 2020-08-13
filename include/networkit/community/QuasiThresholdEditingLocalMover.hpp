@@ -4,6 +4,7 @@
 #include <networkit/community/QuasiThresholdMover/QuasiThresholdEditingLinear.hpp>
 #include <networkit/graph/Graph.hpp>
 #include <networkit/graph/GraphTools.hpp>
+#include <map>
 
 namespace NetworKit {
 	namespace QuasiThresholdMoving {
@@ -27,6 +28,7 @@ namespace NetworKit {
 				count getUsedIterations() const;
 				count getPlateauSize() const;
 				count getRootEqualBestParents() const;
+				std::map<std::string, std::vector<count>> getRunningInfo() const;
 				
 				void setInsertionOrder(std::vector<node> order);
 			private:
@@ -48,6 +50,8 @@ namespace NetworKit {
 				count rootEqualBestParents;
 				
 				Graph quasiThresholdGraph;
+				
+				std::map<std::string, std::vector<count> > runningInfo;
 				
 			};
 	} //namespace QuasiThresholdMoving

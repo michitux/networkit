@@ -6084,6 +6084,7 @@ cdef extern from "<networkit/community/QuasiThresholdEditingLocalMover.hpp>":
 		count getPlateauSize() const
 		_Graph getQuasiThresholdGraph() except +
 		void setInsertionOrder(vector[node] order) except +
+		map[string, vector[count]] getRunningInfo() except +
 
 cdef class QuasiThresholdEditingLocalMover:
 	cdef _QuasiThresholdEditingLocalMover *_this
@@ -6116,6 +6117,9 @@ cdef class QuasiThresholdEditingLocalMover:
 	def setInsertionOrder(self, vector[node] order):
 		self._this.setInsertionOrder(order)
 		return self
+		
+	def getRunningInfo(self):
+		return self._this.getRunningInfo()
 
 
 

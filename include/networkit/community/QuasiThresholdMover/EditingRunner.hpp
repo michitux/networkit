@@ -3,9 +3,11 @@
 
 #include <networkit/graph/Graph.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
+#include <networkit/auxiliary/Timer.hpp>
 #include <networkit/community/QuasiThresholdMover/DynamicForest.hpp>
 #include <networkit/community/QuasiThresholdMover/BucketQueue.hpp>
 #include <networkit/community/QuasiThresholdEditingLocalMover.hpp>
+#include <map>
 
 namespace NetworKit {
   namespace QuasiThresholdMoving {
@@ -31,6 +33,10 @@ namespace NetworKit {
         count getRootEqualBestParents() const {
           return rootEqualBestParentsCpy;
         };
+        
+        std::map<std::string, std::vector<count>> getRunningInfo() const {
+          return runningInfo;
+        }
         
         Graph getQuasiThresholdGraph() const;
         
@@ -115,6 +121,9 @@ namespace NetworKit {
         
         std::mt19937_64& gen;
         std::uniform_int_distribution<count> dist;
+        
+        Aux::Timer timer;
+        std::map<std::string, std::vector<count>> runningInfo;
         
         void localMove(node nodeToMove);
         void processNode(node u, node nodeToMove);
