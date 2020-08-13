@@ -13,9 +13,9 @@ parser.add_argument('-p', '--path')
 args = vars(parser.parse_args())
 path = args['path']
 
-parent_path = '/'.join(path.split('/')[:-2]) + '/'
+parent_path = '/'.join(path.split('/')[:-1]) + '/'
 for root, dirs, f in os.walk(path):
-    dirs = dirs[1:]
+    #dirs = dirs[1:]
     result = []
     for dir in dirs:
         filenames = []
