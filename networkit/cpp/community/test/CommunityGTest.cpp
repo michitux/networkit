@@ -768,7 +768,7 @@ TEST_F(CommunityGTest, testQuasiThresholdMovingWithInsert) {
 }
 
 
-TEST_F(CommunityGTest, testQuasiHuge) {
+/*TEST_F(CommunityGTest, testQuasiHuge) {
 	//Graph G = METISGraphReader().read("input/email.graph");
   //graphio.readMat("input/facebook100/{0}.mat".format(name), key="A")
   //Graph G = EdgeListReader('\t', 0).read("input/terrorist.edgelist");
@@ -805,7 +805,7 @@ TEST_F(CommunityGTest, testQuasiHuge) {
           "----- Edits: ", mover3.getNumberOfEdits(),
           " used ", mover3.getUsedIterations());
   
-}
+}*/
 
 
 
@@ -974,7 +974,6 @@ TEST_F(CommunityGTest, testRandomness) {
   QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::USER_DEFINED_INSERT, 0, false, true);
   std::vector<node> order(G.upperNodeIdBound());
   std::iota(order.begin(), order.end(), 0);
-  //order = [0, 1, 3, 2, 4, 5, 7, 6, 8, 9, 11, 10]
   mover.setInsertionOrder(order);
   mover.run();  
   Graph Q = mover.getQuasiThresholdGraph();
@@ -991,7 +990,34 @@ TEST_F(CommunityGTest, testRandomness) {
     } 
   });
   INFO(mover.getRootEqualBestParents());
-  assert(mover.getRootEqualBestParents() == 7);
+  assert(mover.getRootEqualBestParents() == 10);
+}
+
+
+TEST_F(CommunityGTest, testRandomness2) {
+  /*  x 
+     | 
+     x 
+     |
+     x 
+     
+     considering last insert with vm = 3
+     o = non-vm-neighbor, x = vm-neighbor 
+     ensuring that all 4 equal good positions are found
+  */
+  Graph G(4, false, false);
+  G.addEdge(0, 1);
+  G.addEdge(0, 2);
+  G.addEdge(0, 3);
+  G.addEdge(1, 2);
+  G.addEdge(1, 3);
+  G.addEdge(2, 3);
+  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::USER_DEFINED_INSERT, 0, false, true);
+  std::vector<node> order(G.upperNodeIdBound());
+  std::iota(order.begin(), order.end(), 0);
+  mover.setInsertionOrder(order);
+  mover.run();  
+  assert(mover.getRootEqualBestParents() == 4);
 }
 
 

@@ -29,7 +29,7 @@ namespace NetworKit {
       hasMoved(true),
       insertRun(initialization != QuasiThresholdEditingLocalMover::TRIVIAL && initialization != QuasiThresholdEditingLocalMover::EDITING),		
       rootData(),
-      rootEqualBestParentsCpy(1),
+      rootEqualBestParentsCpy(0),
       currentPlateau(0),
       actualMaximumPlateau(0),
       traversalData(G.upperNodeIdBound()),
@@ -254,11 +254,28 @@ namespace NetworKit {
             }
           }
           
+          if(!randomness) {
+            if (rootData.childCloseness > rootData.scoreMax) {
+              rootData.bestParentBelow = none;
+              rootData.scoreMax = rootData.childCloseness;
+            } 
+          } else {
+            bool coin = false;
+            if (rootData.childCloseness > rootData.scoreMax || rootData.equalBestParents == 0) {
+              //INFO("root better");
+              rootData.scoreMax = rootData.childCloseness;
+              rootData.equalBestParents = 1;
+              coin = true;
+            } else if (rootData.childCloseness == rootData.scoreMax) {
+              //INFO("root equally good");
+              rootData.equalBestParents += 1;
+              coin = randomBool(1/(double)rootData.equalBestParents);
+            }
+            if (coin) {
+              rootData.bestParentBelow = none;
+            }
+          }
           bestEdits = neighbors.size() - rootData.scoreMax;
-          if (rootData.childCloseness > rootData.scoreMax) {
-            rootData.bestParentBelow = none;
-            bestEdits = neighbors.size() - rootData.childCloseness;
-          } 
           
           
           for (node u : touchedNodes) {
@@ -373,10 +390,30 @@ namespace NetworKit {
         
         TRACE("Edit difference after descending: ", traversalData[u].childCloseness);
         
-        if (sumPositiveEdits > traversalData[u].scoreMax || traversalData[u].scoreMax == 0) {
-          traversalData[u].scoreMax = sumPositiveEdits;
-          traversalData[u].bestParentBelow = u;
+        if(!randomness){
+          if (sumPositiveEdits > traversalData[u].scoreMax || traversalData[u].scoreMax == 0) {
+            traversalData[u].scoreMax = sumPositiveEdits;
+            traversalData[u].bestParentBelow = u;
+          }
+        } else {
+          bool coin  = false;
+          if (sumPositiveEdits > traversalData[u].scoreMax || traversalData[u].equalBestParents == 0) {
+            //INFO(u, " is better count = 1");
+            traversalData[u].scoreMax = sumPositiveEdits;
+            traversalData[u].equalBestParents = 1;
+            coin = true;
+          } else if (sumPositiveEdits == traversalData[u].scoreMax) {
+            traversalData[u].equalBestParents += 1;
+            coin = randomBool(1/(double)traversalData[u].equalBestParents);
+            //INFO(u, " equally good count = ", traversalData[u].equalBestParents);
+          }
+          if (coin) {
+            traversalData[u].bestParentBelow = u;
+          }
         }
+        
+        
+
         
         assert(traversalData[u].scoreMax != none);
         
@@ -411,11 +448,15 @@ namespace NetworKit {
         if (randomness) {
           if (traversalData[u].scoreMax > parentData.scoreMax){
             parentData.equalBestParents = traversalData[u].equalBestParents;
+            //INFO(u, " better for ", p);
+            //INFO("set count to ", parentData.equalBestParents);
           }
           if(traversalData[u].scoreMax == parentData.scoreMax){
             if(parentData.scoreMax > 0 || p == none || marker[p]){
               parentData.equalBestParents+=traversalData[u].equalBestParents;
               coin = randomBool(((double)traversalData[u].equalBestParents)/parentData.equalBestParents);
+              //INFO(u, " equally good for ", p);
+              //INFO("increase count by ", traversalData[u].equalBestParents, " to ", parentData.equalBestParents);
             }
           }
         }

@@ -50,12 +50,12 @@ namespace NetworKit {
           count equalBestParents;
           node bestParentBelow;
           
-          TraversalData () : scoreMax(0) , childCloseness(0), equalBestParents(1), bestParentBelow(none){};
+          TraversalData () : scoreMax(0) , childCloseness(0), equalBestParents(0), bestParentBelow(none){};
           
           void reset(){
             scoreMax = 0;
             childCloseness = 0;
-            equalBestParents = 1;
+            equalBestParents = 0;
             bestParentBelow = none;
           };
           
