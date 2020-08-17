@@ -25,13 +25,13 @@ plateau = args['plateau']
 bucketQueue = args['bucketQueue']
 
 
-#graph_names = ['adjnoun.graph', 'dolphins.graph', 'karate.graph', 'lesmis.graph', 'football.graph', 'terrorist.edgelist', 'grass_web.pairs', 
-#'jazz.graph', 'polbooks.graph', 'amazon.edgelist', 'facebook100/Caltech36.mat', 'dblp.edgelist', 'youtube.edgelist', 'facebook100/Penn94.mat', 
-#'lj.edgelist', 'orkut.edgelist', 'cnr-2000.graph', 'in-2004.graph', 'eu-2005.graph', 'uk-2002.graph']
-graph_names = ['adjnoun.graph', 'dolphins.graph', 'karate.graph', 'lesmis.graph']
+graph_names = ['adjnoun.graph', 'dolphins.graph', 'karate.graph', 'lesmis.graph', 'football.graph', 'terrorist.edgelist', 'grass_web.pairs',
+'jazz.graph', 'polbooks.graph', 'amazon.edgelist', 'facebook100/Caltech36.mat', 'dblp.edgelist', 'youtube.edgelist', 'facebook100/Penn94.mat',
+'lj.edgelist', 'orkut.edgelist', 'cnr-2000.graph', 'in-2004.graph', 'eu-2005.graph', 'uk-2002.graph']
+#graph_names = ['adjnoun.graph', 'dolphins.graph', 'karate.graph', 'lesmis.graph']
 input_path = '../input/'
 df = pd.DataFrame(columns  = ['graph', 'iteration', 'edits', 'time'])
-row = 0            
+row = 0
 for graph_name in graph_names:
     name = graph_name.split('/')[-1].split('.')[0]
     i = len(df.index)
@@ -46,7 +46,7 @@ for graph_name in graph_names:
         G = nk.readGraph(graph_path, nk.Format.SNAP)
     G.indexEdges()
     mover = nk.community.QuasiThresholdEditingLocalMover(G, init, maxIterations, sortPaths, randomness, plateau, bucketQueue)
-    mover.run()   
+    mover.run()
     edits = mover.getRunningInfo()[b'edits']
     time = mover.getRunningInfo()[b'time']
     for i in range(len(edits)):
@@ -62,8 +62,3 @@ if not os.path.exists(output_path):
     os.makedirs(output_path)
 file_name = output_path + 'time_' + str(init) + '_' + str(maxIterations) + '_' + str(sortPaths) + '_' + str(randomness) + '_' + str(plateau) + '_' + str(bucketQueue) + '.csv'
 df.to_csv(file_name, sep=',', encoding='utf-8')
-
-
-
-
-
