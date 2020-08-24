@@ -112,7 +112,7 @@ namespace NetworKit {
         
         
         numEdits = countNumberOfEdits();
-        editsBefore = countNumberOfEdits();
+        editsBefore = numEdits;
         
         
         G.forNodes([&](node u) {
@@ -269,7 +269,7 @@ namespace NetworKit {
             } else if (rootData.childCloseness == rootData.scoreMax) {
               //INFO("root equally good");
               rootData.equalBestParents += 1;
-              coin = randomBool(1/(double)rootData.equalBestParents);
+              coin = randomBool(rootData.equalBestParents);
             }
             if (coin) {
               rootData.bestParentBelow = none;
@@ -404,7 +404,7 @@ namespace NetworKit {
             coin = true;
           } else if (sumPositiveEdits == traversalData[u].scoreMax) {
             traversalData[u].equalBestParents += 1;
-            coin = randomBool(1/(double)traversalData[u].equalBestParents);
+            coin = randomBool(traversalData[u].equalBestParents);
             //INFO(u, " equally good count = ", traversalData[u].equalBestParents);
           }
           if (coin) {
@@ -450,11 +450,10 @@ namespace NetworKit {
             parentData.equalBestParents = traversalData[u].equalBestParents;
             //INFO(u, " better for ", p);
             //INFO("set count to ", parentData.equalBestParents);
-          }
-          if(traversalData[u].scoreMax == parentData.scoreMax){
+          } else if(traversalData[u].scoreMax == parentData.scoreMax){
             if(parentData.scoreMax > 0 || p == none || marker[p]){
               parentData.equalBestParents+=traversalData[u].equalBestParents;
-              coin = randomBool(((double)traversalData[u].equalBestParents)/parentData.equalBestParents);
+              coin = randomBool(parentData.equalBestParents, traversalData[u].equalBestParents);
               //INFO(u, " equally good for ", p);
               //INFO("increase count by ", traversalData[u].equalBestParents, " to ", parentData.equalBestParents);
             }

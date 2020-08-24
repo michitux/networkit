@@ -131,9 +131,11 @@ namespace NetworKit {
         count countNumberOfEdits() const;
         count editsIncidentTo(node u) const;
         
-        bool randomBool(count options) {
+        bool randomBool(count options, count optionsToConsider = 1) {
+          assert(options > 0);
+          assert(options >= optionsToConsider);
           count x = dist(gen, std::uniform_int_distribution<count>::param_type(0, options-1));
-          return options == 0 ? 0 : rand() % options == 0;
+          return x < optionsToConsider;
         };
         
         
