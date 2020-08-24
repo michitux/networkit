@@ -22,8 +22,8 @@ seed = args['random_seed']
 input_path = "../input/"
 output_path = args['path']
 nk.setSeed(seed, False)
-        
-        
+
+
 def getInitName(i):
     if (i == 0):
         return 'trivial'
@@ -33,11 +33,11 @@ def getInitName(i):
         return 'random_insert'
     if (i == 3):
         return 'asc_degree_insert'
-        
-def executeMover (G, graph_name, init, m, s, r, p = 0, b_queue = True):
-    mover = nk.community.QuasiThresholdEditingLocalMover(G, init, m, s, r, p, b_queue)
-    a = timeit.default_timer()  
-    mover.run()   
+
+def executeMover (G, graph_name, init, s, r, p, maxIterations, df):
+    mover = nk.community.QuasiThresholdEditingLocalMover(G, init, max(maxIterations), s, r, p, True)
+    a = timeit.default_timer()
+    mover.run()
     delta = timeit.default_timer() - a
     edits = mover.getNumberOfEdits()
     usedIterations = mover.getUsedIterations()
@@ -46,11 +46,16 @@ def executeMover (G, graph_name, init, m, s, r, p = 0, b_queue = True):
         actualPlateau =  mover.getPlateauSize()
     else:
         actualPlateau = 0
-    return [graph_name, G.numberOfNodes(), getInitName(init), m, s, r, p, 
-            edits, usedIterations, actualPlateau, time]
-            
+    i = len(df.index)
+    editsDevelopement = mover.getRunningInfo()[b'edits']
+    for m in maxIterations:
+        u = min(m, usedIterations)
+        edits = editsDevelopement[u]
+        df.loc[i] = [graph_name, G.numberOfNodes(), getInitName(init), m, s, r, p, edits, u, actualPlateau, time]
+        i += 1
+    return df
+
 def runOnGraph(graph_name, df):
-    print("starting")
     name = graph_name.split('/')[-1].split('.')[0]
     i = len(df.index)
     graph_path = input_path + graph_name
@@ -62,21 +67,15 @@ def runOnGraph(graph_name, df):
         G = nk.readGraph(graph_path, nk.Format.SNAP, continuous=False, directed=False)
     if(graph_name.split('.')[-1] == "pairs"):
         G = nk.readGraph(graph_path, nk.Format.SNAP)
-    print("graph read")
-    G.indexEdges()    
+    G.indexEdges()
     for init in initializations:
-        for m in maxIterations:
-            for s in sortPaths:
-                for r in randomness:
-                    if(r):
-                        for p in plateauSize:
-                            print("executeMover(G, " + name + ", " + str(init) + ", " + str(m) + ", " + str(s) + ", " + str(r) + ", " + str(p) + ", b_queue)")
-                            df.loc[i] = executeMover(G, name, init, m, s, r, p, b_queue)
-                            i += 1
-                    else:
-                        print("executeMover(G, " + name + ", " + str(init) + ", " + str(m) + ", " + str(s) + ", " + str(r) + ", " + str(0) + ", b_queue)")
-                        df.loc[i] = executeMover(G, name, init, m, s, r, 0, b_queue)
-                        i+=1
+        for s in sortPaths:
+            for r in randomness:
+                if(r):
+                    for p in plateauSize:
+                        df = executeMover(G, name, init, s, r, p, maxIterations, df)
+                else:
+                    df = executeMover(G, name, init, s, r, 0, maxIterations, df)
     return df
 
 
@@ -96,16 +95,16 @@ if(scenario == 'simple'):
     plateauSize = [0]
     b_queue = True
 if(scenario == 'full'):
-    maxIterations = [0, 5, 100]
+    maxIterations = [0, 5, 10, 100]
     initializations = [0, 1, 2, 3]
     sortPaths = [True, False]
     randomness = [True, False]
     plateauSize = [5]
     b_queue = True
 if(scenario == 'plateauBound'):
-    initializations = [1, 3]
+    initializations = [3]
     maxIterations = [100]
-    sortPaths = [True, False]
+    sortPaths = [True]
     randomness = [True]
     plateauSize = [1, 5, 100]
     b_queue = True
@@ -116,20 +115,20 @@ if(scenario == 'withoutBucketQueue'):
     randomness = [True, False]
     plateauSize = [5]
     b_queue = False
-    
-df = pd.DataFrame(columns  = ['graph', 
+
+df = pd.DataFrame(columns  = ['graph',
                               'n',
-                              'initialization', 
-                              'maxIterations', 
-                              'sortPaths', 
-                              'randomness', 
+                              'initialization',
+                              'maxIterations',
+                              'sortPaths',
+                              'randomness',
                               'plateauSize',
                               'edits',
                               'usedIterations',
                               'actualPlateau',
                               'time'])
-                              
-                              
+
+
 graph_name_simple = graph_name.split('/')[-1].split('.')[0]
 output_path += graph_name_simple + '/'
 
@@ -144,7 +143,3 @@ df['usedIterations'] = df['usedIterations'].apply(np.int64)
 df['actualPlateau'] = df['actualPlateau'].apply(np.int64)
 df['n'] = df['n'].apply(np.int64)
 df.to_csv(output_path + graph_name_simple + '_' + scenario + '_' + str(seed) + '.csv', sep=',', encoding='utf-8')
-
-
-
-

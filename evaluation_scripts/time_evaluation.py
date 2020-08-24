@@ -8,27 +8,30 @@ import argparse
 
 #python3 time_evaluation.py -i 3 -m 100 -s True -r True -p 5 -b True
 
-parser = argparse.ArgumentParser(prog='evaluation.py')
-parser.add_argument('-i', '--init', type=int, choices=[0, 1, 2, 3])
-parser.add_argument('-m', '--maxIterations', type=int)
-parser.add_argument('-s', '--sortPaths', type=bool)
-parser.add_argument('-r', '--randomness', type=bool)
-parser.add_argument('-p', '--plateau', type=int)
-parser.add_argument('-b', '--bucketQueue', type=bool)
-
-args = vars(parser.parse_args())
-init = args['init']
-maxIterations = args['maxIterations']
-sortPaths = args['sortPaths']
-randomness = args['randomness']
-plateau = args['plateau']
-bucketQueue = args['bucketQueue']
+init = 3
+maxIterations = 100
+sortPaths = True
+randomness = True
+plateau = 5
+bucketQueue = False
 
 
-graph_names = ['adjnoun.graph', 'dolphins.graph', 'karate.graph', 'lesmis.graph', 'football.graph', 'terrorist.edgelist', 'grass_web.pairs',
-'jazz.graph', 'polbooks.graph', 'amazon.edgelist', 'facebook100/Caltech36.mat', 'dblp.edgelist', 'youtube.edgelist', 'facebook100/Penn94.mat',
-'lj.edgelist', 'orkut.edgelist', 'cnr-2000.graph', 'in-2004.graph', 'eu-2005.graph', 'uk-2002.graph']
-#graph_names = ['adjnoun.graph', 'dolphins.graph', 'karate.graph', 'lesmis.graph']
+graph_set = 'small_graphs'
+
+
+if graph_set == 'small_graphs':
+    graph_names = ['adjnoun.graph', 'dolphins.graph', 'karate.graph', 'lesmis.graph', 'football.graph', 'terrorist.edgelist', 'grassweb.pairs', 'jazz.graph', 'polbooks.graph']
+if graph_set == 'social_network':
+    graph_names = ['amazon.edgelist', 'facebook100/Caltech36.mat', 'dblp.edgelist', 'youtube.edgelist', 'facebook100/Penn94.mat', 'lj.edgelist', 'orkut.edgelist']
+if graph_set == 'web':
+    graph_names = ['cnr-2000.graph', 'in-2004.graph', 'eu-2005.graph', 'uk-2002.graph']
+if graph_set == 'facebook':
+    graph_names = open('facebooknames.txt').read().splitlines()
+if graph_set == 'generated':
+    graph_names = open('generatednames.txt').read().splitlines()
+if graph_set == 'biological400':
+    graph_names = open('bio400.txt').read().splitlines()
+
 input_path = '../input/'
 df = pd.DataFrame(columns  = ['graph', 'iteration', 'edits', 'time'])
 row = 0
@@ -50,15 +53,19 @@ for graph_name in graph_names:
     edits = mover.getRunningInfo()[b'edits']
     time = mover.getRunningInfo()[b'time']
     for i in range(len(edits)):
-        df.loc[row] = [graph_name, i, edits[i], time[i]]
+        df.loc[row] = [name, i, edits[i], time[i]]
         row += 1
-print(df)
+
 df['iteration'] = df['iteration'].apply(np.int64)
 df['edits'] = df['edits'].apply(np.int64)
 df['time'] = df['time'].apply(np.int64)
 
-output_path = '../output/QTM/'
+output_path = '../output/QTM_3/' + graph_set + '/'
 if not os.path.exists(output_path):
     os.makedirs(output_path)
-file_name = output_path + 'time_' + str(init) + '_' + str(maxIterations) + '_' + str(sortPaths) + '_' + str(randomness) + '_' + str(plateau) + '_' + str(bucketQueue) + '.csv'
+if bucketQueue:
+    file_name = output_path + 'time_bq.csv'
+else:
+    file_name = output_path + 'time_lq.csv'
+
 df.to_csv(file_name, sep=',', encoding='utf-8')

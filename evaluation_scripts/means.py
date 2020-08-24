@@ -13,7 +13,7 @@ parser.add_argument('-p', '--path')
 args = vars(parser.parse_args())
 path = args['path']
 
-parent_path = '/'.join(path.split('/')[:-1]) + '/'
+parent_path = '/'.join(path.split('/')[:-2]) + '/'
 for root, dirs, f in os.walk(path):
     #dirs = dirs[1:]
     result = []
