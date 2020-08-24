@@ -112,7 +112,7 @@ namespace NetworKit {
         
         
         numEdits = countNumberOfEdits();
-        editsBefore = countNumberOfEdits();
+        editsBefore = numEdits;
         
         
         G.forNodes([&](node u) {
