@@ -450,8 +450,7 @@ namespace NetworKit {
             parentData.equalBestParents = traversalData[u].equalBestParents;
             //INFO(u, " better for ", p);
             //INFO("set count to ", parentData.equalBestParents);
-          }
-          if(traversalData[u].scoreMax == parentData.scoreMax){
+          } else if(traversalData[u].scoreMax == parentData.scoreMax){
             if(parentData.scoreMax > 0 || p == none || marker[p]){
               parentData.equalBestParents+=traversalData[u].equalBestParents;
               coin = randomBool(parentData.equalBestParents, traversalData[u].equalBestParents);
