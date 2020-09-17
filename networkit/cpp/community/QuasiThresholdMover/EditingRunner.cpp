@@ -362,7 +362,7 @@ namespace NetworKit {
 
             if (!nodeTouched[c] || traversalData[c].childCloseness == none) {
 
-              if(dynamicForest.depth(c) > maxDepth){
+              if(traversalData[u].childCloseness == 0 || dynamicForest.depth(c) > maxDepth){
                 traversalData[u].childCloseness = none;
               } else {
                 --traversalData[u].childCloseness;

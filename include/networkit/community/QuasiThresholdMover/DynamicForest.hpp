@@ -93,7 +93,7 @@ namespace QuasiThresholdMoving {
 			if(!isLowerEnd(curNode)){
 				return nextNodeInPath(curNode);
 			} 
-			if(paths[path(curNode)].childPaths.size() > 0){
+			if(!paths[path(curNode)].childPaths.empty()){
 				return paths[paths[path(curNode)].childPaths.front()].upperEnd();
 			} 
 			if (curNode == basis) {
@@ -130,7 +130,7 @@ namespace QuasiThresholdMoving {
 				forPathChildrenOf(path(u), [&](pid c) {
 					node child = paths[c].upperEnd();
 					assert(child < path_membership.size());
-					handle(paths[c].upperEnd());
+					handle(child);
 				});
 			}
 		}
@@ -172,8 +172,8 @@ namespace QuasiThresholdMoving {
 		public:
 			SimplePath () : neighborCount(0) , referenceNode(none), parent(none), depth(0), posInParent(0){};
 			count length() const {return pathNodes.size();};
-			node upperEnd() const {return pathNodes.size() == 0 ? none : pathNodes.back();};
-			node lowerEnd() const {return pathNodes.size() == 0 ? none : pathNodes[0];};
+			node upperEnd() const {return pathNodes.empty() ? none : pathNodes.back();};
+			node lowerEnd() const {return pathNodes.empty() ? none : pathNodes[0];};
 			void reset(){
 				neighborCount = 0;
 				referenceNode = none;
