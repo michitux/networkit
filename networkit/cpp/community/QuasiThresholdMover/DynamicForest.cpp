@@ -354,7 +354,7 @@ namespace NetworKit {
 			
 			
 			for(node u = 0; u < path_membership.size(); u++){
-				const std::vector<node>& childNodes = children(u);
+				const std::vector<node> childNodes = children(u);
 				assert(childNodes.size() == childCount(u));
 				//check that parent/child realtionships for nodes are proper
 				for(index i = 0; i < childCount(u); i++){
