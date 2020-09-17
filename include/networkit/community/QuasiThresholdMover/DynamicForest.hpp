@@ -32,6 +32,29 @@ namespace QuasiThresholdMoving {
 				return previousNodeInPath(u);
 			}
 		};
+
+		/**
+		 * Call the given callback for all ancestors of u excluding the virtual root.
+		 *
+		 * @param u        The node for whose ancestors @a callback shall be called.
+		 * @param callback The callback to call
+		 */
+		template <typename F>
+		void forAncestors(node u, F callback) const {
+			assert(u != none);
+			pid cp = path(u);
+			index pp = path_pos[u] + 1;
+			while (cp != none) {
+				const auto& pn = paths[cp].pathNodes;
+				for (auto it = pn.begin() + pp; it != pn.end(); ++it) {
+					callback(*it);
+				}
+
+				cp = paths[cp].parent;
+				pp = 0;
+			}
+		}
+
 		count depth(node u) const {
 			if(u ==  none){
 				return none;

@@ -90,6 +90,16 @@ TEST_F(DynamicForestGTest, testPathStructures) {
 		}
 	});
 	QuasiThresholdMoving::DynamicForest dynForest(forest);
+
+	for (node u : karate.nodeRange()) {
+		node p = u;
+		dynForest.forAncestors(u, [&](node a) {
+			EXPECT_EQ(dynForest.parent(p), a);
+			p = a;
+		});
+		EXPECT_EQ(dynForest.parent(p), none);
+	}
+
 	forest.forNodesInRandomOrder ([&](node nodeToMove){
 		TRACE("==================nodeToMove: ", nodeToMove,"=============================");
 		

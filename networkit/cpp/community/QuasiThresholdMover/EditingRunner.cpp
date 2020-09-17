@@ -202,9 +202,9 @@ namespace NetworKit {
               curEdits += 1 - 2 * marker[c];
             }
           }, [](node){});
-          for (node p = dynamicForest.parent(nodeToMove); p != none; p = dynamicForest.parent(p)) {
-            curEdits += 1 - 2 * marker[p];
-          }
+            dynamicForest.forAncestors(nodeToMove, [&](node p) {
+                                        curEdits += 1 - 2 * marker[p];
+                                        });
         }
         dynamicForest.isolate(nodeToMove);
         if(useBucketQueue){
