@@ -1130,9 +1130,12 @@ TEST_F(CommunityGTest, testQuasiThresholdDeletedNodes) {
 }
 
 TEST_F(CommunityGTest, benchQuasiThresholdMover) {
-  Graph G = SNAPGraphReader(false, true).read("input/amazon.edgelist");
-  G.indexEdges();
-  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::ASC_DEGREE_INSERT, 100, true, false);
+  std::string graphPath;
+  std::cout << "[INPUT] METIS graph file path >" << std::endl;
+  std::getline(std::cin, graphPath);
+  Aux::Random::setSeed(42, true);
+  Graph G = METISGraphReader().read(graphPath);
+  QuasiThresholdMoving::QuasiThresholdEditingLocalMover mover(G, QuasiThresholdMoving::QuasiThresholdEditingLocalMover::ASC_DEGREE_INSERT, 1, true, false);
   mover.run();  
 }
 } /* namespace NetworKit */
