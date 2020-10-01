@@ -24,7 +24,7 @@ namespace NetworKit {
 			rootEqualBestParents(0) {}
 			
 			void QuasiThresholdEditingLocalMover::run() {
-				EditingRunner runner = EditingRunner(G, initialization, maxIterations, sortPaths, randomness, maxPlateauSize, useBucketQueue, order);
+				EditingRunner runner(G, initialization, maxIterations, sortPaths, randomness, maxPlateauSize, useBucketQueue, order);
 				runner.runLocalMover();
 				usedIterations =  runner.getUsedIterations();
 				numEdits = runner.getNumberOfEdits();
