@@ -43,6 +43,19 @@ namespace NetworKit {
         runningInfo["time"] = std::vector<count>();
         runningInfo["edits"] = std::vector<count>();
 
+        if (Aux::PerfEventCountHardware::is_available) {
+            event_counters.emplace_back("cache_misses", Aux::PerfEventCountHardware::CACHE_MISSES);
+            event_counters.emplace_back("cache_references",
+                                        Aux::PerfEventCountHardware::CACHE_REFERENCES);
+            event_counters.emplace_back("cycles", Aux::PerfEventCountHardware::CPU_CYCLES);
+            event_counters.emplace_back("instructions", Aux::PerfEventCountHardware::INSTRUCTIONS);
+        }
+
+        for (const auto &ec : event_counters) {
+            runningInfo[ec.first] = std::vector<count>();
+        }
+
+        for (auto &ec : event_counters) { ec.second.enable(); }
 
         timer.start();
         switch(initialization){
@@ -119,6 +132,15 @@ namespace NetworKit {
         });
 
         timer.stop();
+
+        for (auto &ec : event_counters) {
+            ec.second.disable();
+        }
+
+        for (auto &ec : event_counters) {
+            runningInfo[ec.first].push_back(ec.second.readValue());
+        }
+
         runningInfo["time"].push_back(timer.elapsedMilliseconds());
 
 
@@ -134,6 +156,12 @@ namespace NetworKit {
           handler.assureRunning();
           hasMoved = false;
           timer.start();
+
+          for (auto &ec : event_counters) {
+              ec.second.reset();
+              ec.second.enable();
+          }
+
           if(insertRun){
             for(index j = 0; j < G.numberOfNodes(); j++){
               node nodeToMove = order[j];
@@ -149,10 +177,20 @@ namespace NetworKit {
 
 
           timer.stop();
+          for (auto &ec : event_counters) {
+                ec.second.disable();
+          }
+
           if(i == 0){
             runningInfo["time"][0] += timer.elapsedMilliseconds();
+            for (auto &ec : event_counters) {
+                runningInfo[ec.first][0] += ec.second.readValue();
+            }
           } else {
             runningInfo["time"].push_back(timer.elapsedMilliseconds());
+            for (auto &ec : event_counters) {
+                runningInfo[ec.first].push_back(ec.second.readValue());
+            }
           }
           runningInfo["edits"].push_back(numEdits);
           usedIterations = i;

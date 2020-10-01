@@ -1,6 +1,7 @@
 #ifndef EDITINGRUNNER_H
 #define EDITINGRUNNER_H
 
+#include <networkit/auxiliary/PerfEventCountHardware.hpp>
 #include <networkit/graph/Graph.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
 #include <networkit/auxiliary/Timer.hpp>
@@ -123,6 +124,7 @@ namespace NetworKit {
         std::uniform_int_distribution<count> dist;
         
         Aux::Timer timer;
+        std::vector<std::pair<std::string, Aux::PerfEventCountHardware>> event_counters;
         std::map<std::string, std::vector<count>> runningInfo;
         
         void localMove(node nodeToMove);
