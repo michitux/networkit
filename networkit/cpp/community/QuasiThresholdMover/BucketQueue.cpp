@@ -8,7 +8,7 @@ namespace NetworKit {
 
 namespace QuasiThresholdMoving {
 BucketQueue::BucketQueue(count n)
-    : n(n), nodes(n), border(n), nextNode(none), currentBucket(none) {}
+    : nextNode(none), currentBucket(none), n(n), nodes(n), border(n) {}
 
 void BucketQueue::fill(const std::vector<node> &elements, const DynamicForest &dynamicForest) {
     count maxDepth = std::min(n - 1, 2 * elements.size());

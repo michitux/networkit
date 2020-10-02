@@ -116,7 +116,7 @@ TEST_F(DynamicForestGTest, testPathStructures) {
 			if(nodeToMove != parent){
 				TRACE("==================parent: ", parent,"=============================");
 				std::vector<node> children = dynForest.children(parent);
-				for(int i = 0; i < children.size(); i++){
+				for(index i = 0; i < children.size(); i++){
 					if(children[i] == nodeToMove){
 						children.erase(children.begin()+i);
 						break;

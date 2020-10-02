@@ -161,7 +161,7 @@ private:
     class SimplePath {
     public:
         SimplePath()
-            : neighborCount(0), referenceNode(none), parent(none), depth(0), posInParent(0){};
+            : parent(none), posInParent(0), neighborCount(0), referenceNode(none), depth(0){};
         count length() const { return pathNodes.size(); };
         node upperEnd() const { return pathNodes.empty() ? none : pathNodes.back(); };
         node lowerEnd() const { return pathNodes.empty() ? none : pathNodes[0]; };

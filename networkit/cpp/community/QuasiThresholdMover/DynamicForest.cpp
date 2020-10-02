@@ -12,8 +12,8 @@ DynamicForest::DynamicForest() {}
 
 // deprecated
 DynamicForest::DynamicForest(const Graph &G, const std::vector<node> &parents)
-    : path_membership(G.upperNodeIdBound(), none), path_pos(G.upperNodeIdBound(), 0), freeList(),
-      paths(G.upperNodeIdBound(), SimplePath()) {
+    : paths(G.upperNodeIdBound(), SimplePath()), freeList(),
+      path_membership(G.upperNodeIdBound(), none), path_pos(G.upperNodeIdBound(), 0) {
     Graph forest;
     if (parents.size() == G.upperNodeIdBound()) {
         forest = Graph(GraphTools::copyNodes(G), false, true);
@@ -60,8 +60,8 @@ DynamicForest::DynamicForest(const Graph &G, const std::vector<node> &parents)
 }
 
 DynamicForest::DynamicForest(const std::vector<node> &parents)
-    : path_membership(parents.size(), none), path_pos(parents.size(), 0), freeList(),
-      paths(parents.size(), SimplePath()) {
+    : paths(parents.size(), SimplePath()), freeList(), path_membership(parents.size(), none),
+      path_pos(parents.size(), 0) {
     // at first every node is in its own path
     std::iota(path_membership.begin(), path_membership.end(), 0);
     // build up parent/child relations
@@ -113,7 +113,6 @@ void DynamicForest::updateDepthInSubtree(pid start) {
 }
 
 void DynamicForest::isolate(node u) {
-    node oldParent = parent(u);
     if (paths[path(u)].length() == 1) {
         isolatePath(path(u));
     } else {
@@ -205,7 +204,7 @@ void DynamicForest::splitPath(pid sp, index splitPos) {
 
     pid np = newPath();
     // move upper nodes to new path
-    for (int i = splitPos; i < paths[sp].length(); i++) {
+    for (index i = splitPos; i < paths[sp].length(); i++) {
         addToPath(paths[sp].pathNodes[i], np);
     }
     paths[sp].pathNodes.erase(paths[sp].pathNodes.begin() + splitPos, paths[sp].pathNodes.end());

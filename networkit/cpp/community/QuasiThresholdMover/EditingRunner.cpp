@@ -223,16 +223,12 @@ void EditingRunner::localMove(node nodeToMove) {
         std::stable_sort(neighborQueue.begin(), neighborQueue.end(), [&](node u, node v) {
             return dynamicForest.depth(u) < dynamicForest.depth(v);
         });
-        count level = 0;
-        if (!neighborQueue.empty()) {
-            level = dynamicForest.depth(neighborQueue.back());
-        }
     }
 
     bestChildren.clear();
     rootData.reset();
     // all neighbors to deep
-    if (useBucketQueue && bucketQueue.empty() || !useBucketQueue && neighborQueue.empty()) {
+    if ((useBucketQueue && bucketQueue.empty()) || (!useBucketQueue && neighborQueue.empty())) {
         rootData.bestParentBelow = none;
         bestEdits = neighbors.size();
         TRACE("Isolate");

@@ -9,7 +9,7 @@ QuasiThresholdEditingLocalMover::QuasiThresholdEditingLocalMover(
     bool randomness, count maxPlateauSize, bool useBucketQueue)
     : G(G), initialization(initialization), maxIterations(maxIterations), sortPaths(sortPaths),
       randomness(randomness), maxPlateauSize(maxPlateauSize), useBucketQueue(useBucketQueue),
-      numEdits(0), usedIterations(0), rootEqualBestParents(0) {}
+      usedIterations(0), numEdits(0), rootEqualBestParents(0) {}
 
 void QuasiThresholdEditingLocalMover::run() {
     EditingRunner runner(G, initialization, maxIterations, sortPaths, randomness, maxPlateauSize,
