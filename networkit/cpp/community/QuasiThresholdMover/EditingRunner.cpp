@@ -119,6 +119,7 @@ void EditingRunner::runLocalMover() {
     if (!insertRun) {
         runningInfo["edits"].push_back(numEdits);
     }
+    count generation = 0;
     for (count i = insertRun ? 0 : 1; hasMoved && i <= maxIterations; ++i) {
         if (!hasMoved || (randomness && (currentPlateau >= maxPlateauSize)))
             break;
@@ -134,12 +135,12 @@ void EditingRunner::runLocalMover() {
         if (insertRun) {
             for (index j = 0; j < G.numberOfNodes(); j++) {
                 node nodeToMove = order[j];
-                localMove(nodeToMove);
+                localMove(nodeToMove, generation++);
                 existing[nodeToMove] = 1;
             }
             insertRun = 0;
         } else {
-            G.forNodesInRandomOrder([&](node nodeToMove) { localMove(nodeToMove); });
+            G.forNodesInRandomOrder([&](node nodeToMove) { localMove(nodeToMove, generation++); });
         }
 
         timer.stop();
@@ -181,7 +182,7 @@ Graph EditingRunner::getQuasiThresholdGraph() const {
     return gen.getGraph();
 }
 
-void EditingRunner::localMove(node nodeToMove) {
+void EditingRunner::localMove(node nodeToMove, count generation) {
     assert(numEdits == countNumberOfEdits());
     TRACE("Move node ", nodeToMove);
     handler.assureRunning();
@@ -226,7 +227,7 @@ void EditingRunner::localMove(node nodeToMove) {
     }
 
     bestChildren.clear();
-    rootData.reset();
+    rootData.initialize(generation);
     // all neighbors to deep
     if ((useBucketQueue && bucketQueue.empty()) || (!useBucketQueue && neighborQueue.empty())) {
         rootData.bestParentBelow = none;
@@ -236,7 +237,7 @@ void EditingRunner::localMove(node nodeToMove) {
         if (useBucketQueue) {
             while (!bucketQueue.empty()) {
                 node u = bucketQueue.next();
-                processNode(u, nodeToMove);
+                processNode(u, nodeToMove, generation);
             }
         } else {
             while (!currentLevel.empty() || !neighborQueue.empty()) {
@@ -245,7 +246,7 @@ void EditingRunner::localMove(node nodeToMove) {
                 }
                 for (node u : currentLevel) {
                     assert(dynamicForest.depth(u) == level);
-                    processNode(u, nodeToMove);
+                    processNode(u, nodeToMove, generation);
                 }
                 while (!neighborQueue.empty()
                        && dynamicForest.depth(neighborQueue.back()) == level) {
@@ -255,7 +256,7 @@ void EditingRunner::localMove(node nodeToMove) {
                     if (nodeTouched[u])
                         continue; // if the node was touched in the previous level, it was in
                                   // currentLevel and thus has already been processed
-                    processNode(u, nodeToMove);
+                    processNode(u, nodeToMove, generation);
                 }
                 --level;
                 currentLevel.clear();
@@ -297,7 +298,7 @@ void EditingRunner::localMove(node nodeToMove) {
     }
 
 #ifndef NDEBUG
-    compareWithQuadratic(nodeToMove);
+    compareWithQuadratic(nodeToMove, generation);
 #endif
 
     // calculate the number of saved edits as comparing the absolute number of edits doesn't make
@@ -308,7 +309,6 @@ void EditingRunner::localMove(node nodeToMove) {
     for (node u : touchedNodes) {
         lastVisitedDFSNode[u] = u;
         nodeTouched[u] = false;
-        traversalData[u].reset();
     }
 
     neighbors.clear();
@@ -332,7 +332,7 @@ void EditingRunner::localMove(node nodeToMove) {
     }
 }
 
-void EditingRunner::processNode(node u, node nodeToMove) {
+void EditingRunner::processNode(node u, node nodeToMove, count generation) {
     TRACE("Process ", u);
     TRACE("Processing node ", u, " of depth ", dynamicForest.depth(u),
           " (node to move: ", nodeToMove, ")");
@@ -347,6 +347,8 @@ void EditingRunner::processNode(node u, node nodeToMove) {
         assert(
             marker[u]); // only marked neighbors may be processed without having been touched before
     }
+
+    traversalData[u].initialize(generation);
 
     count sumPositiveEdits = traversalData[u].childCloseness;
     assert(traversalData[u].childCloseness != none);
@@ -436,6 +438,9 @@ void EditingRunner::processNode(node u, node nodeToMove) {
     } else {
         parentData = traversalData[p];
     }
+
+    parentData.initialize(generation);
+
     if ((traversalData[u].scoreMax > 0
          || (traversalData[u].childCloseness != none && traversalData[u].childCloseness > 0))
         && p != none) {
@@ -485,7 +490,7 @@ void EditingRunner::processNode(node u, node nodeToMove) {
     assert(!dynamicForest.children(u).empty() || traversalData[u].childCloseness == 1);
 }
 
-void EditingRunner::compareWithQuadratic(node nodeToMove) const {
+void EditingRunner::compareWithQuadratic(node nodeToMove, count generation) const {
     std::vector<count> missingBelow, missingAbove, existingBelow, existingAbove;
     missingBelow.resize(G.upperNodeIdBound(), 0);
     missingAbove.resize(G.upperNodeIdBound(), 0);
@@ -551,7 +556,8 @@ void EditingRunner::compareWithQuadratic(node nodeToMove) const {
         if (u == nodeToMove || usingDeepNeighbors[u] || !existing[u])
             return;
         if (existingBelow[u] >= missingBelow[u]
-            || (traversalData[u].childCloseness > 0 && traversalData[u].childCloseness != none)) {
+            || (traversalData[u].generation == generation && traversalData[u].childCloseness > 0
+                && traversalData[u].childCloseness != none)) {
             assert(traversalData[u].childCloseness == existingBelow[u] - missingBelow[u]);
         } else if (nodeTouched[u]) {
             assert(traversalData[u].childCloseness == none);

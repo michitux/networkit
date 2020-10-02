@@ -34,19 +34,24 @@ public:
 
 private:
     struct TraversalData {
+        count generation;
         count scoreMax;
         count childCloseness;
         count equalBestParents;
         node bestParentBelow;
 
         TraversalData()
-            : scoreMax(0), childCloseness(0), equalBestParents(0), bestParentBelow(none){};
+            : generation(none), scoreMax(0), childCloseness(0), equalBestParents(0),
+              bestParentBelow(none){};
 
-        void reset() {
-            scoreMax = 0;
-            childCloseness = 0;
-            equalBestParents = 0;
-            bestParentBelow = none;
+        void initialize(count currentGeneration) {
+            if (currentGeneration != generation) {
+                generation = currentGeneration;
+                scoreMax = 0;
+                childCloseness = 0;
+                equalBestParents = 0;
+                bestParentBelow = none;
+            }
         };
 
         std::string toString() {
@@ -115,9 +120,9 @@ private:
     std::vector<std::pair<std::string, Aux::PerfEventCountHardware>> event_counters;
     std::map<std::string, std::vector<count>> runningInfo;
 
-    void localMove(node nodeToMove);
-    void processNode(node u, node nodeToMove);
-    void compareWithQuadratic(node nodeToMove) const;
+    void localMove(node nodeToMove, count generation);
+    void processNode(node u, node nodeToMove, count generation);
+    void compareWithQuadratic(node nodeToMove, count generation) const;
     count countNumberOfEdits() const;
     count editsIncidentTo(node u) const;
 
