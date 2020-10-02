@@ -14,14 +14,14 @@ EditingRunner::EditingRunner(const Graph &G,
                              count maxIterations, bool sortPaths, bool randomness,
                              count maxPlateauSize, bool useBucketQueue, std::vector<node> order)
     : G(G), maxIterations(maxIterations), usedIterations(0), sortPaths(sortPaths),
-      randomness(randomness), maxPlateauSize(maxPlateauSize), useBucketQueue(useBucketQueue),
-      handler(), hasMoved(true),
+      randomness(randomness), maxPlateauSize(maxPlateauSize),
       insertRun(initialization != QuasiThresholdEditingLocalMover::TRIVIAL
                 && initialization != QuasiThresholdEditingLocalMover::EDITING),
-      rootData(), rootEqualBestParentsCpy(0), currentPlateau(0), actualMaximumPlateau(0),
-      traversalData(G.upperNodeIdBound()), nodeTouched(G.upperNodeIdBound(), false),
-      existing(G.upperNodeIdBound(), !insertRun), marker(G.upperNodeIdBound(), false),
-      lastVisitedDFSNode(G.upperNodeIdBound(), none), dist(), gen(Aux::Random::getURNG()) {
+      useBucketQueue(useBucketQueue), handler(), hasMoved(true),
+      marker(G.upperNodeIdBound(), false), lastVisitedDFSNode(G.upperNodeIdBound(), none),
+      traversalData(G.upperNodeIdBound()), nodeTouched(G.upperNodeIdBound(), false), rootData(),
+      existing(G.upperNodeIdBound(), !insertRun), rootEqualBestParentsCpy(0), currentPlateau(0),
+      actualMaximumPlateau(0), gen(Aux::Random::getURNG()), dist() {
 
     runningInfo["time"] = std::vector<count>();
     runningInfo["edits"] = std::vector<count>();
@@ -674,7 +674,7 @@ count EditingRunner::editsIncidentTo(node u) const {
                 if (!G.hasEdge(w, u))
                     edits++;
             },
-            [&](node w) {});
+            [&](node) {});
     });
 
     G.forNeighborsOf(u, [&](node w) {
