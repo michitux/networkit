@@ -1,6 +1,7 @@
 /*
  *
  */
+#include <tlx/unused.hpp>
 #include <networkit/community/QuasiThresholdEditingLocalMover.hpp>
 #include <networkit/community/QuasiThresholdMover/EditingRunner.hpp>
 #include <networkit/community/QuasiThresholdMover/QuasiThresholdEditingLinear.hpp>
@@ -338,6 +339,7 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
           " (node to move: ", nodeToMove, ")");
     TRACE("Parent: ", dynamicForest.parent(u), ", children: ", dynamicForest.children(u));
     assert(u != nodeToMove);
+    tlx::unused(nodeToMove);
     if (useBucketQueue) {
         assert(dynamicForest.depth(u) <= maxDepth);
     }

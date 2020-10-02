@@ -328,6 +328,7 @@ void DynamicForest::moveToPosition(node u, node p, const std::vector<node> &adop
 }
 
 bool DynamicForest::pathsValid() {
+  #ifndef NDEBUG
     // check that parent/child relations for paths are valid
     for (pid sp = 0; sp < paths.size(); sp++) {
         if (paths[sp].pathNodes.size() > 0) {
@@ -417,6 +418,7 @@ bool DynamicForest::pathsValid() {
         assert(paths[freePlace].depth == 0);
         assert(paths[freePlace].posInParent == 0);
     }
+    #endif
     return 1;
 }
 
