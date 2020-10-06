@@ -1,6 +1,7 @@
 #ifndef EDITINGRUNNER_H
 #define EDITINGRUNNER_H
 
+#include <limits>
 #include <map>
 #include <networkit/auxiliary/PerfEventCountHardware.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
@@ -37,29 +38,57 @@ private:
         count generation;
         count scoreMax;
         count childCloseness;
-        count equalBestParents;
         node bestParentBelow;
+        /**
+         * Logarithm of the number of equally good choices for this node.
+         * The logarithm is used as the number of choices can be exponential in the number of nodes.
+         * Therefore, the logarithm is guaranteed to be linear in the number of nodes.
+         */
+        double logEqualBestChoices;
+        node numIndifferentChildren;
 
         TraversalData()
-            : generation(none), scoreMax(0), childCloseness(0), equalBestParents(0),
-              bestParentBelow(none){};
+            : generation(none), scoreMax(0), childCloseness(0), bestParentBelow(none),
+              logEqualBestChoices(-std::numeric_limits<double>::infinity()), numIndifferentChildren(0){};
 
         void initialize(count currentGeneration) {
             if (currentGeneration != generation) {
                 generation = currentGeneration;
                 scoreMax = 0;
                 childCloseness = 0;
-                equalBestParents = 0;
                 bestParentBelow = none;
+                logEqualBestChoices = -std::numeric_limits<double>::infinity();
+                numIndifferentChildren = 0;
             }
         };
+
+        bool hasChoices() {
+            return logEqualBestChoices > -std::numeric_limits<double>::infinity();
+        }
+
+        void addEqualChoices(count choices) {
+            addLogChoices(std::log(choices));
+        }
+
+        void addLogChoices(double logChoices) {
+            /* This uses the technique explained on
+            https://en.wikipedia.org/w/index.php?title=Log_probability&oldid=954092640#Addition_in_log_space
+            to avoid issues when std::exp(logEqualBestChoices) cannot
+            be represented as a double anymore. */
+            if (logChoices > logEqualBestChoices) {
+                logEqualBestChoices =
+                    logChoices + std::log1p(std::exp(logEqualBestChoices - logChoices));
+            } else {
+                logEqualBestChoices += std::log1p(std::exp(logChoices - logEqualBestChoices));
+            }
+        }
 
         std::string toString() {
             std::stringstream ss;
             ss << "\n";
             ss << "scoreMax: " << scoreMax << "\n";
             ss << "childCloseness: " << childCloseness << "\n";
-            ss << "equalBestParents: " << equalBestParents << "\n";
+            ss << "logEqualBestChoices: " << logEqualBestChoices << "\n";
             ss << "bestParentBelow: " << bestParentBelow << "\n";
             return ss.str();
         };
@@ -114,7 +143,8 @@ private:
     count maxDepth;
 
     std::mt19937_64 &gen;
-    std::uniform_int_distribution<count> dist;
+    std::uniform_real_distribution<double> realDist;
+    std::uniform_int_distribution<count> intDist;
 
     Aux::Timer timer;
     std::vector<std::pair<std::string, Aux::PerfEventCountHardware>> event_counters;
@@ -126,10 +156,17 @@ private:
     count countNumberOfEdits() const;
     count editsIncidentTo(node u) const;
 
+    bool logRandomBool(double logProbability) {
+        assert(logProbability <= 0);
+        double x = realDist(gen);
+        if (x == 0) return logProbability > - std::numeric_limits<double>::infinity();
+        return std::log(x) < logProbability;
+    }
+
     bool randomBool(count options, count optionsToConsider = 1) {
         assert(options > 0);
         assert(options >= optionsToConsider);
-        count x = dist(gen, std::uniform_int_distribution<count>::param_type(0, options - 1));
+        count x = intDist(gen, std::uniform_int_distribution<count>::param_type(0, options - 1));
         return x < optionsToConsider;
     };
 };

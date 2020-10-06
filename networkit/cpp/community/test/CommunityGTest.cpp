@@ -920,6 +920,14 @@ TEST_F(CommunityGTest, testRandomness) {
      o - x - o
      |
      x
+
+     6 possibilities to choose neighbor as parent without children
+     2 possibilities to choose neighbor as parent with child adopted
+     3 possibilities to choose inner non-parent as parent with main branch adopted
+     3 possibilities to adopt side branch when choosing non-neighbor as parent to adopt the branch adopted
+     1 possibility to become root without adopting anything
+     1 possibility to become root and adopt main branch
+     = 16 equally good possibilities
      
      considering last insert with vm = 12
      o = non-vm-neighbor, x = vm-neighbor 
@@ -990,7 +998,7 @@ TEST_F(CommunityGTest, testRandomness) {
     } 
   });
   INFO(mover.getRootEqualBestParents());
-  assert(mover.getRootEqualBestParents() == 10);
+  assert(mover.getRootEqualBestParents() == 16);
 }
 
 

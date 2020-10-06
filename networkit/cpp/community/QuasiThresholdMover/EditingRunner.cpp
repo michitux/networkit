@@ -22,7 +22,7 @@ EditingRunner::EditingRunner(const Graph &G,
       marker(G.upperNodeIdBound(), false), lastVisitedDFSNode(G.upperNodeIdBound(), none),
       traversalData(G.upperNodeIdBound()), nodeTouched(G.upperNodeIdBound(), false), rootData(),
       existing(G.upperNodeIdBound(), !insertRun), rootEqualBestParentsCpy(0), currentPlateau(0),
-      actualMaximumPlateau(0), gen(Aux::Random::getURNG()), dist() {
+      actualMaximumPlateau(0), gen(Aux::Random::getURNG()), realDist(), intDist(0, 1) {
 
     runningInfo["time"] = std::vector<count>();
     runningInfo["edits"] = std::vector<count>();
@@ -272,15 +272,16 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
             }
         } else {
             bool coin = false;
-            if (rootData.childCloseness > rootData.scoreMax || rootData.equalBestParents == 0) {
+            double ownWeight = rootData.numIndifferentChildren * std::log(2);
+            if (rootData.childCloseness > rootData.scoreMax || !rootData.hasChoices()) {
                 // INFO("root better");
                 rootData.scoreMax = rootData.childCloseness;
-                rootData.equalBestParents = 1;
+                rootData.logEqualBestChoices = ownWeight;
                 coin = true;
             } else if (rootData.childCloseness == rootData.scoreMax) {
                 // INFO("root equally good");
-                rootData.equalBestParents += 1;
-                coin = randomBool(rootData.equalBestParents);
+                rootData.addLogChoices(ownWeight);
+                coin = logRandomBool(ownWeight - rootData.logEqualBestChoices);
             }
             if (coin) {
                 rootData.bestParentBelow = none;
@@ -312,9 +313,15 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
         nodeTouched[u] = false;
     }
 
+    assert(!randomness || savedEdits == 0 || rootData.hasChoices());
+
     neighbors.clear();
     touchedNodes.clear();
-    rootEqualBestParentsCpy = rootData.equalBestParents;
+    if (rootData.logEqualBestChoices < std::log(std::numeric_limits<long long>::max())) {
+        rootEqualBestParentsCpy = std::llround(std::exp(rootData.logEqualBestChoices));
+    } else {
+        rootEqualBestParentsCpy = std::numeric_limits<count>::max();
+    }
 
     G.forEdgesOf(nodeToMove, [&](node v) { marker[v] = false; });
 
@@ -409,15 +416,16 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
         }
     } else {
         bool coin = false;
+        double ownWeight = traversalData[u].numIndifferentChildren * std::log(2);
         if (sumPositiveEdits > traversalData[u].scoreMax
-            || traversalData[u].equalBestParents == 0) {
+            || !traversalData[u].hasChoices()) {
             // INFO(u, " is better count = 1");
             traversalData[u].scoreMax = sumPositiveEdits;
-            traversalData[u].equalBestParents = 1;
+            traversalData[u].logEqualBestChoices = ownWeight;
             coin = true;
         } else if (sumPositiveEdits == traversalData[u].scoreMax) {
-            traversalData[u].equalBestParents += 1;
-            coin = randomBool(traversalData[u].equalBestParents);
+            traversalData[u].addLogChoices(ownWeight);
+            coin = logRandomBool(ownWeight - traversalData[u].logEqualBestChoices);
             // INFO(u, " equally good count = ", traversalData[u].equalBestParents);
         }
         if (coin) {
@@ -434,12 +442,7 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
     }
     TRACE("Maximum gain at ", u, ": ", traversalData[u].scoreMax);
     node p = dynamicForest.parent(u);
-    TraversalData parentData;
-    if (p == none) {
-        parentData = rootData;
-    } else {
-        parentData = traversalData[p];
-    }
+    TraversalData &parentData = (p == none) ? rootData : traversalData[p];
 
     parentData.initialize(generation);
 
@@ -459,34 +462,29 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
             }
         }
     }
-    bool coin = 0;
-    if (randomness) {
-        if (traversalData[u].scoreMax > parentData.scoreMax) {
-            parentData.equalBestParents = traversalData[u].equalBestParents;
-            // INFO(u, " better for ", p);
-            // INFO("set count to ", parentData.equalBestParents);
-        } else if (traversalData[u].scoreMax == parentData.scoreMax) {
-            if (parentData.scoreMax > 0 || p == none || marker[p]) {
-                parentData.equalBestParents += traversalData[u].equalBestParents;
-                coin = randomBool(parentData.equalBestParents, traversalData[u].equalBestParents);
-                // INFO(u, " equally good for ", p);
-                // INFO("increase count by ", traversalData[u].equalBestParents, " to ",
-                // parentData.equalBestParents);
-            }
-        }
-    }
-    if (traversalData[u].scoreMax > parentData.scoreMax || coin) {
+
+    if (traversalData[u].scoreMax > parentData.scoreMax) {
+        parentData.logEqualBestChoices = traversalData[u].logEqualBestChoices;
         parentData.scoreMax = traversalData[u].scoreMax;
         parentData.bestParentBelow = traversalData[u].bestParentBelow;
+        // INFO(u, " better for ", p);
+        // INFO("set count to ", parentData.equalBestParents);
+    } else if (randomness && traversalData[u].scoreMax == parentData.scoreMax) {
+        parentData.addLogChoices(traversalData[u].logEqualBestChoices);
+        if (logRandomBool(traversalData[u].logEqualBestChoices - parentData.logEqualBestChoices)) {
+            parentData.bestParentBelow = traversalData[u].bestParentBelow;
+        }
+        // INFO(u, " equally good for ", p);
+        // INFO("increase count by ", traversalData[u].equalBestParents, " to ",
+        // parentData.equalBestParents);
     }
+
     if (traversalData[u].childCloseness != none) {
         assert(traversalData[u].childCloseness <= traversalData[u].scoreMax);
         parentData.childCloseness += traversalData[u].childCloseness;
-    }
-    if (p == none) {
-        rootData = parentData;
-    } else {
-        traversalData[p] = parentData;
+        if (randomness && traversalData[u].childCloseness == 0) {
+            ++parentData.numIndifferentChildren;
+        }
     }
 
     assert(!dynamicForest.children(u).empty() || traversalData[u].childCloseness == 1);
