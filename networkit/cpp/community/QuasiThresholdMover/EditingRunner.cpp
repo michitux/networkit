@@ -291,10 +291,8 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
 
         for (node u : touchedNodes) {
             if (u != nodeToMove && dynamicForest.parent(u) == rootData.bestParentBelow
-                && traversalData[u].childCloseness != none) {
-                if (traversalData[u].childCloseness > 0 || (randomness && randomBool(2))) {
-                    bestChildren.push_back(u);
-                }
+                && (traversalData[u].childCloseness > 0 || (randomness && traversalData[u].childCloseness == 0 && randomBool(2)))) {
+                bestChildren.push_back(u);
             }
         }
     }
@@ -359,8 +357,8 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
 
     traversalData[u].initialize(generation);
 
-    count sumPositiveEdits = traversalData[u].childCloseness;
-    assert(traversalData[u].childCloseness != none);
+    int64_t sumPositiveEdits = traversalData[u].childCloseness;
+    assert(traversalData[u].childCloseness >= 0);
 
     traversalData[u].childCloseness += marker[u];
     traversalData[u].childCloseness -=
@@ -371,17 +369,17 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
 
     assert(!marker[u] || traversalData[u].childCloseness > 0);
 
-    if (traversalData[u].childCloseness != none) {
+    if (traversalData[u].childCloseness >= 0) {
         assert(lastVisitedDFSNode[u] == u);
 
         node c = dynamicForest.nextDFSNodeOnEnter(u, u);
 
         while (c != u) {
 
-            if (!nodeTouched[c] || traversalData[c].childCloseness == none) {
+            if (!nodeTouched[c] || traversalData[c].childCloseness < 0) {
 
                 if (traversalData[u].childCloseness == 0 || dynamicForest.depth(c) > maxDepth) {
-                    traversalData[u].childCloseness = none;
+                    traversalData[u].childCloseness = -1;
                 } else {
                     --traversalData[u].childCloseness;
                 }
@@ -389,7 +387,7 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
                 // advance to the next starting point for the DFS search.
                 c = lastVisitedDFSNode[c];
 
-                if (traversalData[u].childCloseness == none) {
+                if (traversalData[u].childCloseness < 0) {
                     lastVisitedDFSNode[u] = c;
                     break;
                 }
@@ -433,7 +431,7 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
         }
     }
 
-    assert(traversalData[u].scoreMax != none);
+    assert(traversalData[u].scoreMax >= 0);
 
     traversalData[u].scoreMax += marker[u];
 
@@ -446,9 +444,7 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
 
     parentData.initialize(generation);
 
-    if ((traversalData[u].scoreMax > 0
-         || (traversalData[u].childCloseness != none && traversalData[u].childCloseness > 0))
-        && p != none) {
+    if ((traversalData[u].scoreMax > 0 || traversalData[u].childCloseness > 0) && p != none) {
         if (useBucketQueue) {
             assert(dynamicForest.depth(p) <= maxDepth);
         }
@@ -479,7 +475,7 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
         // parentData.equalBestParents);
     }
 
-    if (traversalData[u].childCloseness != none) {
+    if (traversalData[u].childCloseness >= 0) {
         assert(traversalData[u].childCloseness <= traversalData[u].scoreMax);
         parentData.childCloseness += traversalData[u].childCloseness;
         if (randomness && traversalData[u].childCloseness == 0) {
@@ -491,7 +487,7 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
 }
 
 void EditingRunner::compareWithQuadratic(node nodeToMove, count generation) const {
-    std::vector<count> missingBelow, missingAbove, existingBelow, existingAbove;
+    std::vector<int64_t> missingBelow, missingAbove, existingBelow, existingAbove;
     missingBelow.resize(G.upperNodeIdBound(), 0);
     missingAbove.resize(G.upperNodeIdBound(), 0);
     existingBelow.resize(G.upperNodeIdBound(), 0);
@@ -556,11 +552,10 @@ void EditingRunner::compareWithQuadratic(node nodeToMove, count generation) cons
         if (u == nodeToMove || usingDeepNeighbors[u] || !existing[u])
             return;
         if (existingBelow[u] >= missingBelow[u]
-            || (traversalData[u].generation == generation && traversalData[u].childCloseness > 0
-                && traversalData[u].childCloseness != none)) {
+            || (traversalData[u].generation == generation && traversalData[u].childCloseness > 0)) {
             assert(traversalData[u].childCloseness == existingBelow[u] - missingBelow[u]);
         } else if (nodeTouched[u]) {
-            assert(traversalData[u].childCloseness == none);
+            assert(traversalData[u].childCloseness < 0);
         }
     });
 

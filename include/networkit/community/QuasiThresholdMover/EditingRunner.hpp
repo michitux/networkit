@@ -36,8 +36,8 @@ public:
 private:
     struct TraversalData {
         count generation;
-        count scoreMax;
-        count childCloseness;
+        int64_t scoreMax;
+        int64_t childCloseness;
         node bestParentBelow;
         /**
          * Logarithm of the number of equally good choices for this node.
