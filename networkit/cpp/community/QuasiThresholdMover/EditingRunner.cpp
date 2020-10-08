@@ -256,14 +256,13 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
                 assert(dynamicForest.depth(u) == level);
                 processNode(u, nodeToMove, generation);
             }
-            while (!neighborQueue.empty()
-                    && dynamicForest.depth(neighborQueue.back()) == level) {
+            while (!neighborQueue.empty() && dynamicForest.depth(neighborQueue.back()) == level) {
                 node u = neighborQueue.back();
                 neighborQueue.pop_back();
                 assert(dynamicForest.depth(u) == level);
                 if (nodeTouched[u])
                     continue; // if the node was touched in the previous level, it was in
-                                // currentLevel and thus has already been processed
+                              // currentLevel and thus has already been processed
                 processNode(u, nodeToMove, generation);
             }
             --level;
@@ -299,11 +298,16 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
 
     bestEdits = numNeighbors - rootData.scoreMax;
 
-    for (node u : touchedNodes) {
-        if (u != nodeToMove && dynamicForest.parent(u) == rootData.bestParentBelow
-            && (traversalData[u].childCloseness > 0
-                || (randomness && traversalData[u].childCloseness == 0 && randomBool(2)))) {
-            bestChildren.push_back(u);
+    // If sortPaths and randomness is on, only adopt children when the chosen parent is the
+    // lower end of its path.
+    if (!sortPaths || !randomness || rootData.bestParentBelow == none
+        || dynamicForest.isLowerEnd(rootData.bestParentBelow)) {
+        for (node u : touchedNodes) {
+            if (u != nodeToMove && dynamicForest.parent(u) == rootData.bestParentBelow
+                && (traversalData[u].childCloseness > 0
+                    || (randomness && traversalData[u].childCloseness == 0 && randomBool(2)))) {
+                bestChildren.push_back(u);
+            }
         }
     }
 
@@ -431,10 +435,27 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
             // INFO(u, " is better count = 1");
             traversalData[u].scoreMax = sumPositiveEdits;
             traversalData[u].logEqualBestChoices = ownWeight;
+            // Either we do not adopt children, or we are at the lower end of a path.
+            // Otherwise, there must be a node below u that is at least as good.
+            assert(!sortPaths || sumPositiveEdits == 0 || dynamicForest.isLowerEnd(u));
             coin = true;
         } else if (sumPositiveEdits == traversalData[u].scoreMax) {
-            traversalData[u].addLogChoices(ownWeight);
-            coin = logRandomBool(ownWeight - traversalData[u].logEqualBestChoices);
+            // if sortPaths is on, children are only adopted at the lower end of the path
+            if (sortPaths && !dynamicForest.isLowerEnd(u)) {
+                // If adopting children brings no benefit, we consider the option of
+                // choosing u as parent and not adopting children.
+                // Possibly there is also the option of adopting the only child (the next
+                // node in the path, but this results in the same graph as choosing the
+                // lowermost node in the path as parent and adopting all its children.
+                if (sumPositiveEdits == 0) {
+                    traversalData[u].addLogChoices(0);
+                    coin = logRandomBool(-traversalData[u].logEqualBestChoices);
+                }
+            } else {
+                traversalData[u].addLogChoices(ownWeight);
+                coin = logRandomBool(ownWeight - traversalData[u].logEqualBestChoices);
+            }
+            assert(traversalData[u].hasChoices());
             // INFO(u, " equally good count = ", traversalData[u].equalBestParents);
         }
         if (coin) {

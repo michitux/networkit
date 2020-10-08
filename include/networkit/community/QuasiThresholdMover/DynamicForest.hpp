@@ -215,7 +215,9 @@ private:
     };
 
     bool isUpperEnd(node u) const { return (path_pos[u] == paths[path(u)].length() - 1); };
+public:
     bool isLowerEnd(node u) const { return (path_pos[u] == 0); };
+private:
     node nextNodeInPath(node u) const {
         if (isLowerEnd(u)) {
             return none;
