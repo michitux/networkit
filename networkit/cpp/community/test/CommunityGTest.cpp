@@ -847,6 +847,7 @@ TEST_F(CommunityGTest, testQuasiInputOutput) {
 
 
 TEST_F(CommunityGTest, testInclusionMinimal) {
+  Aux::Random::setSeed(37, false);
   count minimum = 60;
 	Graph karate = METISGraphReader().read("input/lesmis.graph");  
   karate.indexEdges();
