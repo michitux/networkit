@@ -187,24 +187,28 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
     assert(numEdits == countNumberOfEdits());
     TRACE("Move node ", nodeToMove);
     handler.assureRunning();
+    numNeighbors = 0;
     G.forEdgesOf(nodeToMove, [&](node v) {
-        if (existing[v]) {
+        if (!insertRun || existing[v]) {
+            ++numNeighbors;
             marker[v] = true;
             neighbors.push_back(v);
-            if (sortPaths)
-                dynamicForest.moveUpNeighbor(v, nodeToMove);
         }
     });
-    if (sortPaths)
-        dynamicForest.moveUpNeighbor(nodeToMove, nodeToMove);
-    curChildren = dynamicForest.children(nodeToMove);
-    curParent = dynamicForest.parent(nodeToMove);
-    if (insertRun) {
-        maxDepth = 2 * neighbors.size();
-        curEdits = neighbors.size();
-    } else {
-        maxDepth = 2 * neighbors.size();
-        curEdits = G.degree(nodeToMove);
+
+    if (!sortPaths) {
+        // Do not even attempt to store children when sortPaths is on
+        // as due to the sorting they become meaningless.
+        curChildren = dynamicForest.children(nodeToMove);
+        curParent = dynamicForest.parent(nodeToMove);
+    }
+
+    maxDepth = 2 * numNeighbors;
+    curEdits = numNeighbors;
+
+    if (!insertRun) {
+        // Calculate the old number of edits incident to c to be able to compute the improvement
+        // later
         dynamicForest.dfsFrom(
             nodeToMove,
             [&](node c) {
@@ -215,7 +219,15 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
             [](node) {});
         dynamicForest.forAncestors(nodeToMove, [&](node p) { curEdits += 1 - 2 * marker[p]; });
     }
+
     dynamicForest.isolate(nodeToMove);
+
+    if (sortPaths) {
+        for (node v : neighbors) {
+            dynamicForest.moveUpNeighbor(nodeToMove, v);
+        }
+    }
+
     if (useBucketQueue) {
         bucketQueue.fill(neighbors, dynamicForest);
     } else {
@@ -229,71 +241,69 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
 
     bestChildren.clear();
     rootData.initialize(generation);
-    // all neighbors to deep
-    if ((useBucketQueue && bucketQueue.empty()) || (!useBucketQueue && neighborQueue.empty())) {
-        rootData.bestParentBelow = none;
-        bestEdits = neighbors.size();
-        TRACE("Isolate");
+
+    if (useBucketQueue) {
+        while (!bucketQueue.empty()) {
+            node u = bucketQueue.next();
+            processNode(u, nodeToMove, generation);
+        }
     } else {
-        if (useBucketQueue) {
-            while (!bucketQueue.empty()) {
-                node u = bucketQueue.next();
+        while (!currentLevel.empty() || !neighborQueue.empty()) {
+            if (currentLevel.empty()) {
+                level = dynamicForest.depth(neighborQueue.back());
+            }
+            for (node u : currentLevel) {
+                assert(dynamicForest.depth(u) == level);
                 processNode(u, nodeToMove, generation);
             }
-        } else {
-            while (!currentLevel.empty() || !neighborQueue.empty()) {
-                if (currentLevel.empty()) {
-                    level = dynamicForest.depth(neighborQueue.back());
-                }
-                for (node u : currentLevel) {
-                    assert(dynamicForest.depth(u) == level);
-                    processNode(u, nodeToMove, generation);
-                }
-                while (!neighborQueue.empty()
-                       && dynamicForest.depth(neighborQueue.back()) == level) {
-                    node u = neighborQueue.back();
-                    neighborQueue.pop_back();
-                    assert(dynamicForest.depth(u) == level);
-                    if (nodeTouched[u])
-                        continue; // if the node was touched in the previous level, it was in
-                                  // currentLevel and thus has already been processed
-                    processNode(u, nodeToMove, generation);
-                }
-                --level;
-                currentLevel.clear();
-                currentLevel.swap(nextLevel);
+            while (!neighborQueue.empty()
+                    && dynamicForest.depth(neighborQueue.back()) == level) {
+                node u = neighborQueue.back();
+                neighborQueue.pop_back();
+                assert(dynamicForest.depth(u) == level);
+                if (nodeTouched[u])
+                    continue; // if the node was touched in the previous level, it was in
+                                // currentLevel and thus has already been processed
+                processNode(u, nodeToMove, generation);
             }
+            --level;
+            currentLevel.clear();
+            currentLevel.swap(nextLevel);
+        }
+    }
+
+    if (!randomness) {
+        if (rootData.childCloseness > rootData.scoreMax) {
+            rootData.bestParentBelow = none;
+            rootData.scoreMax = rootData.childCloseness;
+        }
+    } else {
+        bool coin = false;
+        double ownWeight = rootData.numIndifferentChildren * std::log(2);
+        if (rootData.childCloseness > rootData.scoreMax || !rootData.hasChoices()) {
+            // INFO("root better");
+            rootData.scoreMax = rootData.childCloseness;
+            rootData.logEqualBestChoices = ownWeight;
+            coin = true;
+        } else if (rootData.childCloseness == rootData.scoreMax) {
+            // INFO("root equally good");
+            rootData.addLogChoices(ownWeight);
+            coin = logRandomBool(ownWeight - rootData.logEqualBestChoices);
+        }
+        if (coin) {
+            rootData.bestParentBelow = none;
         }
 
-        if (!randomness) {
-            if (rootData.childCloseness > rootData.scoreMax) {
-                rootData.bestParentBelow = none;
-                rootData.scoreMax = rootData.childCloseness;
-            }
-        } else {
-            bool coin = false;
-            double ownWeight = rootData.numIndifferentChildren * std::log(2);
-            if (rootData.childCloseness > rootData.scoreMax || !rootData.hasChoices()) {
-                // INFO("root better");
-                rootData.scoreMax = rootData.childCloseness;
-                rootData.logEqualBestChoices = ownWeight;
-                coin = true;
-            } else if (rootData.childCloseness == rootData.scoreMax) {
-                // INFO("root equally good");
-                rootData.addLogChoices(ownWeight);
-                coin = logRandomBool(ownWeight - rootData.logEqualBestChoices);
-            }
-            if (coin) {
-                rootData.bestParentBelow = none;
-            }
-        }
-        bestEdits = neighbors.size() - rootData.scoreMax;
+        assert(rootData.hasChoices());
+    }
 
-        for (node u : touchedNodes) {
-            if (u != nodeToMove && dynamicForest.parent(u) == rootData.bestParentBelow
-                && (traversalData[u].childCloseness > 0 || (randomness && traversalData[u].childCloseness == 0 && randomBool(2)))) {
-                bestChildren.push_back(u);
-            }
+    bestEdits = numNeighbors - rootData.scoreMax;
+
+    for (node u : touchedNodes) {
+        if (u != nodeToMove && dynamicForest.parent(u) == rootData.bestParentBelow
+            && (traversalData[u].childCloseness > 0
+                || (randomness && traversalData[u].childCloseness == 0 && randomBool(2)))) {
+            bestChildren.push_back(u);
         }
     }
 
@@ -311,21 +321,23 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
         nodeTouched[u] = false;
     }
 
-    assert(!randomness || savedEdits == 0 || rootData.hasChoices());
+    assert(!randomness || rootData.hasChoices());
 
-    neighbors.clear();
-    touchedNodes.clear();
     if (rootData.logEqualBestChoices < std::log(std::numeric_limits<long long>::max())) {
         rootEqualBestParentsCpy = std::llround(std::exp(rootData.logEqualBestChoices));
     } else {
         rootEqualBestParentsCpy = std::numeric_limits<count>::max();
     }
 
-    G.forEdgesOf(nodeToMove, [&](node v) { marker[v] = false; });
+    for (node v : neighbors) {
+        marker[v] = false;
+    }
+    neighbors.clear();
+    touchedNodes.clear();
 
-    if (savedEdits > 0 || (savedEdits == 0 && randomness)) {
+    if (sortPaths || savedEdits > 0 || randomness) {
         dynamicForest.moveToPosition(nodeToMove, rootData.bestParentBelow, bestChildren);
-        hasMoved = true;
+        hasMoved |= (savedEdits > 0 || (randomness && rootEqualBestParentsCpy > 1));
         numEdits -= savedEdits;
 #ifndef NDEBUG
         assert(numEdits == countNumberOfEdits());
@@ -415,8 +427,7 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
     } else {
         bool coin = false;
         double ownWeight = traversalData[u].numIndifferentChildren * std::log(2);
-        if (sumPositiveEdits > traversalData[u].scoreMax
-            || !traversalData[u].hasChoices()) {
+        if (sumPositiveEdits > traversalData[u].scoreMax || !traversalData[u].hasChoices()) {
             // INFO(u, " is better count = 1");
             traversalData[u].scoreMax = sumPositiveEdits;
             traversalData[u].logEqualBestChoices = ownWeight;
@@ -525,24 +536,26 @@ void EditingRunner::compareWithQuadratic(node nodeToMove, count generation) cons
     assert(missingBelow[nodeToMove] == 0);
     assert(existingBelow[nodeToMove] == 0);
 
-    bool exactValue = true;
-    for (node c : curChildren) {
-        missingBelow[nodeToMove] += missingBelow[c];
-        existingBelow[nodeToMove] += existingBelow[c];
-        if (usingDeepNeighbors[c])
-            exactValue = false;
-    }
+    if (!sortPaths) {
+        bool exactValue = true;
+        for (node c : curChildren) {
+            missingBelow[nodeToMove] += missingBelow[c];
+            existingBelow[nodeToMove] += existingBelow[c];
+            if (usingDeepNeighbors[c])
+                exactValue = false;
+        }
 
-    if (curParent != none) {
-        missingAbove[nodeToMove] = missingAbove[curParent];
-        existingAbove[nodeToMove] = existingAbove[curParent];
-        if (usingDeepNeighbors[curParent])
-            exactValue = false;
-    }
-    if (exactValue) {
-        assert(curEdits
-               == neighbors.size() - existingAbove[nodeToMove] - existingBelow[nodeToMove]
-                      + missingAbove[nodeToMove] + missingBelow[nodeToMove]);
+        if (curParent != none) {
+            missingAbove[nodeToMove] = missingAbove[curParent];
+            existingAbove[nodeToMove] = existingAbove[curParent];
+            if (usingDeepNeighbors[curParent])
+                exactValue = false;
+        }
+        if (exactValue) {
+            assert(curEdits
+                   == numNeighbors - existingAbove[nodeToMove] - existingBelow[nodeToMove]
+                          + missingAbove[nodeToMove] + missingBelow[nodeToMove]);
+        }
     }
 
     count minEdits = curEdits;
@@ -570,7 +583,7 @@ void EditingRunner::compareWithQuadratic(node nodeToMove, count generation) cons
         if (p == nodeToMove)
             return;
 
-        count edits = neighbors.size();
+        count edits = numNeighbors;
         if (p != none) {
             edits += missingAbove[p];
             edits -= existingAbove[p];
@@ -604,7 +617,7 @@ void EditingRunner::compareWithQuadratic(node nodeToMove, count generation) cons
 
     assert(minEdits >= bestEdits);
 
-    count childClosenessControl = neighbors.size();
+    count childClosenessControl = numNeighbors;
     if (rootData.bestParentBelow != none) {
         childClosenessControl -=
             (existingAbove[rootData.bestParentBelow] - missingAbove[rootData.bestParentBelow]);
@@ -612,8 +625,12 @@ void EditingRunner::compareWithQuadratic(node nodeToMove, count generation) cons
     for (node u : bestChildren) {
         childClosenessControl -= (existingBelow[u] - missingBelow[u]);
     }
-    TRACE("Current edits: ", curEdits, " (with parent ", curParent, " and current children ",
-          curChildren, "), minimum edits: ", minEdits);
+    if (!sortPaths) {
+        TRACE("Current edits: ", curEdits, " (with parent ", curParent, " and current children ",
+              curChildren, "), minimum edits: ", minEdits);
+    } else {
+        TRACE("Current edits: ", curEdits, ", minimum edits: ", minEdits);
+    }
     TRACE("Quadratic algorithm wants to have new parent ", minParent, " and new children ",
           minChildren);
     TRACE("Linear algorithm wants to have new parent ", rootData.bestParentBelow,

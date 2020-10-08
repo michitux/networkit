@@ -119,6 +119,7 @@ private:
 
     BucketQueue bucketQueue;
     std::vector<node> neighbors;
+    count numNeighbors;
     std::vector<node> touchedNodes;
     std::vector<node> lastVisitedDFSNode;
     std::vector<TraversalData> traversalData;
