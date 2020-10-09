@@ -635,7 +635,7 @@ void EditingRunner::compareWithQuadratic(node nodeToMove, count generation) cons
         }
     }
 
-    count minEdits = curEdits;
+    count minEdits = std::numeric_limits<count>::max();
     std::vector<node> minChildren;
     node minParent = curParent;
     G.forNodes([&](node u) {
@@ -713,6 +713,11 @@ void EditingRunner::compareWithQuadratic(node nodeToMove, count generation) cons
     TRACE("Linear algorithm wants to have new parent ", rootData.bestParentBelow,
           " and new children ", bestChildren, " edits: ", childClosenessControl);
     assert(minEdits >= childClosenessControl);
+
+    G.forNodes([&](node u) {
+        tlx::unused(u);
+        TRACE("Node", marker[u] ? "[x]" : "", " ", u, ", parent ", dynamicForest.parent(u));
+    });
 }
 
 count EditingRunner::countNumberOfEdits() const {
