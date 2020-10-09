@@ -26,6 +26,7 @@ EditingRunner::EditingRunner(const Graph &G,
 
     runningInfo["time"] = std::vector<count>();
     runningInfo["edits"] = std::vector<count>();
+    runningInfo["nodes_moved"] = std::vector<count>();
 
     if (Aux::PerfEventCountHardware::is_available) {
         event_counters.emplace_back("cache_misses", Aux::PerfEventCountHardware::CACHE_MISSES);
@@ -113,6 +114,7 @@ EditingRunner::EditingRunner(const Graph &G,
     }
 
     runningInfo["time"].push_back(timer.elapsedMilliseconds());
+    runningInfo["nodes_moved"].push_back(0);
 }
 
 void EditingRunner::runLocalMover() {
@@ -126,6 +128,7 @@ void EditingRunner::runLocalMover() {
             break;
         handler.assureRunning();
         hasMoved = false;
+        numNodesMoved = 0;
         timer.start();
 
         for (auto &ec : event_counters) {
@@ -142,6 +145,7 @@ void EditingRunner::runLocalMover() {
             insertRun = 0;
         } else {
             G.forNodesInRandomOrder([&](node nodeToMove) { localMove(nodeToMove, generation++); });
+            INFO("Iteration: ", i, " edits: ", numEdits, " moved nodes: ", numNodesMoved);
         }
 
         timer.stop();
@@ -150,11 +154,13 @@ void EditingRunner::runLocalMover() {
         }
 
         if (i == 0) {
+            runningInfo["nodes_moved"][0] = numNodesMoved;
             runningInfo["time"][0] += timer.elapsedMilliseconds();
             for (auto &ec : event_counters) {
                 runningInfo[ec.first][0] += ec.second.readValue();
             }
         } else {
+            runningInfo["nodes_moved"].push_back(numNodesMoved);
             runningInfo["time"].push_back(timer.elapsedMilliseconds());
             for (auto &ec : event_counters) {
                 runningInfo[ec.first].push_back(ec.second.readValue());
@@ -406,6 +412,7 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
     if (sortPaths || savedEdits > 0 || randomness) {
         dynamicForest.moveToPosition(nodeToMove, rootData.bestParentBelow, bestChildren);
         hasMoved |= (savedEdits > 0 || (randomness && rootEqualBestParentsCpy > 1));
+        numNodesMoved += (savedEdits > 0 || (randomness && rootEqualBestParentsCpy > 1));
         numEdits -= savedEdits;
 #ifndef NDEBUG
         assert(numEdits == countNumberOfEdits());

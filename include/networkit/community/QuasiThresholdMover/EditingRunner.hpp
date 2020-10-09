@@ -163,6 +163,7 @@ private:
     std::vector<bool> existing;
 
     count rootEqualBestParentsCpy;
+    count numNodesMoved;
 
     count editsBefore;
     count currentPlateau;
