@@ -271,12 +271,10 @@ void DynamicForest::moveToPosition(node u, node p, const std::vector<node> &adop
     assert(paths[path(u)].length() == 1);
     // check that all children are adopted ones
     if (p != none) {
-#ifndef NDEBUG
         std::vector<node> oldChildren = children(p);
         for (node c : adoptedChildren) {
             assert(std::find(oldChildren.begin(), oldChildren.end(), c) != oldChildren.end());
         }
-#endif
     } else {
         for (node c : adoptedChildren) {
             assert(std::find(roots.begin(), roots.end(), path(c)) != roots.end());
@@ -349,6 +347,12 @@ bool DynamicForest::pathsValid() {
     for (node u = 0; u < path_membership.size(); u++) {
         const std::vector<node> childNodes = children(u);
         assert(childNodes.size() == childCount(u));
+
+        if (childNodes.size() == 1) {
+            node c = childNodes.front();
+            assert(path(c) == path(u));
+        }
+
         // check that parent/child realtionships for nodes are proper
         for (index i = 0; i < childCount(u); i++) {
             node c = childNodes[i];
