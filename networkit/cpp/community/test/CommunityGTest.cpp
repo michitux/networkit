@@ -923,12 +923,12 @@ TEST_F(CommunityGTest, testRandomness) {
      x
 
      6 possibilities to choose neighbor as parent without children
-     2 possibilities to choose neighbor as parent with child adopted
-     3 possibilities to choose inner non-parent as parent with main branch adopted
-     3 possibilities to adopt side branch when choosing non-neighbor as parent to adopt the branch adopted
+     2 possibilities to choose neighbor as parent with child adopted -- Equivalent!
+     3 possibilities to choose inner non-parent as parent with main branch adopted -- Equivalent!
+     3 possibilities to adopt side branch when choosing non-neighbor as parent + main branch adopted
      1 possibility to become root without adopting anything
      1 possibility to become root and adopt main branch
-     = 16 equally good possibilities
+     = 16 equally good possibilities, but only 10 non-equivalent
      
      considering last insert with vm = 12
      o = non-vm-neighbor, x = vm-neighbor 
@@ -999,7 +999,7 @@ TEST_F(CommunityGTest, testRandomness) {
     } 
   });
   INFO(mover.getRootEqualBestParents());
-  assert(mover.getRootEqualBestParents() == 16);
+  assert(mover.getRootEqualBestParents() == 10);
 }
 
 
@@ -1013,6 +1013,7 @@ TEST_F(CommunityGTest, testRandomness2) {
      considering last insert with vm = 3
      o = non-vm-neighbor, x = vm-neighbor 
      ensuring that all 4 equal good positions are found
+     but all 4 are equivalent - actually only one position!
   */
   Graph G(4, false, false);
   G.addEdge(0, 1);
@@ -1026,7 +1027,7 @@ TEST_F(CommunityGTest, testRandomness2) {
   std::iota(order.begin(), order.end(), 0);
   mover.setInsertionOrder(order);
   mover.run();  
-  assert(mover.getRootEqualBestParents() == 4);
+  assert(mover.getRootEqualBestParents() == 1);
 }
 
 

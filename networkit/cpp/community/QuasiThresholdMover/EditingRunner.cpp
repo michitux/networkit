@@ -285,9 +285,12 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
             rootData.logEqualBestChoices = ownWeight;
             coin = true;
         } else if (rootData.childCloseness == rootData.scoreMax) {
+            ownWeight = rootData.calculateOwnWeightForEqualChoices();
+            if (ownWeight > -std::numeric_limits<double>::infinity()) {
+                rootData.addLogChoices(ownWeight);
+                coin = logRandomBool(ownWeight - rootData.logEqualBestChoices);
+            }
             // INFO("root equally good");
-            rootData.addLogChoices(ownWeight);
-            coin = logRandomBool(ownWeight - rootData.logEqualBestChoices);
         }
         if (coin) {
             rootData.bestParentBelow = none;
@@ -300,13 +303,74 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
 
     // If sortPaths and randomness is on, only adopt children when the chosen parent is the
     // lower end of its path.
-    if (!sortPaths || !randomness || rootData.bestParentBelow == none
-        || dynamicForest.isLowerEnd(rootData.bestParentBelow)) {
+    const TraversalData &bestParentData =
+        (rootData.bestParentBelow == none) ? rootData : traversalData[rootData.bestParentBelow];
+    // Check if there are any close children at all, or if there are no close children, if
+    // randomness is enabled and we have at least two indifferent children (one alone would not be
+    // adopted).
+    if (bestParentData.numCloseChildren > 0
+        || (randomness && bestParentData.numIndifferentChildren > 1)) {
+        std::vector<node> indifferentChildren;
         for (node u : touchedNodes) {
-            if (u != nodeToMove && dynamicForest.parent(u) == rootData.bestParentBelow
-                && (traversalData[u].childCloseness > 0
-                    || (randomness && traversalData[u].childCloseness == 0 && randomBool(2)))) {
-                bestChildren.push_back(u);
+            if (u != nodeToMove && dynamicForest.parent(u) == rootData.bestParentBelow) {
+                if (traversalData[u].childCloseness > 0) {
+                    bestChildren.push_back(u);
+                } else if (randomness && traversalData[u].childCloseness == 0) {
+                    indifferentChildren.push_back(u);
+                }
+            }
+        }
+
+        assert(bestChildren.size() == bestParentData.numCloseChildren);
+
+        if (randomness) { // make sure we adopt either 0 or at least two children
+            assert(indifferentChildren.size() == bestParentData.numIndifferentChildren);
+            // If we shall adopt one child, there must be another indifferent child that we just
+            // sample randomly to get at least two
+            if (bestChildren.size() == 1) {
+                assert(!indifferentChildren.empty());
+                index i = Aux::Random::index(indifferentChildren.size());
+                bestChildren.push_back(indifferentChildren[i]);
+                indifferentChildren[i] = indifferentChildren.back();
+                indifferentChildren.pop_back();
+            }
+
+            // If there are no best children, sample either 0 or at least two indifferent children
+            if (bestChildren.size() == 0 && !indifferentChildren.empty()) {
+                assert(indifferentChildren.size() != 1);
+                if (indifferentChildren.size() == 2) {
+                    // Sample either 0 or two nodes from indifferentChildren
+                    if (randomBool(2)) {
+                        for (node u : indifferentChildren) {
+                            bestChildren.push_back(u);
+                        }
+                    }
+                } else {
+                    // sample either 0 or at least two nodes from indifferentChildren
+                    std::vector<node> sample;
+                    do {
+                        for (node u : indifferentChildren) {
+                            sample.clear();
+                            if (randomBool(2)) {
+                                sample.push_back(u);
+                            }
+                        }
+                    } while (sample.size() == 1);
+
+                    for (node u : sample) {
+                        bestChildren.push_back(u);
+                    }
+                }
+            }
+
+            // If there are already two children, just sample randomly from the remaining
+            // indifferent children
+            if (bestChildren.size() > 1) {
+                for (node u : indifferentChildren) {
+                    if (randomBool(2)) {
+                        bestChildren.push_back(u);
+                    }
+                }
             }
         }
     }
@@ -440,18 +504,8 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
             assert(!sortPaths || sumPositiveEdits == 0 || dynamicForest.isLowerEnd(u));
             coin = true;
         } else if (sumPositiveEdits == traversalData[u].scoreMax) {
-            // if sortPaths is on, children are only adopted at the lower end of the path
-            if (sortPaths && !dynamicForest.isLowerEnd(u)) {
-                // If adopting children brings no benefit, we consider the option of
-                // choosing u as parent and not adopting children.
-                // Possibly there is also the option of adopting the only child (the next
-                // node in the path, but this results in the same graph as choosing the
-                // lowermost node in the path as parent and adopting all its children.
-                if (sumPositiveEdits == 0) {
-                    traversalData[u].addLogChoices(0);
-                    coin = logRandomBool(-traversalData[u].logEqualBestChoices);
-                }
-            } else {
+            ownWeight = traversalData[u].calculateOwnWeightForEqualChoices();
+            if (ownWeight > -std::numeric_limits<double>::infinity()) {
                 traversalData[u].addLogChoices(ownWeight);
                 coin = logRandomBool(ownWeight - traversalData[u].logEqualBestChoices);
             }
@@ -510,8 +564,10 @@ void EditingRunner::processNode(node u, node nodeToMove, count generation) {
     if (traversalData[u].childCloseness >= 0) {
         assert(traversalData[u].childCloseness <= traversalData[u].scoreMax);
         parentData.childCloseness += traversalData[u].childCloseness;
-        if (randomness && traversalData[u].childCloseness == 0) {
+        if (traversalData[u].childCloseness == 0) {
             ++parentData.numIndifferentChildren;
+        } else {
+            ++parentData.numCloseChildren;
         }
     }
 

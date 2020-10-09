@@ -45,11 +45,13 @@ private:
          * Therefore, the logarithm is guaranteed to be linear in the number of nodes.
          */
         double logEqualBestChoices;
-        node numIndifferentChildren;
+        count numIndifferentChildren;
+        count numCloseChildren;
 
         TraversalData()
             : generation(none), scoreMax(0), childCloseness(0), bestParentBelow(none),
-              logEqualBestChoices(-std::numeric_limits<double>::infinity()), numIndifferentChildren(0){};
+              logEqualBestChoices(-std::numeric_limits<double>::infinity()),
+              numIndifferentChildren(0), numCloseChildren(0){};
 
         void initialize(count currentGeneration) {
             if (currentGeneration != generation) {
@@ -59,16 +61,13 @@ private:
                 bestParentBelow = none;
                 logEqualBestChoices = -std::numeric_limits<double>::infinity();
                 numIndifferentChildren = 0;
+                numCloseChildren = 0;
             }
         };
 
-        bool hasChoices() {
-            return logEqualBestChoices > -std::numeric_limits<double>::infinity();
-        }
+        bool hasChoices() { return logEqualBestChoices > -std::numeric_limits<double>::infinity(); }
 
-        void addEqualChoices(count choices) {
-            addLogChoices(std::log(choices));
-        }
+        void addEqualChoices(count choices) { addLogChoices(std::log(choices)); }
 
         void addLogChoices(double logChoices) {
             /* This uses the technique explained on
@@ -81,6 +80,34 @@ private:
             } else {
                 logEqualBestChoices += std::log1p(std::exp(logChoices - logEqualBestChoices));
             }
+        }
+
+        double calculateOwnWeightForEqualChoices() {
+            double ownWeight = numIndifferentChildren * std::log(2);
+            // Never adopt only one child, as this is always equivalent to choosing the child as
+            // parent and adopting all its children
+            if (numCloseChildren != 1
+                || numIndifferentChildren > 0) {
+                if (numCloseChildren == 0) {
+                    if (numIndifferentChildren < 2) {
+                        // we need no or at least two indifferent children, so here only 0
+                        // remains as option
+                        ownWeight = 0;
+                    } else {
+                        // Subtract the numIndifferentChildren possibilities of choosing exactly
+                        // one indifferent child.
+                        ownWeight += std::log1p(-std::exp(
+                            ownWeight - std::log(numIndifferentChildren)));
+                    }
+                } else if (numCloseChildren == 1) {
+                    // Subtract the one possibility of choosing exactly 0 indifferent children
+                    ownWeight += std::log1p(-std::exp(-ownWeight));
+                }
+
+                return ownWeight;
+            }
+
+            return -std::numeric_limits<double>::infinity();
         }
 
         std::string toString() {
@@ -160,7 +187,8 @@ private:
     bool logRandomBool(double logProbability) {
         assert(logProbability <= 0);
         double x = realDist(gen);
-        if (x == 0) return logProbability > - std::numeric_limits<double>::infinity();
+        if (x == 0)
+            return logProbability > -std::numeric_limits<double>::infinity();
         return std::log(x) < logProbability;
     }
 
