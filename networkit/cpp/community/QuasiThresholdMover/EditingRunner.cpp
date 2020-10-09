@@ -224,7 +224,7 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
 
     if (sortPaths) {
         for (node v : neighbors) {
-            dynamicForest.moveUpNeighbor(nodeToMove, v);
+            dynamicForest.moveUpNeighbor(v, nodeToMove);
         }
     }
 
