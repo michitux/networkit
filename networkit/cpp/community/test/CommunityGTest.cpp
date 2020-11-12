@@ -39,6 +39,7 @@
 #include <networkit/generators/ClusteredRandomGraphGenerator.hpp>
 #include <networkit/generators/ErdosRenyiGenerator.hpp>
 #include <networkit/community/CoverF1Similarity.hpp>
+#include <networkit/community/QuasiThresholdGreedyBound.hpp>
 
 #include <tlx/unused.hpp>
 
@@ -722,4 +723,28 @@ TEST_F(CommunityGTest, testCoverF1Similarity) {
     EXPECT_DOUBLE_EQ((1.0 * 10.0 + f1 * 10.0) / 29.0, sim.getWeightedAverage());
 }
 
+TEST_F(CommunityGTest, testQuasiThresholdGreedyBound) {
+	Graph karate = METISGraphReader().read("input/karate.graph");
+
+	QuasiThresholdGreedyBound bound(karate);
+	bound.run();
+
+        INFO("Greedy bound on karate is ", bound.getMinDistance());
+        EXPECT_GT(bound.getMinDistance(), 1);
+        EXPECT_LE(bound.getMinDistance(), 21);
+}
+
+TEST_F(CommunityGTest, benchQuasiThresholdGreedyBound) {
+        std::string graphPath;
+        std::cout << "[INPUT] METIS graph file path for QT bound >" << std::endl;
+        std::getline(std::cin, graphPath);
+	Graph G = METISGraphReader().read(graphPath);
+
+	QuasiThresholdGreedyBound bound(G);
+	bound.run();
+
+        INFO("Greedy bound on the graph is ", bound.getMinDistance());
+        EXPECT_GT(bound.getMinDistance(), 1);
+        EXPECT_LE(bound.getMinDistance(), G.numberOfEdges() / 3);
+}
 } /* namespace NetworKit */

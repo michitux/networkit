@@ -29,6 +29,7 @@ networkit_add_module(community
     PartitionFragmentation.cpp
     PartitionHubDominance.cpp
     PartitionIntersection.cpp
+    QuasiThresholdGreedyBound.cpp
     SampledGraphStructuralRandMeasure.cpp
     SampledNodeStructuralRandMeasure.cpp
     StablePartitionNodes.cpp

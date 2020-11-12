@@ -1068,6 +1068,44 @@ cdef class CoverF1Similarity(LocalCoverEvaluation):
 		assert(self._G == G)
 		assert(self._C == C)
 
+cdef extern from "<networkit/community/QuasiThresholdGreedyBound.hpp>":
+	cdef cppclass _QuasiThresholdGreedyBound "NetworKit::QuasiThresholdGreedyBound"(_Algorithm):
+		_QuasiThresholdGreedyBound(_Graph G) except +
+		count getMinDistance() except +
+
+cdef class QuasiThresholdGreedyBound(Algorithm):
+	"""
+	Simple greedy bound for the quasi-threshold editing distance.
+
+	Computes a bound by greedily packing forbidden subgraphs as described in
+
+	Gottesbüren, L., Hamann, M., Schoch, P., Strasser, B., Wagner, D., &
+	Zühlsdorf, S. (2020). Engineering Exact Quasi-Threshold Editing. In S. Faro
+	& D. Cantone (Eds.), 18th International Symposium on Experimental Algorithms
+	(SEA 2020) (Vol. 160, p. 10:1–10:14). Schloss Dagstuhl–Leibniz-Zentrum für
+	Informatik. https://doi.org/10.4230/LIPIcs.SEA.2020.10
+
+	Parameters:
+	-----------
+	G : Graph
+		The graph on which the bound shall be computed
+	"""
+	cdef Graph _G
+
+	def __cinit__(self, Graph G):
+		self._G = G
+		self._this = new _QuasiThresholdGreedyBound(G._this)
+
+	def getMinDistance(self):
+		"""
+		Get the minimum quasi-threshold editing distance
+
+		Returns:
+		--------
+		The minimum editing distance
+		"""
+		return (<_QuasiThresholdGreedyBound*>(self._this)).getMinDistance()
+
 def detectCommunities(G, algo=None, inspect=True):
 	""" Perform high-performance community detection on the graph.
 		:param    G    the graph
