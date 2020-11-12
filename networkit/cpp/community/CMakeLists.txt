@@ -29,14 +29,20 @@ networkit_add_module(community
     PartitionFragmentation.cpp
     PartitionHubDominance.cpp
     PartitionIntersection.cpp
+    QuasiThresholdEditingLocalMover.cpp
     QuasiThresholdGreedyBound.cpp
     SampledGraphStructuralRandMeasure.cpp
     SampledNodeStructuralRandMeasure.cpp
     StablePartitionNodes.cpp
+    QuasiThresholdMover/DynamicForest.cpp
+    QuasiThresholdMover/QuasiThresholdEditingLinear.cpp
+    QuasiThresholdMover/BucketQueue.cpp
+    QuasiThresholdMover/EditingRunner.cpp
     )
 
 networkit_module_link_modules(community
     auxiliary base coarsening components flow graph matching structures)
 
 add_subdirectory(test)
+add_subdirectory(QuasiThresholdMover/test)
 

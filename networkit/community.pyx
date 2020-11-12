@@ -1106,6 +1106,58 @@ cdef class QuasiThresholdGreedyBound(Algorithm):
 		"""
 		return (<_QuasiThresholdGreedyBound*>(self._this)).getMinDistance()
 
+cdef extern from "<networkit/community/QuasiThresholdEditingLocalMover.hpp>" namespace "NetworKit::QuasiThresholdMoving::QuasiThresholdEditingLocalMover":
+	cdef enum _Initialization "NetworKit::QuasiThresholdMoving::QuasiThresholdEditingLocalMover::Initialization":
+		TRIVIAL,
+		EDITING,
+		RANDOM_INSERT,
+		ASC_DEGREE_INSERT,
+		USER_DEFINED_INSERT
+
+cdef extern from "<networkit/community/QuasiThresholdEditingLocalMover.hpp>":
+
+	cdef cppclass _QuasiThresholdEditingLocalMover "NetworKit::QuasiThresholdMoving::QuasiThresholdEditingLocalMover"(_Algorithm):
+		_QuasiThresholdEditingLocalMover(_Graph G, _Initialization initialization, count maxIterations, bool_t sortPaths, bool_t randomness, count maxPlateauSize, bool_t useBucketQueue) except +
+		count getNumberOfEdits() const
+		count getUsedIterations() const
+		count getPlateauSize() const
+		_Graph getQuasiThresholdGraph() except +
+		void setInsertionOrder(vector[node] order) except +
+		map[string, vector[count]] getRunningInfo() except +
+
+cdef class QuasiThresholdEditingLocalMover(Algorithm):
+	cdef Graph _G
+
+	Trivial = _Initialization.TRIVIAL
+	Editing = _Initialization.EDITING
+	RandomInsert = _Initialization.RANDOM_INSERT
+	AscDegreeInsert = _Initialization.ASC_DEGREE_INSERT
+	UserDefindedInsert = _Initialization.USER_DEFINED_INSERT
+
+	def __cinit__(self, Graph G, _Initialization initialization = _Initialization.TRIVIAL, count maxIterations = 5, bool_t sortPaths = True, bool_t randomness = False, count maxPlateauSize = 4, bool_t useBucketQueue = True):
+		self._G = G
+		self._this = new _QuasiThresholdEditingLocalMover(G._this, initialization, maxIterations, sortPaths, randomness, maxPlateauSize, useBucketQueue)
+
+	def getNumberOfEdits(self):
+		return (<_QuasiThresholdEditingLocalMover *>(self._this)).getNumberOfEdits()
+
+	def getUsedIterations(self):
+		return (<_QuasiThresholdEditingLocalMover *>(self._this)).getUsedIterations()
+
+	def getPlateauSize(self):
+		return (<_QuasiThresholdEditingLocalMover *>(self._this)).getPlateauSize()
+
+	def getQuasiThresholdGraph(self):
+		return Graph().setThis((<_QuasiThresholdEditingLocalMover *>(self._this)).getQuasiThresholdGraph())
+
+
+	def setInsertionOrder(self, vector[node] order):
+		(<_QuasiThresholdEditingLocalMover *>(self._this)).setInsertionOrder(order)
+		return self
+
+	def getRunningInfo(self):
+		return (<_QuasiThresholdEditingLocalMover *>(self._this)).getRunningInfo()
+
 def detectCommunities(G, algo=None, inspect=True):
 	""" Perform high-performance community detection on the graph.
 		:param    G    the graph
