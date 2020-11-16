@@ -113,7 +113,7 @@ EditingRunner::EditingRunner(const Graph &G,
         runningInfo[ec.first].push_back(ec.second.readValue());
     }
 
-    runningInfo["time"].push_back(timer.elapsedMilliseconds());
+    runningInfo["time"].push_back(timer.elapsedMicroseconds());
     runningInfo["nodes_moved"].push_back(0);
 }
 
@@ -155,13 +155,13 @@ void EditingRunner::runLocalMover() {
 
         if (i == 0) {
             runningInfo["nodes_moved"][0] = numNodesMoved;
-            runningInfo["time"][0] += timer.elapsedMilliseconds();
+            runningInfo["time"][0] += timer.elapsedMicroseconds();
             for (auto &ec : event_counters) {
                 runningInfo[ec.first][0] += ec.second.readValue();
             }
         } else {
             runningInfo["nodes_moved"].push_back(numNodesMoved);
-            runningInfo["time"].push_back(timer.elapsedMilliseconds());
+            runningInfo["time"].push_back(timer.elapsedMicroseconds());
             for (auto &ec : event_counters) {
                 runningInfo[ec.first].push_back(ec.second.readValue());
             }
