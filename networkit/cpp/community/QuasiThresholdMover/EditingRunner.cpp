@@ -368,8 +368,8 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
                     // sample either 0 or at least two nodes from indifferentChildren
                     std::vector<node> sample;
                     do {
+                        sample.clear();
                         for (node u : indifferentChildren) {
-                            sample.clear();
                             if (randomBool(2)) {
                                 sample.push_back(u);
                             }
