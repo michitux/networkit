@@ -380,11 +380,9 @@ void EditingRunner::localMove(node nodeToMove, count generation) {
                         bestChildren.push_back(u);
                     }
                 }
-            }
-
-            // If there are already two children, just sample randomly from the remaining
-            // indifferent children
-            if (bestChildren.size() > 1) {
+            } else if (bestChildren.size() > 1) {
+                // If there are already two children, just sample randomly from the remaining
+                // indifferent children
                 for (node u : indifferentChildren) {
                     if (randomBool(2)) {
                         bestChildren.push_back(u);
