@@ -11,7 +11,7 @@ namespace NetworKit {
 namespace QuasiThresholdMoving {
 class QuasiThresholdEditingLocalMover : public Algorithm {
 public:
-    enum Initialization { TRIVIAL, EDITING, RANDOM_INSERT, ASC_DEGREE_INSERT, USER_DEFINED_INSERT };
+    enum Initialization { TRIVIAL, EDITING, RANDOM_INSERT, ASC_DEGREE_INSERT, DESC_DEGREE_INSERT, USER_DEFINED_INSERT };
 
     QuasiThresholdEditingLocalMover(const Graph &G, Initialization initializarion = TRIVIAL,
                                     count maxIterations = 5, bool sortPaths = true,

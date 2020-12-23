@@ -83,6 +83,19 @@ EditingRunner::EditingRunner(const Graph &G,
         }
         break;
     }
+    case QuasiThresholdEditingLocalMover::DESC_DEGREE_INSERT: {
+        dynamicForest = DynamicForest(std::vector<node>(G.upperNodeIdBound(), none));
+
+        std::vector<std::vector<node>> buckets(G.numberOfNodes());
+        G.forNodes([&](node u) { buckets[G.degree(u)].push_back(u); });
+        this->order.reserve(G.numberOfNodes());
+        for (auto it = buckets.rbegin(); it != buckets.rend(); ++it) {
+            for (node u : *it) {
+                this->order.push_back(u);
+            }
+        }
+        break;
+    }
     case QuasiThresholdEditingLocalMover::USER_DEFINED_INSERT: {
         dynamicForest = DynamicForest(std::vector<node>(G.upperNodeIdBound(), none));
         this->order = std::move(order);
