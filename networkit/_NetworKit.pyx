@@ -5927,6 +5927,34 @@ cdef class CutClustering(CommunityDetector):
 			pyResult[res.first] = Partition().setThis(res.second)
 		return pyResult
 
+
+cdef extern from "<networkit/community/LouvainMapEquation.hpp>":
+	cdef cppclass _LouvainMapEquation "NetworKit::LouvainMapEquation"(_CommunityDetectionAlgorithm):
+		_LouvainMapEquation(_Graph, bool, count, bool_t parallel) except +
+
+
+cdef class LouvainMapEquation(CommunityDetector):
+	"""
+	Community detection algorithm based on the Louvain algorithm. Uses the Map Equation to find
+	optimal communities.
+
+	Parameters
+	----------
+	G : networkit.Graph
+	    The graph on which the algorithm has to run.
+	hierarchical: bool
+	    (optional) Iteratively create a graph of the locally optimal clusters and optimize locally on that graph.
+	maxIterations: count
+	    (optional) The maximum number of local move iterations.
+	parallel: bool
+	    (optional) Execute the algorithm in parallel.
+	"""
+
+	def __cinit__(self, Graph G not None, hierarchical = False, maxIterations = 256, parallel = False):
+		self._G = G
+		self._this = new _LouvainMapEquation(G._this, hierarchical, maxIterations, parallel)
+
+
 cdef class DissimilarityMeasure:
 	""" Abstract base class for partition/community dissimilarity measures """
 	# TODO: use conventional class design of parametrized constructor, run-method and getters
