@@ -16,6 +16,12 @@ CommunityDetectionAlgorithm::CommunityDetectionAlgorithm(const Graph& G) : Algor
     }
 }
 
+void CommunityDetectionAlgorithm::setGraph(const Graph &G) {
+    this->G = &G;
+    hasRun = false;
+    result = Partition(0);
+}
+
 CommunityDetectionAlgorithm::CommunityDetectionAlgorithm(const Graph& G, const Partition& baseClustering) : Algorithm(), G(&G), result(baseClustering) {
 }
 

@@ -28,6 +28,15 @@ public:
     CommunityDetectionAlgorithm(const Graph& G);
 
     /**
+     * Set the graph.
+     *
+     * This resets the result.
+     *
+     * @param[in] G input graph
+     */
+    void setGraph(const Graph &G);
+
+    /**
      * A community detection algorithm operates on a graph, so the constructor expects a graph.
      *
      * @param[in] G input graph
