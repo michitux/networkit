@@ -60,6 +60,7 @@ void EgoSplitting::setDefaultParameters() {
     parameters["Cleanup"] = "Yes";
     parameters["Cleanup Merge"] = "Yes";
     parameters["Cleanup Min Overlap"] = "0.5";
+    parameters["Cleanup Conductance"] = "Yes";
 
     // Debug/Analysis
     parameters["Store EgoNet Graphs"] = "No";
@@ -502,11 +503,170 @@ void EgoSplitting::createCover(const std::vector<std::vector<node>> &communities
 void EgoSplitting::cleanUpCommunities(std::vector<std::vector<node>> &communities) {
     if (parameters.at("Cleanup") == "Yes") {
         discardSmallCommunities(communities);
-        bool mergeDiscarded = parameters.at("Cleanup Merge") == "Yes";
-        double minOverlap = Aux::stringToDouble(parameters.at("Cleanup Min Overlap"));
-        SignificanceCommunityCleanUp cleanup(G, communities, stochasticDistribution,
-                                             0.1, 0.1, minOverlap, mergeDiscarded);
-        cleanup.run();
+
+        if (parameters.at("Cleanup Conductance") == "Yes") {
+            std::vector<bool> inCommunity(G->upperNodeIdBound(), false);
+            const double totalVolume = G->totalEdgeWeight() * 2;
+            for (std::vector<node> &community : communities) {
+                for (node u : community) {
+                    inCommunity[u] = true;
+                }
+
+                auto nodeVolumeCut = [&](node u) {
+                    double volume = 0;
+                    double cut = 0;
+
+                    G.forNeighborsOf(u, [&](node v, edgeweight weight) {
+                        volume += weight;
+
+                        if (u == v) {
+                            volume += weight;
+                        }
+
+                        if (!inCommunity[v]) {
+                            cut += weight;
+                        }
+                    });
+
+                    return std::make_pair(volume, cut);
+                };
+
+                double volume = 0, cut = 0;
+
+                for (node u : community) {
+                    auto uVolCut = nodeVolumeCut(u);
+                    volume += uVolCut.first;
+                    cut += uVolCut.second;
+                }
+
+                auto conductance = [totalVolume](double cut, double volume) {
+                    return cut / std::min(volume, totalVolume - volume);
+                };
+
+                std::vector<node> newCommunity = community;
+
+                auto assureVolumeCut = [&]() {
+#ifndef NDEBUG
+                    double volumeDebug = 0, cutDebug = 0;
+
+                    for (node u : newCommunity) {
+                        assert(inCommunity[u]);
+                        auto uVolCut = nodeVolumeCut(u);
+                        volumeDebug += uVolCut.first;
+                        cutDebug += uVolCut.second;
+                    }
+
+                    assert(volumeDebug == volume);
+                    assert(cutDebug == cut);
+
+                    G.forNodes([&](node u) {
+                        if (inCommunity[u]) {
+                            if (std::find(newCommunity.begin(), newCommunity.end(), u)
+                                == newCommunity.end()) {
+                                ERROR("Node ", u, "marked but not in community");
+                                assert(false);
+                            }
+                        }
+                    });
+#endif
+                };
+
+                double currentConductance = conductance(cut, volume);
+
+                auto newEnd = newCommunity.end();
+                count numRemoved = 0;
+
+                do {
+                    newCommunity.erase(newEnd, newCommunity.end());
+
+                    std::shuffle(newCommunity.begin(), newCommunity.end(), Aux::Random::getURNG());
+
+                    newEnd = std::remove_if(newCommunity.begin(), newCommunity.end(), [&](node u) {
+                        auto uVolCut = nodeVolumeCut(u);
+
+                        double newVol = volume - uVolCut.first;
+                        double newCut = cut - 2 * uVolCut.second + uVolCut.first;
+                        double newConductance = conductance(newCut, newVol);
+
+                        if (newConductance < currentConductance) {
+                            volume = newVol;
+                            cut = newCut;
+                            currentConductance = newConductance;
+                            inCommunity[u] = false;
+                            ++numRemoved;
+                            return true;
+                        }
+
+                        return false;
+                    });
+
+                } while (newEnd != newCommunity.end());
+
+                assureVolumeCut();
+
+                std::unordered_map<node, double> neighborStrength;
+
+                for (node u : newCommunity) {
+                    G.forNeighborsOf(u, [&](node v, edgeweight weight) {
+                        if (!inCommunity[v]) {
+                            neighborStrength[v] += weight;
+                        }
+                    });
+                }
+
+                count numAdded = 0;
+
+                for (auto it : neighborStrength) {
+                    node v = it.first;
+                    double vStrength = it.second;
+                    double vVol = G.weightedDegree(v, true);
+
+                    double newVol = volume + vVol;
+                    double newCut = cut - 2 * vStrength + vVol;
+                    double newConductance = conductance(newCut, newVol);
+
+                    if (newConductance < currentConductance) {
+                        volume = newVol;
+                        cut = newCut;
+                        currentConductance = newConductance;
+                        inCommunity[v] = true;
+                        newCommunity.push_back(v);
+
+                        assureVolumeCut();
+
+                        ++numAdded;
+
+                        G.forNeighborsOf(v, [&](node x, edgeweight weight) {
+                            if (!inCommunity[x]) {
+                                // do not insert new neighbors
+                                auto xIt = neighborStrength.find(x);
+                                if (xIt != neighborStrength.end()) {
+                                    xIt->second += weight;
+                                }
+                            }
+                        });
+                    }
+                }
+
+                INFO("Cluster ", community, " added: ", numAdded, " removed: ", numRemoved, " new: ", newCommunity);
+
+                for (node u : newCommunity) {
+                    inCommunity[u] = false;
+                }
+
+                if (numAdded + numRemoved > community.size() / 2) {
+                    newCommunity.clear(); // will be discarded later
+                }
+
+                community.swap(newCommunity);
+            }
+        } else {
+            bool mergeDiscarded = parameters.at("Cleanup Merge") == "Yes";
+            double minOverlap = Aux::stringToDouble(parameters.at("Cleanup Min Overlap"));
+            SignificanceCommunityCleanUp cleanup(*G, communities, stochasticDistribution, 0.1, 0.1,
+                                                 minOverlap, mergeDiscarded);
+            cleanup.run();
+        }
     }
     discardSmallCommunities(communities);
 
