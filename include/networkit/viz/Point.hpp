@@ -16,6 +16,7 @@
 #include <cmath>
 #include <numeric>
 #include <string>
+#include <stdexcept>
 #include <vector>
 
 #include <tlx/simple_vector.hpp>
