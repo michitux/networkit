@@ -17,7 +17,7 @@
 
 namespace NetworKit {
 
-class LouvainMapEquation final : public CommunityDetectionAlgorithm {
+class LouvainMapEquation final : public CloneableCommunityDetectionAlgorithm<LouvainMapEquation> {
 private:
     enum class ParallelizationType : uint8_t { None, RelaxMap, Synchronous };
 
@@ -84,7 +84,7 @@ private:
     double totalCut, totalVolume;
 
     // for RelaxMap
-    std::vector<Aux::Spinlock> locks;
+    Aux::SpinlockArray locks;
 
     // for SLM
     Partition nextPartition;

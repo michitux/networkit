@@ -24,7 +24,8 @@ namespace NetworKit {
 
 LouvainMapEquation::LouvainMapEquation(const Graph &graph, bool hierarchical, count maxIterations,
                                        ParallelizationType parallelizationType)
-    : CommunityDetectionAlgorithm(graph), parallel(parallelizationType > ParallelizationType::None),
+    : CloneableCommunityDetectionAlgorithm<LouvainMapEquation>(graph),
+      parallel(parallelizationType > ParallelizationType::None),
       parallelizationType(parallelizationType), hierarchical(hierarchical),
       maxIterations(maxIterations), clusterCut(graph.upperNodeIdBound()),
       clusterVolume(graph.upperNodeIdBound()),
