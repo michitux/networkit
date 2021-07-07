@@ -15,8 +15,8 @@
 #include <cassert>
 #include <cmath>
 #include <numeric>
-#include <string>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include <tlx/simple_vector.hpp>
