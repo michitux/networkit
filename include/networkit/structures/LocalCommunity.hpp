@@ -208,6 +208,15 @@ public:
     bool contains(node u) const;
 
     /**
+     * Check if the given node @a u is in the shell.
+     *
+     * @param u The node to check
+     *
+     * @return If @a u is in the shell.
+     */
+    bool shellContains(node u) const;
+
+    /**
      * Return the community as a std::set<node>.
      *
      * @return The community as std::set<node>
@@ -339,6 +348,28 @@ public:
      * @return The size of the boundary.
      */
     count boundarySize() const { return currentBoundary->size(); }
+
+    /**
+     * Get the information for a node in the community
+     *
+     * Note that the values will only be set when AllowRemoval is true.
+     *
+     * @param u The node in the community to get the information for
+     * @return The community information
+     */
+    CommunityInfo getCommunityInfo(node u) const {
+        return community.at(u);
+    }
+
+    /**
+     * Get the information for a node in the shell of the community
+     *
+     * @param u The node in the shell to get the information for
+     * @return The shell information
+     */
+    ShellInfo getShellInfo(node u) const {
+        return shell.at(u);
+    }
 
 private:
     const Graph *G;

@@ -266,6 +266,11 @@ bool LocalCommunity<ShellMaintainsExtDeg, MaintainBoundary, AllowRemoval>::conta
 }
 
 template <bool ShellMaintainsExtDeg, bool MaintainBoundary, bool AllowRemoval>
+bool LocalCommunity<ShellMaintainsExtDeg, MaintainBoundary, AllowRemoval>::shellContains(node u) const {
+    return shell.find(u) != shell.end();
+}
+
+template <bool ShellMaintainsExtDeg, bool MaintainBoundary, bool AllowRemoval>
 std::set<node> LocalCommunity<ShellMaintainsExtDeg, MaintainBoundary, AllowRemoval>::toSet() const {
     std::set<node> result;
 
