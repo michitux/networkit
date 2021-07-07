@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <algorithm>
 
+#include <networkit/auxiliary/IncrementalUniformRandomSelector.hpp>
 #include <networkit/auxiliary/ParseString.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
 #include <networkit/community/EgoSplitting.hpp>
@@ -18,6 +19,7 @@
 #include <networkit/components/ConnectedComponents.hpp>
 #include <networkit/coarsening/ParallelPartitionCoarsening.hpp>
 #include <networkit/graph/RandomMaximumSpanningForest.hpp>
+#include <networkit/structures/LocalCommunity.hpp>
 #include <networkit/structures/Partition.hpp>
 
 
@@ -508,157 +510,116 @@ void EgoSplitting::cleanUpCommunities(std::vector<std::vector<node>> &communitie
             std::vector<bool> inCommunity(G->upperNodeIdBound(), false);
             const double totalVolume = G->totalEdgeWeight() * 2;
             for (std::vector<node> &community : communities) {
-                for (node u : community) {
-                    inCommunity[u] = true;
-                }
 
-                auto nodeVolumeCut = [&](node u) {
-                    double volume = 0;
-                    double cut = 0;
-
-                    G.forNeighborsOf(u, [&](node v, edgeweight weight) {
-                        volume += weight;
-
-                        if (u == v) {
-                            volume += weight;
-                        }
-
-                        if (!inCommunity[v]) {
-                            cut += weight;
-                        }
-                    });
-
-                    return std::make_pair(volume, cut);
-                };
-
-                double volume = 0, cut = 0;
+                LocalCommunity<true, false, true> localCommunity(*G);
+                using ShellInfo = LocalCommunity<true, false, true>::ShellInfo;
+                using CommunityInfo = LocalCommunity<true, false, true>::CommunityInfo;
 
                 for (node u : community) {
-                    auto uVolCut = nodeVolumeCut(u);
-                    volume += uVolCut.first;
-                    cut += uVolCut.second;
+                    localCommunity.addNode(u);
                 }
+
+                double volume = localCommunity.internalEdgeWeight() * 2 + localCommunity.cut();
+                double cut = localCommunity.cut();
 
                 auto conductance = [totalVolume](double cut, double volume) {
                     return cut / std::min(volume, totalVolume - volume);
                 };
 
-                std::vector<node> newCommunity = community;
+                double currentConductance = conductance(cut, volume);
 
                 auto assureVolumeCut = [&]() {
 #ifndef NDEBUG
-                    double volumeDebug = 0, cutDebug = 0;
-
-                    for (node u : newCommunity) {
-                        assert(inCommunity[u]);
-                        auto uVolCut = nodeVolumeCut(u);
-                        volumeDebug += uVolCut.first;
-                        cutDebug += uVolCut.second;
-                    }
+                    double volumeDebug = localCommunity.internalEdgeWeight() * 2 + localCommunity.cut();
+                    double cutDebug = localCommunity.cut();
 
                     assert(volumeDebug == volume);
                     assert(cutDebug == cut);
-
-                    G.forNodes([&](node u) {
-                        if (inCommunity[u]) {
-                            if (std::find(newCommunity.begin(), newCommunity.end(), u)
-                                == newCommunity.end()) {
-                                ERROR("Node ", u, "marked but not in community");
-                                assert(false);
-                            }
-                        }
-                    });
+                    assert(currentConductance == conductance(cut, volume));
 #endif
                 };
 
-                double currentConductance = conductance(cut, volume);
+                count numAdded = 0, numRemoved = 0;
 
-                auto newEnd = newCommunity.end();
-                count numRemoved = 0;
+                auto tooManyChanged = [&]() -> bool {
+                    return (numAdded + numRemoved) > community.size();
+                };
 
-                do {
-                    newCommunity.erase(newEnd, newCommunity.end());
+                node uMin;
+                do { // outer loop: add a node
+                    do { // inner loop: remove as many nodes as necessary
+                        uMin = none;
+                        double qMin = currentConductance;
 
-                    std::shuffle(newCommunity.begin(), newCommunity.end(), Aux::Random::getURNG());
+                        Aux::IncrementalUniformRandomSelector selector;
 
-                    newEnd = std::remove_if(newCommunity.begin(), newCommunity.end(), [&](node u) {
-                        auto uVolCut = nodeVolumeCut(u);
+                        localCommunity.forCommunityNodes([&](node u, const CommunityInfo &uInfo) {
+                            double newCut = cut + uInfo.intDeg.get() - uInfo.extDeg.get();
+                            double newVol = volume - uInfo.intDeg.get() - uInfo.extDeg.get();
 
-                        double newVol = volume - uVolCut.first;
-                        double newCut = cut - 2 * uVolCut.second + uVolCut.first;
-                        double newConductance = conductance(newCut, newVol);
+                            double newConductance = conductance(newCut, newVol);
 
-                        if (newConductance < currentConductance) {
-                            volume = newVol;
-                            cut = newCut;
-                            currentConductance = newConductance;
-                            inCommunity[u] = false;
-                            ++numRemoved;
-                            return true;
-                        }
-
-                        return false;
-                    });
-
-                } while (newEnd != newCommunity.end());
-
-                assureVolumeCut();
-
-                std::unordered_map<node, double> neighborStrength;
-
-                for (node u : newCommunity) {
-                    G.forNeighborsOf(u, [&](node v, edgeweight weight) {
-                        if (!inCommunity[v]) {
-                            neighborStrength[v] += weight;
-                        }
-                    });
-                }
-
-                count numAdded = 0;
-
-                for (auto it : neighborStrength) {
-                    node v = it.first;
-                    double vStrength = it.second;
-                    double vVol = G.weightedDegree(v, true);
-
-                    double newVol = volume + vVol;
-                    double newCut = cut - 2 * vStrength + vVol;
-                    double newConductance = conductance(newCut, newVol);
-
-                    if (newConductance < currentConductance) {
-                        volume = newVol;
-                        cut = newCut;
-                        currentConductance = newConductance;
-                        inCommunity[v] = true;
-                        newCommunity.push_back(v);
-
-                        assureVolumeCut();
-
-                        ++numAdded;
-
-                        G.forNeighborsOf(v, [&](node x, edgeweight weight) {
-                            if (!inCommunity[x]) {
-                                // do not insert new neighbors
-                                auto xIt = neighborStrength.find(x);
-                                if (xIt != neighborStrength.end()) {
-                                    xIt->second += weight;
-                                }
+                            if (newConductance < qMin) {
+                                uMin = u;
+                                qMin = newConductance;
+                                selector.reset();
+                            } else if (uMin != none && newConductance == qMin && selector.addElement()) {
+                                uMin = u;
                             }
                         });
+
+                        if (uMin != none) {
+                            currentConductance = qMin;
+                            localCommunity.removeNode(uMin);
+                            volume = localCommunity.internalEdgeWeight() * 2 + localCommunity.cut();
+                            cut = localCommunity.cut();
+                            ++numRemoved;
+                            assureVolumeCut();
+                        }
+                    } while (uMin != none && !tooManyChanged());
+
+                    uMin = none;
+                    double qMin = currentConductance;
+
+                    // find node with max score
+                    Aux::IncrementalUniformRandomSelector selector;
+                    localCommunity.forShellNodes([&](node u, const ShellInfo &uInfo) {
+                        double newCut = cut - uInfo.intDeg.get() + uInfo.extDeg.get();
+                        double newVol = volume + uInfo.intDeg.get() + uInfo.extDeg.get();
+
+                        double newConductance = conductance(newCut, newVol);
+
+                        if (newConductance < qMin) {
+                            uMin = u;
+                            qMin = newConductance;
+                            selector.reset();
+                        } else if (uMin != none && newConductance == qMin && selector.addElement()) {
+                            uMin = u;
+                        }
+                    });
+
+                    if (uMin != none) {
+                        currentConductance = qMin;
+                        localCommunity.addNode(uMin);
+                        volume = localCommunity.internalEdgeWeight() * 2 + localCommunity.cut();
+                        cut = localCommunity.cut();
+
+                        ++numAdded;
+                        assureVolumeCut();
                     }
+                } while (uMin != none && !tooManyChanged());
+
+                if (tooManyChanged()) {
+                    INFO("Cluster ", community, " added: ", numAdded, " removed: ", numRemoved, " cleared");
+
+                    community.clear(); // will be discarded later
+                } else {
+                    auto newCommunity = localCommunity.toSet();
+
+                    INFO("Cluster ", community, " added: ", numAdded, " removed: ", numRemoved, " new: ", newCommunity);
+
+                    community.assign(newCommunity.begin(), newCommunity.end());
                 }
-
-                INFO("Cluster ", community, " added: ", numAdded, " removed: ", numRemoved, " new: ", newCommunity);
-
-                for (node u : newCommunity) {
-                    inCommunity[u] = false;
-                }
-
-                if (numAdded + numRemoved > community.size() / 2) {
-                    newCommunity.clear(); // will be discarded later
-                }
-
-                community.swap(newCommunity);
             }
         } else {
             bool mergeDiscarded = parameters.at("Cleanup Merge") == "Yes";
