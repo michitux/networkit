@@ -28,8 +28,8 @@ namespace NetworKit {
 EgoSplitting::EgoSplitting(const Graph &G, bool parallelEgoNetEvaluation)
         : EgoSplitting(G, parallelEgoNetEvaluation,
                        PLM(G, true, 1.0, "none randomized"),
-                       PLM(G, true, 1.0)) {
-}
+                       LouvainMapEquation(G, true, 64, "relaxmap"))
+                       {}
 
 EgoSplitting::EgoSplitting(const Graph &G, bool parallelEgoNetEvaluation,
                            const CommunityDetectionAlgorithm &clusterAlgo)

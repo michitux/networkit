@@ -51,10 +51,6 @@ public:
         : LouvainMapEquation(graph, hierarchical, maxIterations,
                              convertStringToParallelizationType(parallelizationStrategy)) {}
 
-    std::unique_ptr<CommunityDetectionAlgorithm> clone() const override {
-        throw std::runtime_error("Clone not implemented");
-    }
-
     void run() override;
 
     std::string toString() const override;

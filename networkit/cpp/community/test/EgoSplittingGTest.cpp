@@ -33,6 +33,7 @@ public:
     }
 
     void testEgoSplitting(const std::map<std::string, std::string> &parameters, bool parallelEgoNets = false) {
+
         EgoSplitting algo(testGraph, parallelEgoNets);
         algo.setParameters(parameters);
         algo.run();

@@ -27,14 +27,7 @@ LouvainMapEquation::LouvainMapEquation(const Graph &graph, bool hierarchical, co
     : CloneableCommunityDetectionAlgorithm<LouvainMapEquation>(graph),
       parallel(parallelizationType > ParallelizationType::None),
       parallelizationType(parallelizationType), hierarchical(hierarchical),
-      maxIterations(maxIterations), clusterCut(graph.upperNodeIdBound()),
-      clusterVolume(graph.upperNodeIdBound()),
-      locks(parallelizationType == ParallelizationType::RelaxMap ? graph.upperNodeIdBound() : 0),
-      nextPartition(
-          parallelizationType == ParallelizationType::Synchronous ? graph.upperNodeIdBound() : 0),
-      ets_neighborClusterWeights(parallel ? Aux::getMaxNumberOfThreads() : 1) {
-    result = Partition(graph.upperNodeIdBound());
-}
+      maxIterations(maxIterations) {}
 
 void LouvainMapEquation::run() {
     if (hasRun)
@@ -42,15 +35,23 @@ void LouvainMapEquation::run() {
 
     Aux::SignalHandler handler;
 
+    result = Partition(G->upperNodeIdBound());
     result.allToSingletons();
-    nextPartition.allToSingletons();
+    if (parallelizationType == ParallelizationType::Synchronous) {
+        nextPartition = Partition(G->upperNodeIdBound());
+        nextPartition.allToSingletons();
+    }
+    if (parallelizationType == ParallelizationType::RelaxMap) {
+        locks = Aux::SpinlockArray(G->upperNodeIdBound());
+    }
+    ets_neighborClusterWeights.resize(parallel ? Aux::getMaxNumberOfThreads() : 1);
 
     // remove unused nodes from clustering
     if (G->numberOfNodes() != G->upperNodeIdBound()) {
         for (node u = 0; u < G->upperNodeIdBound(); ++u) {
             if (!G->hasNode(u)) {
                 result.remove(u);
-                if (parallel && parallelizationType == ParallelizationType::Synchronous) {
+                if (parallelizationType == ParallelizationType::Synchronous) {
                     nextPartition.remove(u);
                 }
             }
@@ -455,6 +456,8 @@ void LouvainMapEquation::runHierarchical() {
 void LouvainMapEquation::calculateInitialClusterCutAndVolume() {
     totalCut = 0.0;
     totalVolume = 0.0;
+    clusterCut.assign(G->upperNodeIdBound(), 0.0);
+    clusterVolume.assign(G->upperNodeIdBound(), 0.0);
 
     if (parallel) {
 #pragma omp parallel if (G->upperNodeIdBound() > 50000)

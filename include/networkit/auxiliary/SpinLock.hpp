@@ -22,8 +22,12 @@ private:
 
 class SpinlockArray {
 public:
-    SpinlockArray(size_t n) : spinlocks(n) {}
+    SpinlockArray(size_t n = 0) : spinlocks(n) {}
     SpinlockArray(const SpinlockArray &other) : SpinlockArray(other.size()) {}
+    SpinlockArray &operator=(const SpinlockArray &other) {
+        spinlocks = std::vector<Spinlock>(other.size());
+        return *this;
+    }
     Spinlock &operator[](size_t idx) { return spinlocks[idx]; }
     size_t size() const { return spinlocks.size(); }
 
