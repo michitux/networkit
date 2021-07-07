@@ -12,7 +12,6 @@
 
 #include <tlx/container.hpp>
 
-#include <networkit/auxiliary/IncrementalUniformRandomSelector.hpp>
 #include <networkit/auxiliary/ParseString.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
 #include <networkit/auxiliary/VectorComparator.hpp>
@@ -23,7 +22,6 @@
 #include <networkit/components/ConnectedComponents.hpp>
 #include <networkit/coarsening/ParallelPartitionCoarsening.hpp>
 #include <networkit/graph/RandomMaximumSpanningForest.hpp>
-#include <networkit/structures/LocalCommunity.hpp>
 #include <networkit/structures/Partition.hpp>
 
 
@@ -513,16 +511,37 @@ void EgoSplitting::cleanUpCommunities(std::vector<std::vector<node>> &communitie
         if (parameters.at("Cleanup Conductance") == "Yes") {
             const double totalVolume = G->totalEdgeWeight() * 2;
 
-            #pragma omp parallel
+            // For weighted graphs
+            std::vector<double> weightedDegree(G->upperNodeIdBound());
+            G->parallelForNodes([&](node u) {
+                weightedDegree[u] = G->weightedDegree(u, true);
+            });
+
+#pragma omp parallel
             {
+                std::vector<double> internalStrength(G->upperNodeIdBound());
 
-                std::vector<double> communityStrength(G->upperNodeIdBound(),
-                                                      std::numeric_limits<double>::signaling_NaN());
-                tlx::DAryAddressableIntHeap<node, 4, Aux::LessInVector<double>> communityHeap(
-                    Aux::LessInVector<double>{communityStrength});
+                auto communityStrength = [&](node u) -> double {
+                    return internalStrength[u] / weightedDegree[u];
+                };
 
-                tlx::DAryAddressableIntHeap<node, 4, Aux::GreaterInVector<double>> shellHeap(
-                    Aux::GreaterInVector<double>{communityStrength});
+                auto strengthLess = [&](node a, node b) -> bool {
+                    return communityStrength(a) < communityStrength(b);
+                };
+
+                auto strengthGreater = [&](node a, node b) -> bool {
+                    return communityStrength(a) > communityStrength(b);
+                };
+
+                tlx::DAryAddressableIntHeap<node, 4, decltype(strengthLess)> communityHeap(
+                    strengthLess);
+
+                tlx::DAryAddressableIntHeap<node, 4, decltype(strengthGreater)> shellHeap(
+                    strengthGreater);
+
+                std::vector<bool> inCommunity(G->upperNodeIdBound());
+                std::vector<node> addedNodes;
+                std::vector<node> touchedNodes;
 
 #pragma omp for schedule(dynamic, 10)
                 for (omp_index communityIndex = 0; communityIndex < communities.size();
@@ -530,41 +549,83 @@ void EgoSplitting::cleanUpCommunities(std::vector<std::vector<node>> &communitie
                     std::vector<node> &community(communities[communityIndex]);
                     TRACE("Starting cleanup of community of size ", community.size());
 
-                    LocalCommunity<true, false, true> localCommunity(*G);
-                    using ShellInfo = LocalCommunity<true, false, true>::ShellInfo;
-                    using CommunityInfo = LocalCommunity<true, false, true>::CommunityInfo;
-
                     for (node u : community) {
-                        localCommunity.addNode(u);
+                        inCommunity[u] = true;
                     }
 
-                    localCommunity.forCommunityNodes([&](node u, const CommunityInfo &info) {
-                        communityStrength[u] = info.intDeg.get() / G->weightedDegree(u);
-                        communityHeap.push(u);
-                    });
+                    double volume = 0, cut = 0;
+                    for (node u : community) {
+                        G->forNeighborsOf(u, [&](node v, edgeweight ew) {
+                            volume += ew;
 
-                    localCommunity.forShellNodes([&](node u, const ShellInfo &info) {
-                        communityStrength[u] = info.intDeg.get() / G->weightedDegree(u);
-                        shellHeap.push(u);
-                    });
+                            if (u == v) {
+                                volume += ew;
+                                return;
+                            }
+
+                            if (internalStrength[v] == 0) {
+                                touchedNodes.push_back(v);
+                            }
+
+                            internalStrength[v] += ew;
+
+                            if (inCommunity[v]) {
+                                communityHeap.update(v);
+                            } else {
+                                cut += ew;
+                                shellHeap.update(v);
+                            }
+                        });
+                    }
 
                     auto conductance = [totalVolume](double cut, double volume) {
                         return cut / std::min(volume, totalVolume - volume);
                     };
 
-                    auto cut = [&localCommunity]() { return localCommunity.cut(); };
-
-                    auto volume = [&localCommunity]() {
-                        return localCommunity.internalEdgeWeight() * 2 + localCommunity.cut();
-                    };
-
-                    double currentConductance = conductance(cut(), volume());
+                    double currentConductance = conductance(cut, volume);
 
                     auto assureVolumeCut = [&]() {
+                        assert(currentConductance == conductance(cut, volume));
 #ifndef NDEBUG
-                        assert(currentConductance == conductance(cut(), volume()));
+#ifdef NETWORKIT_SANITY_CHECKS
+                        double volumeDebug = 0, cutDebug = 0;
+
+                        G->forNodes([&](node u) {
+                            double debugInternalStrength = 0;
+
+                            G->forNeighborsOf(u, [&](node v, edgeweight ew) {
+                                if (u == v) return;
+
+                                if (inCommunity[v]) {
+                                    debugInternalStrength += ew;
+                                }
+                            });
+
+                            assert(debugInternalStrength == internalStrength[u]);
+
+                            if (inCommunity[u]) {
+                                G->forNeighborsOf(u, [&](node v, edgeweight ew) {
+                                    volumeDebug += ew;
+
+                                    if (u == v) {
+                                        volumeDebug += ew;
+                                        return;
+                                    }
+
+                                    if (!inCommunity[v]) {
+                                        cutDebug += ew;
+                                    }
+                                });
+                            }
+                        });
+
+                        assert(volumeDebug == volume);
+                        assert(cutDebug == cut);
+#endif
 #endif
                     };
+
+                    assureVolumeCut();
 
                     count numAdded = 0, numRemoved = 0;
 
@@ -572,34 +633,25 @@ void EgoSplitting::cleanUpCommunities(std::vector<std::vector<node>> &communitie
                         return (numAdded + numRemoved) > community.size();
                     };
 
-                    auto conductanceAfterAdding = [&](node u) -> double {
-                        ShellInfo uInfo = localCommunity.getShellInfo(u);
-
-                        double newCut = cut() - uInfo.intDeg.get() + uInfo.extDeg.get();
-                        double newVol = volume() + uInfo.intDeg.get() + uInfo.extDeg.get();
-
-                        return conductance(newCut, newVol);
-                    };
-
-                    auto conductanceAfterRemoving = [&](node u) -> double {
-                        CommunityInfo uInfo = localCommunity.getCommunityInfo(u);
-
-                        double newCut = cut() + uInfo.intDeg.get() - uInfo.extDeg.get();
-                        double newVol = volume() - uInfo.intDeg.get() - uInfo.extDeg.get();
-
-                        return conductance(newCut, newVol);
-                    };
-
                     while (!(communityHeap.empty() && shellHeap.empty()) && !tooManyChanged()) {
+                        double cutAdd = 0, volAdd = 0, cutRemove = 0, volRemove = 0;
                         double conductanceAdd = std::numeric_limits<double>::max();
                         double conductanceRemove = std::numeric_limits<double>::max();
 
                         if (!communityHeap.empty()) {
-                            conductanceRemove = conductanceAfterRemoving(communityHeap.top());
+                            node u = communityHeap.top();
+                            cutRemove = cut + 2 * internalStrength[u] - weightedDegree[u];
+                            volRemove = volume - weightedDegree[u];
+
+                            conductanceRemove = conductance(cutRemove, volRemove);
                         }
 
                         if (!shellHeap.empty()) {
-                            conductanceAdd = conductanceAfterAdding(shellHeap.top());
+                            node u = shellHeap.top();
+                            cutAdd = cut - 2 * internalStrength[u] + weightedDegree[u];
+                            volAdd = volume + weightedDegree[u];
+
+                            conductanceAdd = conductance(cutAdd, volAdd);
                         }
 
                         if (conductanceRemove <= conductanceAdd) {
@@ -608,47 +660,57 @@ void EgoSplitting::cleanUpCommunities(std::vector<std::vector<node>> &communitie
 
                             if (conductanceRemove < currentConductance) {
                                 currentConductance = conductanceRemove;
-                                localCommunity.removeNode(u);
+                                cut = cutRemove;
+                                volume = volRemove;
+                                inCommunity[u] = false;
+
                                 ++numRemoved;
-                                assureVolumeCut();
 
                                 // Update heaps
-                                G->forNeighborsOf(u, [&](node v) {
-                                    if (localCommunity.contains(v)) {
-                                        communityStrength[v] =
-                                            localCommunity.getCommunityInfo(v).intDeg.get()
-                                            / G->weightedDegree(v);
+                                G->forNeighborsOf(u, [&](node v, edgeweight ew) {
+                                    if (u == v) return;
+
+                                    internalStrength[v] -= ew;
+                                    if (inCommunity[v]) {
                                         // This may insert the node again if it is not in the queue.
                                         // This is intentional here as the node just lost a neighbor
                                         communityHeap.update(v);
                                     } else if (shellHeap.contains(v)) {
-                                        if (localCommunity.shellContains(v)) {
-                                            communityStrength[v] =
-                                                localCommunity.getShellInfo(v).intDeg.get()
-                                                / G->weightedDegree(v);
+                                        if (internalStrength[v] > 0) {
                                             shellHeap.update(v);
                                         } else {
                                             shellHeap.remove(v);
                                         }
                                     }
                                 });
+
+                                assureVolumeCut();
                             }
                         } else {
                             node u = shellHeap.top();
                             shellHeap.pop();
 
+                            assert(!inCommunity[u]);
+
                             if (conductanceAdd < currentConductance) {
                                 currentConductance = conductanceAdd;
-                                localCommunity.addNode(u);
+                                cut = cutAdd;
+                                volume = volAdd;
+                                inCommunity[u] = true;
+                                addedNodes.push_back(u);
                                 ++numAdded;
-                                assureVolumeCut();
 
                                 // Update heaps
-                                G->forNeighborsOf(u, [&](node v) {
-                                    if (localCommunity.shellContains(v)) {
-                                        communityStrength[v] =
-                                            localCommunity.getShellInfo(v).intDeg.get()
-                                            / G->weightedDegree(v);
+                                G->forNeighborsOf(u, [&](node v, edgeweight ew) {
+                                    if (u == v) return;
+
+                                    if (internalStrength[v] == 0) {
+                                        touchedNodes.push_back(v);
+                                    }
+
+                                    internalStrength[v] += ew;
+
+                                    if (!inCommunity[v]) {
                                         // This may insert the node if it is not in the queue which
                                         // is intential here as this node got a higher score now
                                         shellHeap.update(v);
@@ -656,12 +718,11 @@ void EgoSplitting::cleanUpCommunities(std::vector<std::vector<node>> &communitie
                                         // Only update the community heap if the node is already in
                                         // it, as this node has a new internal neighbor it seems
                                         // unlikely that it should be removed now
-                                        communityStrength[v] =
-                                            localCommunity.getCommunityInfo(v).intDeg.get()
-                                            / G->weightedDegree(v);
                                         communityHeap.update(v);
                                     }
                                 });
+
+                                assureVolumeCut();
                             }
                         }
                     }
@@ -670,7 +731,15 @@ void EgoSplitting::cleanUpCommunities(std::vector<std::vector<node>> &communitie
                         TRACE("Cluster ", community, " added: ", numAdded, " removed: ", numRemoved,
                               " cleared");
 
+                        for (node u : community) {
+                            inCommunity[u] = false;
+                        }
+
                         community.clear(); // will be discarded later
+
+                        for (node u : addedNodes) {
+                            inCommunity[u] = false;
+                        }
 
                         // FIXME: clear is linear in the key space!
                         while (!communityHeap.empty()) {
@@ -680,13 +749,39 @@ void EgoSplitting::cleanUpCommunities(std::vector<std::vector<node>> &communitie
                             shellHeap.pop();
                         }
                     } else {
-                        auto newCommunity = localCommunity.toSet();
+                        auto new_end =
+                            std::remove_if(community.begin(), community.end(), [&](node u) {
+                                if (inCommunity[u]) {
+                                    inCommunity[u] = false;
+                                    return false;
+                                }
 
-                        TRACE("Cluster ", community, " added: ", numAdded, " removed: ", numRemoved,
-                              " new: ", newCommunity);
+                                return true;
+                            });
+                        community.erase(new_end, community.end());
 
-                        community.assign(newCommunity.begin(), newCommunity.end());
+                        for (node u : addedNodes) {
+                            if (inCommunity[u]) {
+                                inCommunity[u] = false;
+                                community.push_back(u);
+                            }
+                        }
+
+                        TRACE("Cluster ", community, " added: ", numAdded,
+                              " removed: ", numRemoved);
                     }
+
+                    for (node u : touchedNodes) {
+                        internalStrength[u] = 0;
+                    }
+
+                    addedNodes.clear();
+                    touchedNodes.clear();
+
+                    assert(std::all_of(internalStrength.begin(), internalStrength.end(),
+                                       [](double x) { return x == .0; }));
+
+                    assert(std::all_of(inCommunity.begin(), inCommunity.end(), std::logical_not<bool>()));
                 }
             }
         } else {
