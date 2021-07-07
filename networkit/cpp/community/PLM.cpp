@@ -20,10 +20,10 @@ namespace NetworKit {
 
 PLM::PLM(const Graph &G, bool refine, double gamma, std::string par, count maxIter, bool turbo,
          bool recurse, bool measure_time)
-    : CommunityDetectionAlgorithm(G), parallelism(std::move(par)), refine(refine), gamma(gamma),
+    : BaseClass(G), parallelism(std::move(par)), refine(refine), gamma(gamma),
       maxIter(maxIter), turbo(turbo), recurse(recurse), measure_time(measure_time) {}
 
-PLM::PLM(const Graph& G, const PLM& other) : CommunityDetectionAlgorithm(G), parallelism(other.parallelism), refine(other.refine), gamma(other.gamma), maxIter(other.maxIter), turbo(other.turbo), recurse(other.recurse) {}
+PLM::PLM(const Graph& G, const PLM& other) : BaseClass(G), parallelism(other.parallelism), refine(other.refine), gamma(other.gamma), maxIter(other.maxIter), turbo(other.turbo), recurse(other.recurse) {}
 
 void PLM::run() {
     Aux::SignalHandler handler;

@@ -16,7 +16,7 @@ namespace NetworKit {
  * @ingroup community
  * A parallel agglomerative community detection algorithm, maximizing modularity.
  */
-class ParallelAgglomerativeClusterer final: public CommunityDetectionAlgorithm {
+class ParallelAgglomerativeClusterer final: public CloneableCommunityDetectionAlgorithm<ParallelAgglomerativeClusterer> {
 
 public:
     /**

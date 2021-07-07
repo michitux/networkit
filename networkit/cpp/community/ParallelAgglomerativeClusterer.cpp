@@ -14,7 +14,7 @@
 
 namespace NetworKit {
 
-ParallelAgglomerativeClusterer::ParallelAgglomerativeClusterer(const Graph& G) : CommunityDetectionAlgorithm(G) {}
+ParallelAgglomerativeClusterer::ParallelAgglomerativeClusterer(const Graph& G) : BaseClass(G) {}
 
 void ParallelAgglomerativeClusterer::run() {
 

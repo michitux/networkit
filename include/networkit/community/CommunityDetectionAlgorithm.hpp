@@ -8,6 +8,8 @@
 #ifndef NETWORKIT_COMMUNITY_COMMUNITY_DETECTION_ALGORITHM_HPP_
 #define NETWORKIT_COMMUNITY_COMMUNITY_DETECTION_ALGORITHM_HPP_
 
+#include <memory>
+
 #include <networkit/base/Algorithm.hpp>
 #include <networkit/graph/Graph.hpp>
 #include <networkit/structures/Partition.hpp>
@@ -53,6 +55,12 @@ public:
     void run() override = 0;
 
     /**
+     * Return a copy of the community detection algorithm.
+     * @return copy of the community detection algorithm
+     */
+    virtual std::unique_ptr<CommunityDetectionAlgorithm> clone() const = 0;
+
+    /**
      * Returns the result of the run method or throws an error, if the algorithm hasn't run yet.
      * @return partition of the node set
      */
@@ -66,6 +74,21 @@ public:
 protected:
     const Graph* G;
     Partition result;
+};
+
+template<class Derived>
+class CloneableCommunityDetectionAlgorithm : public CommunityDetectionAlgorithm {
+public:
+    using BaseClass = CloneableCommunityDetectionAlgorithm<Derived>;
+    using CommunityDetectionAlgorithm::CommunityDetectionAlgorithm;
+
+    /**
+     * Return a copy of the community detection algorithm.
+     * @return copy of the community detection algorithm
+     */
+    std::unique_ptr<CommunityDetectionAlgorithm> clone() const override {
+        return std::make_unique<Derived>(static_cast<Derived const &>(*this));
+    }
 };
 
 } /* namespace NetworKit */

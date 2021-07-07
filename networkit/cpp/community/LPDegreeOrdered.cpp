@@ -13,7 +13,7 @@
 
 namespace NetworKit {
 
-LPDegreeOrdered::LPDegreeOrdered(const Graph& G) : CommunityDetectionAlgorithm(G) {}
+LPDegreeOrdered::LPDegreeOrdered(const Graph& G) : BaseClass(G) {}
 
 void LPDegreeOrdered::run() {
     count n = G->numberOfNodes();

@@ -30,7 +30,7 @@ LPPotts::LPPotts(const Graph &G, double alpha, count theta, count maxIterations,
 
 LPPotts::LPPotts(const Graph &G, const Partition &baseClustering, double alpha, count theta,
                  count maxIterations, bool parallel)
-        : CommunityDetectionAlgorithm(G, baseClustering), alpha(alpha), updateThreshold(theta),
+        : BaseClass(G, baseClustering), alpha(alpha), updateThreshold(theta),
           maxIterations(maxIterations), parallel(parallel) {
 }
 

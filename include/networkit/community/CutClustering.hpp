@@ -10,7 +10,7 @@ namespace NetworKit {
  * Flake, Gary William; Tarjan, Robert E.; Tsioutsiouliklis, Kostas. Graph Clustering and Minimum Cut Trees.
  * Internet Mathematics 1 (2003), no. 4, 385--408.
  */
-class CutClustering final : public CommunityDetectionAlgorithm {
+class CutClustering final : public CloneableCommunityDetectionAlgorithm<CutClustering> {
 public:
     /**
      * Initialize cut clustering algorithm with parameter alpha.

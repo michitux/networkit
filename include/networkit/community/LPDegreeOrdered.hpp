@@ -19,7 +19,7 @@ using label = index; // a label is the same as a cluster id
  * Label propagation-based community detection algorithm which
  * processes nodes in increasing order of node degree.
  */
-class LPDegreeOrdered final : public CommunityDetectionAlgorithm {
+class LPDegreeOrdered final : public CloneableCommunityDetectionAlgorithm<LPDegreeOrdered> {
 private:
     count nIterations = 0; //!< number of iterations in last run
 

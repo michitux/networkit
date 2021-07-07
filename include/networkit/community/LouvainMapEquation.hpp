@@ -17,7 +17,7 @@
 
 namespace NetworKit {
 
-class LouvainMapEquation : public CommunityDetectionAlgorithm {
+class LouvainMapEquation final : public CommunityDetectionAlgorithm {
 private:
     enum class ParallelizationType : uint8_t { None, RelaxMap, Synchronous };
 
@@ -50,6 +50,10 @@ public:
                                 const std::string &parallelizationStrategy = "relaxmap")
         : LouvainMapEquation(graph, hierarchical, maxIterations,
                              convertStringToParallelizationType(parallelizationStrategy)) {}
+
+    std::unique_ptr<CommunityDetectionAlgorithm> clone() const override {
+        throw std::runtime_error("Clone not implemented");
+    }
 
     void run() override;
 

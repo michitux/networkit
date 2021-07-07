@@ -12,7 +12,7 @@
 #include <networkit/flow/EdmondsKarp.hpp>
 #include <networkit/graph/GraphTools.hpp>
 
-NetworKit::CutClustering::CutClustering(const Graph& G, NetworKit::edgeweight alpha) : CommunityDetectionAlgorithm(G), alpha(alpha) { }
+NetworKit::CutClustering::CutClustering(const Graph& G, NetworKit::edgeweight alpha) : BaseClass(G), alpha(alpha) { }
 
 void NetworKit::CutClustering::run() {
     Partition result(G->upperNodeIdBound());

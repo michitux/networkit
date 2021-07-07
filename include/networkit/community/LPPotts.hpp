@@ -19,7 +19,7 @@ namespace NetworKit {
  * Label propagation algorithm using the Absolute Potts Model technique.
  *
  */
-class LPPotts : public CommunityDetectionAlgorithm {
+class LPPotts final : public CloneableCommunityDetectionAlgorithm<LPPotts> {
 public:
 
     /**
