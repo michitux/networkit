@@ -27,7 +27,7 @@ PLM::PLM(const Graph& G, const PLM& other) : BaseClass(G), parallelism(other.par
 
 void PLM::run() {
     Aux::SignalHandler handler;
-
+    bool parallel = parallelism != "none" && parallelism != "none randomized";
     count z = G->upperNodeIdBound();
 
     // init communities to singletons
@@ -36,8 +36,7 @@ void PLM::run() {
     {
         index i = 0;
         G->forNodes([&](node u) {
-            zeta[u] = i;
-            ++i;
+            zeta[u] = i++;
         });
 
         assert(i == G->numberOfNodes());
@@ -46,22 +45,21 @@ void PLM::run() {
 
     // init graph-dependent temporaries
     std::vector<double> volNode(z, 0.0);
+    std::vector<double> volCommunity(o, 0.0);
     // $\omega(E)$
     edgeweight total = G->totalEdgeWeight();
-    DEBUG("total edge weight: " , total);
     edgeweight divisor = (2 * total * total); // needed in modularity calculation
 
-    G->parallelForNodes([&](node u) { // calculate and store volume of each node
-        volNode[u] += G->weightedDegree(u);
-        volNode[u] += G->weight(u, u); // consider self-loop twice
-    });
-
-    // init community-dependent temporaries
-    std::vector<double> volCommunity(o, 0.0);
-    zeta.parallelForEntries([&](node u, index C) { // set volume for all communities
-        if (C != none)
-            volCommunity[C] = volNode[u];
-    });
+    // calculate and store volume of each node
+    auto calcVol = [&](node u) {
+        volNode[u] = G->weightedDegree(u, true /* count self loops twice */);
+        volCommunity[zeta.subsetOf(u)] = volNode[u];
+    };
+    if (parallel) {
+        G->parallelForNodes(calcVol);
+    } else {
+        G->forNodes(calcVol);
+    }
 
     // first move phase
     bool moved = false; // indicates whether any node has been moved in the last pass
@@ -72,7 +70,6 @@ void PLM::run() {
     // stores the list of neighboring communities, one vector per thread
     std::vector<std::vector<index> > neigh_comm;
 
-    bool parallel = parallelism != "none" && parallelism != "none randomized";
     if (turbo) {
         if (parallel) { // initialize arrays for all threads only when actually needed
             turboAffinity.resize(omp_get_max_threads());
@@ -272,9 +269,12 @@ void PLM::run() {
         // unpack communities in coarse graph onto fine graph
         const std::vector<node>& nodeToMetaNode(coarsening.getFineToCoarseNodeMapping());
 
-        G->forNodes([&](node v) {
-            zeta[v] = zetaCoarse[nodeToMetaNode[v]];
-        });
+        auto project = [&](node v) { zeta[v] = zetaCoarse[nodeToMetaNode[v]]; };
+        if (parallel) {
+            G->parallelForNodes(project);
+        } else {
+            G->forNodes(project);
+        }
         zeta.setUpperBound(zetaCoarse.upperBound());
 
         // refinement phase
