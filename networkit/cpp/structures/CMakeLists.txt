@@ -1,5 +1,6 @@
 networkit_add_module(structures
     Cover.cpp
+    GlobalCommunity.cpp
     LocalCommunity.cpp
     LowToHighDirectedGraph.cpp
     NodeMapping.cpp
