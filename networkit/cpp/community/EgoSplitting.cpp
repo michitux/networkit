@@ -486,7 +486,9 @@ void EgoSplitting::createPersonaClustering() {
 std::vector<std::vector<node>> EgoSplitting::getCommunitiesFromPersonaClustering() {
     personaPartition.compact(personaPartition.upperBound() < 2 * personaGraph.numberOfNodes());
     std::vector<std::vector<node>> communities(personaPartition.upperBound());
-    G->forNodes([&](node u) {
+
+    auto implSequential = [&] {
+      G->forNodes([&](node u) {
         for (index i = personaOffsets[u]; i < personaOffsets[u + 1]; ++i) {
             if (personaGraph.hasNode(i)) {
                 index commId = personaPartition.subsetOf(i);
@@ -495,8 +497,129 @@ std::vector<std::vector<node>> EgoSplitting::getCommunitiesFromPersonaClustering
                 }
             }
         }
-    });
+      });
+    };
 
+    auto implParallel1 = [&] {
+      std::vector<std::pair<index, node>> nodesSortedByPersonaCommunity(personaGraph.upperNodeIdBound() + 1);
+      G->balancedParallelForNodes([&](node u) {
+        for (index i = personaOffsets[u]; i < personaOffsets[u + 1]; ++i) {
+            if (personaGraph.hasNode(i)) {
+                index commID = personaPartition.subsetOf(i);
+                nodesSortedByPersonaCommunity[i] = std::make_pair(commID, u);
+            } else {
+                nodesSortedByPersonaCommunity[i] = std::make_pair(none, none);
+            }
+        }
+      });
+      nodesSortedByPersonaCommunity.back() = std::make_pair(none, none);    // sentinel
+      Aux::Parallel::sort(nodesSortedByPersonaCommunity.begin(), nodesSortedByPersonaCommunity.end());
+
+      auto get_comm = [&](omp_index i) { return std::get<0>(nodesSortedByPersonaCommunity[i]); };
+#pragma omp parallel for schedule(guided)       // no idea what the best schedule should be. this is a nasty pattern
+      for (omp_index i = 0; i < personaGraph.upperNodeIdBound(); ++i) {
+          const index comm = get_comm(i);
+          if ((i == 0 || comm != get_comm(i - 1)) && comm != none) {
+              std::vector<node>& nodeList = communities[comm];
+              for (index j = i; get_comm(j) == comm; ++j) {
+                  const node u = nodesSortedByPersonaCommunity[j].second;
+                  if (nodeList.empty() || nodeList.back() != u) {
+                      nodeList.push_back(u);
+                  }
+              }
+          }
+      }
+    };
+
+    auto implParallel2 = [&] {
+        Aux::SpinlockArray locks(personaPartition.upperBound());
+        G->balancedParallelForNodes([&](node u) {
+           std::vector<index> comms;
+            for (index i = personaOffsets[u]; i < personaOffsets[u + 1]; ++i) {
+               if (personaGraph.hasNode(i)) {
+                   comms.push_back(personaPartition.subsetOf(i));
+               }
+            }
+            std::sort(comms.begin(), comms.end());
+            auto newEnd = std::unique(comms.begin(), comms.end());
+            comms.erase(newEnd, comms.end());
+            for (index c : comms) {
+              locks[c].lock();
+              communities[c].push_back(u);
+              locks[c].unlock();
+            }
+        });
+    };
+
+    auto implParallel3 = [&] {
+        std::vector<index> offsets(personaPartition.upperBound() + 1, 0);
+        personaGraph.balancedParallelForNodes([&](node persona) {
+            __atomic_fetch_add(&offsets[personaPartition.subsetOf(persona)], 1, __ATOMIC_RELAXED);
+        });
+
+        // TODO use omp scan
+        for (index i = 1; i < offsets.size(); ++i) {
+            offsets[i] += offsets[i - 1];
+        }
+
+        // can actually use number of nodes here, not upperNodeIdBound !
+        std::vector<node> sorted(personaGraph.numberOfNodes(), none);
+        G->balancedParallelForNodes([&](node u) {
+            for (index i = personaOffsets[u]; i < personaOffsets[u + 1]; ++i) {
+                if (personaGraph.hasNode(i)) {
+                    index comm = personaPartition.subsetOf(i);
+                    index pos = __atomic_fetch_sub(&offsets[comm], 1, __ATOMIC_RELAXED) - 1;
+                    sorted[pos] = u;
+                }
+            }
+        });
+
+
+#pragma omp parallel for schedule (guided)
+        for (omp_index i = 0; i < offsets.size() - 1; ++i) {
+            // each community sub-range may now have duplicate nodes!
+            auto begin = sorted.begin() + offsets[i];
+            auto end = sorted.begin() +  offsets[i + 1];
+            std::sort(begin, end);
+            auto newEnd = std::unique(begin, end);
+            auto& nodeList = communities[i];
+            for ( ; begin != newEnd; ++begin) {
+                nodeList.push_back(*begin);
+            }
+        }
+
+    };
+
+
+    // implSequential();
+    implParallel3();
+    // implParallel1();
+    // implParallel2();
+
+    // to verify correctness of the parallel implementations
+#ifndef NDEBUG
+    // check if each node in the node list of a community has a persona in that community
+#pragma omp parallel for schedule (guided)
+    for (index c = 0; c < communities.size(); ++c) {
+        for (node u : communities[c]) {
+            bool any = false;
+            for (node i = personaOffsets[u]; !any && i < personaOffsets[u + 1]; ++i) {
+                any |= personaGraph.hasNode(i) && personaPartition.subsetOf(i) == c;
+            }
+            assert(any);
+        }
+    }
+
+    // check if each node is in the node-lists of the communities of its personas
+    G->balancedParallelForNodes([&](node u) {
+      for (node i = personaOffsets[u]; i < personaOffsets[u + 1]; ++i) {
+          if (personaGraph.hasNode(i)) {
+              const index c = personaPartition.subsetOf(i);
+              assert(std::find(communities[c].begin(), communities[c].end(), u) != communities[c].end());
+          }
+      }
+    });
+#endif
     return communities;
 }
 
