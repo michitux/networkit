@@ -3,6 +3,7 @@ networkit_add_module(community
     ClusteringGenerator.cpp
     CommunityDetectionAlgorithm.cpp
     Conductance.cpp
+    ConductanceCommunityCleanup.cpp
     CoverHubDominance.cpp
     CoverF1Similarity.cpp
     OverlappingNMIDistance.cpp

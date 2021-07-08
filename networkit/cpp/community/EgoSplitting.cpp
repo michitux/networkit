@@ -16,6 +16,7 @@
 #include <networkit/auxiliary/ParseString.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
 #include <networkit/auxiliary/VectorComparator.hpp>
+#include <networkit/community/ConductanceCommunityCleanup.hpp>
 #include <networkit/community/EgoSplitting.hpp>
 #include <networkit/community/PLM.hpp>
 #include <networkit/community/LouvainMapEquation.hpp>
@@ -23,7 +24,6 @@
 #include <networkit/components/ConnectedComponents.hpp>
 #include <networkit/coarsening/ParallelPartitionCoarsening.hpp>
 #include <networkit/graph/RandomMaximumSpanningForest.hpp>
-#include <networkit/structures/GlobalCommunity.hpp>
 #include <networkit/structures/Partition.hpp>
 
 
@@ -567,161 +567,22 @@ void EgoSplitting::cleanUpCommunities(std::vector<std::vector<node>> &communitie
         discardSmallCommunities(communities);
 
         if (parameters.at("Cleanup Conductance") == "Yes") {
-            const double totalVolume = G->totalEdgeWeight() * 2;
+            // Cleanup does initialization potentially in O(m) - initialize once, copy O(n)
+            // information for each thread.
+            ConductanceCommunityCleanup cleanup(*G);
 
-            std::vector<double> weightedDegree(G->upperNodeIdBound());
-            G->parallelForNodes([&](node u) {
-                weightedDegree[u] = G->weightedDegree(u, true);
-            });
+#pragma omp parallel for schedule(dynamic, 10) firstprivate(cleanup)
+            for (omp_index communityIndex = 0; communityIndex < communities.size();
+                 ++communityIndex) {
+                std::vector<node> &community(communities[communityIndex]);
+                TRACE("Starting cleanup of community of size ", community.size());
 
-#pragma omp parallel
-            {
-                GlobalCommunity globalCommunity(*G);
+                cleanup.setCommunity(community.begin(), community.end());
+                cleanup.run();
 
-                auto communityStrength = [&](node u) -> double {
-                    return globalCommunity.getInternalStrength(u) / weightedDegree[u];
-                };
-
-                auto strengthLess = [&](node a, node b) -> bool {
-                    return communityStrength(a) < communityStrength(b);
-                };
-
-                auto strengthGreater = [&](node a, node b) -> bool {
-                    return communityStrength(a) > communityStrength(b);
-                };
-
-                tlx::DAryAddressableIntHeap<node, 4, decltype(strengthLess)> communityHeap(
-                    strengthLess);
-
-                tlx::DAryAddressableIntHeap<node, 4, decltype(strengthGreater)> shellHeap(
-                    strengthGreater);
-
-#pragma omp for schedule(dynamic, 10)
-                for (omp_index communityIndex = 0; communityIndex < communities.size();
-                     ++communityIndex) {
-                    std::vector<node> &community(communities[communityIndex]);
-                    TRACE("Starting cleanup of community of size ", community.size());
-
-                    globalCommunity.init(community.begin(), community.end());
-
-                    assert(globalCommunity.getSize() == community.size());
-
-                    globalCommunity.forNodesWithInternalStrength([&](node u, double) {
-                        if (globalCommunity.contains(u)) {
-                            communityHeap.push(u);
-                        } else {
-                            shellHeap.push(u);
-                        }
-                    });
-
-                    auto conductance = [totalVolume](double cut, double volume) {
-                        return cut / std::min(volume, totalVolume - volume);
-                    };
-
-                    double currentConductance = conductance(globalCommunity.getCut(), globalCommunity.getVolume());
-
-                    count numAdded = 0, numRemoved = 0;
-
-                    auto tooManyChanged = [&]() -> bool {
-                        return (numAdded + numRemoved) > community.size();
-                    };
-
-                    while (!(communityHeap.empty() && shellHeap.empty()) && !tooManyChanged()) {
-                        double cutAdd = 0, volAdd = 0, cutRemove = 0, volRemove = 0;
-                        double conductanceAdd = std::numeric_limits<double>::max();
-                        double conductanceRemove = std::numeric_limits<double>::max();
-
-                        if (!communityHeap.empty()) {
-                            node u = communityHeap.top();
-                            // FIXME: this is not correct for graphs with self-loops!
-                            cutRemove = globalCommunity.getCut() + 2 * globalCommunity.getInternalStrength(u) - weightedDegree[u];
-                            volRemove = globalCommunity.getVolume() - weightedDegree[u];
-
-                            conductanceRemove = conductance(cutRemove, volRemove);
-                        }
-
-                        if (!shellHeap.empty()) {
-                            node u = shellHeap.top();
-                            cutAdd = globalCommunity.getCut() - 2 * globalCommunity.getInternalStrength(u) + weightedDegree[u];
-                            volAdd = globalCommunity.getVolume() + weightedDegree[u];
-
-                            conductanceAdd = conductance(cutAdd, volAdd);
-                        }
-
-                        if (conductanceRemove <= conductanceAdd) {
-                            node u = communityHeap.top();
-                            communityHeap.pop();
-
-                            if (conductanceRemove < currentConductance) {
-                                currentConductance = conductanceRemove;
-
-                                globalCommunity.removeNode(u, [&](node v, double internalStrength) {
-                                    if (globalCommunity.contains(v)) {
-                                        // This may insert the node again if it is not in the queue.
-                                        // This is intentional here as the node just lost a neighbor
-                                        communityHeap.update(v);
-                                    } else if (shellHeap.contains(v)) {
-                                        if (internalStrength > 0) {
-                                            shellHeap.update(v);
-                                        } else {
-                                            shellHeap.remove(v);
-                                        }
-                                    }
-                                });
-
-                                ++numRemoved;
-
-                                assert(currentConductance == conductance(globalCommunity.getCut(), globalCommunity.getVolume()));
-                            }
-                        } else {
-                            node u = shellHeap.top();
-                            shellHeap.pop();
-
-                            assert(!globalCommunity.contains(u));
-
-                            if (conductanceAdd < currentConductance) {
-                                currentConductance = conductanceAdd;
-                                ++numAdded;
-
-                                globalCommunity
-                                    .addNode(u, [&](node v, double) {
-                                    // Update heaps
-                                        if (!globalCommunity.contains(v)) {
-                                            // This may insert the node if it is not in the queue
-                                            // which is intential here as this node got a higher
-                                            // score now
-                                            shellHeap.update(v);
-                                        } else if (communityHeap.contains(v)) {
-                                            // Only update the community heap if the node is already
-                                            // in it, as this node has a new internal neighbor it
-                                            // seems unlikely that it should be removed now
-                                            communityHeap.update(v);
-                                        }
-                                    });
-
-                                assert(currentConductance == conductance(globalCommunity.getCut(), globalCommunity.getVolume()));
-                            }
-                        }
-                    }
-
-                    // FIXME: clear is linear in the key space!
-                    while (!communityHeap.empty()) {
-                        communityHeap.pop();
-                    }
-                    while (!shellHeap.empty()) {
-                        shellHeap.pop();
-                    }
-
-                    if (!tooManyChanged()) {
-                        community.clear(); // tooManyChanged depends on community.size()
-                        globalCommunity.forCommunityNodes([&](node u) { community.push_back(u); });
-                        assert(community.size() == globalCommunity.getSize());
-                    } else {
-                        community.clear();
-                    }
-
-                    globalCommunity.clear();
-                }
+                community.clear();
+                cleanup.forCommunityNodes([&](node u) { community.push_back(u); });
+                assert(community.size() == cleanup.size());
             }
         } else {
             bool mergeDiscarded = parameters.at("Cleanup Merge") == "Yes";
