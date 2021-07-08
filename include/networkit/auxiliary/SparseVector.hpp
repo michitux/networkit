@@ -74,7 +74,7 @@ public:
      * Returns true iff an element was previously inserted at the given index.
      * @param idx
      */
-    bool indexIsUsed(index idx);
+    bool indexIsUsed(index idx) const;
 
     /**
      * Inserts value at position i, or replaces the value if previously inserted
@@ -117,7 +117,7 @@ public:
      * @param lambda
      */
     template <typename ElementHandler>
-    void forElements(ElementHandler &&lambda) {
+    void forElements(ElementHandler &&lambda) const {
         for (index i : usedIndexes) {
             lambda(i, data[i]);
         }
@@ -198,7 +198,7 @@ void NetworKit::SparseVector<T>::resize(size_t size, T emptyValue) {
 }
 
 template <typename T>
-bool NetworKit::SparseVector<T>::indexIsUsed(index idx) {
+bool NetworKit::SparseVector<T>::indexIsUsed(index idx) const {
     return data[idx] != emptyValue;
 }
 
