@@ -39,9 +39,9 @@ class Test_CommunityDetection(unittest.TestCase):
 			self.assertGreater(size, 4)
 			self.assertLess(size, 40)
 
-		plmFactory = community.PLMFactory(True, 1.0, "none randomized")
-		louvainFactory = community.LouvainMapEquationFactory(True, 16, "RelaxMap")
-		egoSplitting = community.EgoSplitting(lfrGraph, plmFactory, louvainFactory)
+		plm = community.PLM(lfrGraph, True, 1.0, "none randomized")
+		mapeq = community.LouvainMapEquation(lfrGraph, True, 16, "relaxmap")
+		egoSplitting = community.EgoSplitting(lfrGraph, plm, mapeq)
 		egoSplitting.run()
 		cover = egoSplitting.getCover()
 		self.assertGreater(cover.numberOfSubsets(), 5)
