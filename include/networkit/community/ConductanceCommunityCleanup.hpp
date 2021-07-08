@@ -71,4 +71,4 @@ private:
 };
 } // namespace NetworKit
 
-#endif
+#endif // NETWORKIT_COMMUNITY_CONDUCTANCE_COMMUNITY_CLEANUP_HPP_
