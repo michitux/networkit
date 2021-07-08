@@ -88,7 +88,7 @@ void Partition::compact(bool useTurbo) {
                 compactingMap[s] = i++;
             }
         });
-        this->parallelForEntries([&](index e, index s) { // replace old SubsetIDs with the new IDs
+        this->forEntries([&](index e, index s) { // replace old SubsetIDs with the new IDs
             if (s != none) {
                 data[e] = compactingMap[s];
             }
