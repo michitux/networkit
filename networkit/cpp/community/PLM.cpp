@@ -32,7 +32,16 @@ void PLM::run() {
 
     // init communities to singletons
     Partition zeta(z);
-    zeta.allToSingletons();
+    zeta.setUpperBound(G->numberOfNodes());
+    {
+        index i = 0;
+        G->forNodes([&](node u) {
+            zeta[u] = i;
+            ++i;
+        });
+
+        assert(i == G->numberOfNodes());
+    }
     index o = zeta.upperBound();
 
     // init graph-dependent temporaries
