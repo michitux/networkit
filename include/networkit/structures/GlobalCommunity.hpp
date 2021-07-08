@@ -237,4 +237,4 @@ private:
 
 } // namespace NetworKit
 
-#endif
+#endif // NETWORKIT_STRUCTURES_GLOBAL_COMMUNITY_HPP_
