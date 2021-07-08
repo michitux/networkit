@@ -11,7 +11,8 @@
 #include <algorithm>
 
 #include <tlx/container.hpp>
-
+#include <networkit/auxiliary/IncrementalUniformRandomSelector.hpp>
+#include <networkit/auxiliary/Parallel.hpp>
 #include <networkit/auxiliary/ParseString.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
 #include <networkit/auxiliary/VectorComparator.hpp>
@@ -381,6 +382,7 @@ void EgoSplitting::connectPersonas() {
     for (node u = 0; u < G->upperNodeIdBound(); ++u) {
         if (!G->hasNode(u) || G->degree(u) < 2)
             continue;
+        // NOTE this is thread-safe already!
         // Connect personas of each node
         for (const WeightedEdge &edge : personaEdges[u]) {
             node pu = getPersona(u, edge.u);
@@ -389,6 +391,7 @@ void EgoSplitting::connectPersonas() {
             personaGraph.addEdge(pu, pv, edge.weight);
         }
 
+        // NOTE this looks like we can use Graph.addPartialEdge(..)
         // Connect personas of different nodes
         const index egoBeginU = egoNetPartitionsOffset[u];
         const index nextEgoBegin = egoNetPartitionsOffset[u + 1];
@@ -453,6 +456,8 @@ void EgoSplitting::connectPersonas() {
     }
 #endif
 
+    // NOTE CC algo sequential.
+
     // Remove small components in the persona graph, as the resulting communities would always be discarded
     ConnectedComponents compsAlgo(personaGraph);
     compsAlgo.run();
@@ -463,6 +468,7 @@ void EgoSplitting::connectPersonas() {
     personaGraph.forNodes([&](node u) {
         const index c = compsAlgo.componentOfNode(u);
         if (componentSizes[c] < minCommunitySize) {
+            // NOTE remove node kinda slow. not thread-safe. it would be perfectly fine to clean the edge-lists in parallel and then deactivate the node
             personaGraph.removeNode(u);
         }
     });
