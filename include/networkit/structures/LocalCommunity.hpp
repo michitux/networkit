@@ -365,9 +365,7 @@ public:
      * @param u The node in the shell to get the information for
      * @return The shell information
      */
-    ShellInfo getShellInfo(node u) const {
-        return shell.at(u);
-    }
+    ShellInfo getShellInfo(node u) const { return shell.at(u); }
 
 private:
     const Graph *G;
