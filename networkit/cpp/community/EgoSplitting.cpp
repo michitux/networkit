@@ -325,7 +325,7 @@ void EgoSplitting::createEgoNets() {
                 span.run();
                 const Graph &spanningForest = span.getMSF();
                 std::vector<WeightedEdge> edges;
-                personaEdges.reserve(std::min(spanningForest.numberOfEdges(), numPersonas - 1));
+                edges.reserve(std::min(spanningForest.numberOfEdges(), numPersonas - 1));
                 spanningForest.forEdges([&](node u, node v) {
                     index p_u = personaIndex[u];
                     index p_v = personaIndex[v];
