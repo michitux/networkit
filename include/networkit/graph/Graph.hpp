@@ -1149,14 +1149,23 @@ public:
      *
      * @param node u Node.
      */
-    void removePartialOutEdges(Unsafe, node u) {
+    void removePartialOutEdges(Unsafe, node u, bool shrinkToFit=false) {
         assert(hasNode(u));
         outEdges[u].clear();
+        if (shrinkToFit) {
+            outEdges[u].shrink_to_fit();
+        }
         if (isWeighted()) {
             outEdgeWeights[u].clear();
+            if (shrinkToFit) {
+                outEdgeWeights[u].shrink_to_fit();
+            }
         }
         if (hasEdgeIds()) {
             outEdgeIds[u].clear();
+            if (shrinkToFit) {
+                outEdgeIds[u].shrink_to_fit();
+            }
         }
     }
 

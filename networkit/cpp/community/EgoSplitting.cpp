@@ -112,6 +112,9 @@ void EgoSplitting::run() {
     std::vector<std::vector<node>> communities = getCommunitiesFromPersonaClustering();
     addTime(timer, "5  Create Communities");
 
+    personaGraph.balancedParallelForNodes([&](node u) {
+        personaGraph.removePartialOutEdges(Unsafe(), u, true);
+    });
     personaGraph = Graph(); // deallocate persona graph
     addTime(timer, "6  Dealloc Persona Graph");
 
