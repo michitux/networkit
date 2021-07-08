@@ -357,9 +357,7 @@ public:
      * @param u The node in the community to get the information for
      * @return The community information
      */
-    CommunityInfo getCommunityInfo(node u) const {
-        return community.at(u);
-    }
+    CommunityInfo getCommunityInfo(node u) const { return community.at(u); }
 
     /**
      * Get the information for a node in the shell of the community
