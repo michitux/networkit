@@ -529,7 +529,7 @@ std::vector<std::vector<node>> EgoSplitting::getCommunitiesFromPersonaClustering
 #ifndef NDEBUG
     // check if each node in the node list of a community has a persona in that community
 #pragma omp parallel for schedule (guided)
-    for (index c = 0; c < communities.size(); ++c) {
+    for (omp_index c = 0; c < communities.size(); ++c) {
         for (node u : communities[c]) {
             bool any = false;
             for (node i = personaOffsets[u]; !any && i < personaOffsets[u + 1]; ++i) {
