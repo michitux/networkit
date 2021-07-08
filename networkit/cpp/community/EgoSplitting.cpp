@@ -488,9 +488,7 @@ void EgoSplitting::createPersonaClustering() {
 std::vector<std::vector<node>> EgoSplitting::getCommunitiesFromPersonaClustering() {
     personaPartition.compact(personaPartition.upperBound() < 2 * personaGraph.numberOfNodes());
     std::vector<std::vector<node>> communities(personaPartition.upperBound());
-
-
-    std::vector<std::atomic<index>> offsets(personaPartition.upperBound() + 1, 0);
+    std::vector<std::atomic<index>> offsets(personaPartition.upperBound() + 1);
     personaGraph.balancedParallelForNodes([&](node persona) {
         offsets[personaPartition.subsetOf(persona)].fetch_add(1, std::memory_order_relaxed);
     });
@@ -516,7 +514,7 @@ std::vector<std::vector<node>> EgoSplitting::getCommunitiesFromPersonaClustering
     for (omp_index i = 0; i < offsets.size() - 1; ++i) {
         // each community sub-range may now have duplicate nodes!
         auto begin = sorted.begin() + offsets[i].load(std::memory_order_relaxed);
-        auto end = sorted.begin() +  offsets[i + 1].load(std::memory_order_relaxed);
+        auto end = sorted.begin() + offsets[i + 1].load(std::memory_order_relaxed);
         std::sort(begin, end);
         auto newEnd = std::unique(begin, end);
         auto& nodeList = communities[i];
