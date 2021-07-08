@@ -40,6 +40,7 @@
 #include <networkit/community/CoverF1Similarity.hpp>
 #include <networkit/community/LPPotts.hpp>
 #include <networkit/community/OverlappingNMIDistance.hpp>
+#include <networkit/graph/GraphTools.hpp>
 
 #include <tlx/unused.hpp>
 
@@ -197,6 +198,26 @@ TEST_F(CommunityGTest, testDeletedNodesPLM) {
     DEBUG("modularity: " , modularity.getQuality(zeta2, G));
     EXPECT_TRUE(GraphClusteringTools::isProperClustering(G, zeta2));
 
+}
+
+TEST_F(CommunityGTest, testSubgraphPLM) {
+    METISGraphReader reader;
+    Modularity modularity;
+    Graph G = reader.read("input/PGPgiantcompo.graph");
+
+    PLM plm1(G);
+    plm1.run();
+    Partition zeta1 = plm1.getPartition();
+
+    auto c2 = zeta1.getMembers(2);
+    Graph g2 = GraphTools::subgraphFromNodes(G, c2.begin(), c2.end());
+
+    PLM plm2(g2);
+    plm2.run();
+    Partition zeta2 = plm2.getPartition();
+
+    EXPECT_TRUE(GraphClusteringTools::isProperClustering(g2, zeta2));
+    EXPECT_GE(zeta2.numberOfSubsets(), 1);
 }
 
 TEST_F(CommunityGTest, testModularity) {
