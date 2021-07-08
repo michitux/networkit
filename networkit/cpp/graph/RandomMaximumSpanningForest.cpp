@@ -41,7 +41,7 @@ void RandomMaximumSpanningForest::run() {
         calculateAttribute = true;
     }
 
-    Aux::Parallel::sort(weightedEdges.begin(), weightedEdges.end(), std::greater<weightedEdge>());
+    std::sort(weightedEdges.begin(), weightedEdges.end(), std::greater<weightedEdge>());
 
     handler.assureRunning();
 
