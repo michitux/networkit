@@ -13,7 +13,7 @@ class ConductanceCommunityCleanup final : public Algorithm {
 public:
     ConductanceCommunityCleanup(const Graph &g);
 
-  ConductanceCommunityCleanup(const ConductanceCommunityCleanup &other);
+    ConductanceCommunityCleanup(const ConductanceCommunityCleanup &other);
 
     template <typename InputIt>
     void setCommunity(InputIt begin, InputIt end) {
@@ -30,7 +30,7 @@ public:
         community.forCommunityNodes(f);
     }
 
-  ConductanceCommunityCleanup &operator=(const ConductanceCommunityCleanup &other);
+    ConductanceCommunityCleanup &operator=(const ConductanceCommunityCleanup &other);
 
     size_t size() const { return community.getSize(); }
 
