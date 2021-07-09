@@ -336,8 +336,14 @@ double LouvainMapEquation::fitnessChange(node, double degree, double loopWeight,
     const double cutTarget = clusterCut[targetCluster];
     const double volTarget = clusterVolume[targetCluster];
     const double cutDifferenceCurrent = 2 * weightToCurrent - degree + 2 * loopWeight;
-    double totalCutNew, targetClusterCutNew, targetClusterCutCurrent, targetCutPlusVolumeNew,
-        targetCutPlusVolumeCurrent;
+
+    double values[5]; // allocate values as array for simd loop below
+
+    // Define meaningful aliases for the values
+    double &totalCutNew = values[0], &targetClusterCutNew = values[1],
+           &targetClusterCutCurrent = values[2], &targetCutPlusVolumeNew = values[3],
+           &targetCutPlusVolumeCurrent = values[4];
+
     if (currentCluster != targetCluster) {
         double cutDifferenceTarget = degree - 2 * weightToTarget - 2 * loopWeight;
 
@@ -354,20 +360,15 @@ double LouvainMapEquation::fitnessChange(node, double degree, double loopWeight,
         targetCutPlusVolumeCurrent = cutTarget + cutDifferenceCurrent + volTarget - degree;
     }
 
-    auto normalizeAndPLogP = [&](double &x) {
-        if (x > 0.0) {
-            x /= totalVolume;
-            x *= std::log(x);
+#pragma omp simd
+    for (size_t i = 0; i < 5; ++i) {
+        values[i] /= totalVolume;
+        if (values[i] > 0) {
+            values[i] *= std::log(values[i]);
         } else {
-            x = 0.0;
+            values[i] = 0;
         }
-    };
-
-    normalizeAndPLogP(totalCutNew);
-    normalizeAndPLogP(targetClusterCutNew);
-    normalizeAndPLogP(targetClusterCutCurrent);
-    normalizeAndPLogP(targetCutPlusVolumeNew);
-    normalizeAndPLogP(targetCutPlusVolumeCurrent);
+    }
 
     return totalCutNew
            + ((targetCutPlusVolumeNew - targetCutPlusVolumeCurrent)

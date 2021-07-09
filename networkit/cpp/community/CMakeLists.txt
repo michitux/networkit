@@ -50,3 +50,9 @@ networkit_module_link_modules(community
 add_subdirectory(test)
 add_subdirectory(cleanup/test)
 
+# Enable math-optimizations and thus vectorized log for LouvainMapEquation
+if (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR
+    ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR
+    ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
+  set_source_files_properties(LouvainMapEquation.cpp DIRECTORY ../../.. PROPERTIES COMPILE_OPTIONS "-ffast-math")
+endif()
