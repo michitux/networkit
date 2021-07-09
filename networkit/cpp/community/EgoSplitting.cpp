@@ -156,6 +156,7 @@ void EgoSplitting::createEgoNets() {
             }
         }
     }
+    const bool extendEgoNet = parameters.at("Extend EgoNet") == "Yes";
     const double extendFactor = Aux::stringToDouble(parameters.at("Maximum Extend Factor"));
     const double extendExponent = Aux::stringToDouble(parameters.at("Maximum Extend Exponent"));
     const bool storeEgoNetGraphs = parameters.at("Store EgoNet Graphs") == "Yes";
@@ -189,71 +190,71 @@ void EgoSplitting::createEgoNets() {
             if (originalEgoNetSize == 0)
                 continue; // egoNode has only degree-1-neighbors
 
-            // Calculate number of neighbors in egoNet for all neighbors of the egonet
-            weightToOriginalEgoNet.reset();
-            double egonetVolume = 0;
-            double egonetCut = 0;
-            for (node u : egoMapping.globalNodes()) {
-                G->forEdgesOf(u, [&](node, node neighbor, edgeweight weight) {
-                    egonetVolume += weight;
-                    if (neighbor != egoNode && !egoMapping.isMapped(neighbor)) {
-                        egonetCut += weight;
-                        if (!weightToOriginalEgoNet.indexIsUsed(neighbor)) {
-                            weightToOriginalEgoNet.insert(neighbor, weight);
-                        } else {
-                            weightToOriginalEgoNet[neighbor] += weight;
+            if (extendEgoNet) {
+                // Calculate number of neighbors in egoNet for all neighbors of the egonet
+                weightToOriginalEgoNet.reset();
+                double egonetVolume = 0;
+                double egonetCut = 0;
+                for (node u : egoMapping.globalNodes()) {
+                    G->forEdgesOf(u, [&](node, node neighbor, edgeweight weight) {
+                        egonetVolume += weight;
+                        if (neighbor != egoNode && !egoMapping.isMapped(neighbor)) {
+                            egonetCut += weight;
+                            if (!weightToOriginalEgoNet.indexIsUsed(neighbor)) {
+                                weightToOriginalEgoNet.insert(neighbor, weight);
+                            } else {
+                                weightToOriginalEgoNet[neighbor] += weight;
+                            }
                         }
+                    });
+                }
+
+                // Get scores of extension candidates
+                candidatesAndScores.clear();
+                weightToOriginalEgoNet.forElements([&](node candidate, double neighborCount) {
+                    if (neighborCount >= minNeighbors) {
+                        double score = neighborCount * neighborCount / G->degree(candidate);
+                        candidatesAndScores.emplace_back(candidate, score);
                     }
                 });
-            }
 
-            // Get scores of extension candidates
-            candidatesAndScores.clear();
-            weightToOriginalEgoNet.forElements([&](node candidate, double neighborCount) {
-                if (neighborCount >= minNeighbors) {
-                    double score = neighborCount * neighborCount / G->degree(candidate);
-                    candidatesAndScores.emplace_back(candidate, score);
+                // Select best candidates
+                count extendedNodesLimit =
+                    std::ceil(extendFactor * std::pow(originalEgoNetSize, extendExponent));
+                if (candidatesAndScores.size() > extendedNodesLimit) {
+                    std::nth_element(
+                        candidatesAndScores.begin(),
+                        candidatesAndScores.begin() + extendedNodesLimit, candidatesAndScores.end(),
+                        [](const std::pair<node, double> &a, const std::pair<node, double> &b) {
+                            return a.second > b.second;
+                        });
+                    candidatesAndScores.resize(extendedNodesLimit);
                 }
-            });
 
-            // Select best candidates
-            count extendedNodesLimit = std::ceil(
-                    extendFactor * std::pow(originalEgoNetSize, extendExponent));
-            if (candidatesAndScores.size() > extendedNodesLimit) {
-                std::nth_element(candidatesAndScores.begin(),
-                                 candidatesAndScores.begin() + extendedNodesLimit,
-                                 candidatesAndScores.end(),
-                                 [](const std::pair<node, double> &a,
-                                    const std::pair<node, double> &b) {
-                                     return a.second > b.second;
-                                 });
-                candidatesAndScores.resize(extendedNodesLimit);
-            }
+                if (conductanceExtend) {
+                    // Only add candidates that improve the conductance
+                    std::sort(candidatesAndScores.begin(), candidatesAndScores.end(),
+                              [](const std::pair<node, double> &a,
+                                 const std::pair<node, double> &b) { return a.second > b.second; });
 
-            if (conductanceExtend) {
-                // Only add candidates that improve the conductance
-                std::sort(candidatesAndScores.begin(), candidatesAndScores.end(),
-                          [](const std::pair<node, double> &a, const std::pair<node, double> &b) {
-                              return a.second > b.second;
-                          });
+                    for (const std::pair<node, double> &cs : candidatesAndScores) {
+                        node candidate = cs.first;
+                        double candidateDegree = G->degree(candidate);
+                        double edgesToEgoNet = weightToOriginalEgoNet[candidate];
 
-                for (const std::pair<node, double> &cs : candidatesAndScores) {
-                    node candidate = cs.first;
-                    double candidateDegree = G->degree(candidate);
-                    double edgesToEgoNet = weightToOriginalEgoNet[candidate];
+                        double newVolume = egonetVolume + candidateDegree;
+                        double newCut = egonetCut - 2 * edgesToEgoNet + candidateDegree;
 
-                    double newVolume = egonetVolume + candidateDegree;
-                    double newCut = egonetCut - 2 * edgesToEgoNet + candidateDegree;
-
-                    if (egonetCut / egonetVolume >= newCut / newVolume) {
-                        egoMapping.addNode(candidate);
-                        egonetCut = newCut;
-                        egonetVolume = newVolume;
+                        if (egonetCut / egonetVolume >= newCut / newVolume) {
+                            egoMapping.addNode(candidate);
+                            egonetCut = newCut;
+                            egonetVolume = newVolume;
+                        }
                     }
-                }
-            } else {
-                for (const std::pair<node, double> &cs : candidatesAndScores) {
-                    egoMapping.addNode(cs.first);
+                } else {
+                    for (const std::pair<node, double> &cs : candidatesAndScores) {
+                        egoMapping.addNode(cs.first);
+                    }
                 }
             }
 
