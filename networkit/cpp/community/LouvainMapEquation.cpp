@@ -109,7 +109,7 @@ count LouvainMapEquation::localMoving(std::vector<node> &nodes, count iteration)
             int tid = omp_get_thread_num();
             SparseVector<double> &neighborClusterWeights = ets_neighborClusterWeights[tid];
             if (iteration == 0) {
-                neighborClusterWeights.resize(G->upperNodeIdBound(), 0.0);
+                neighborClusterWeights.resize(result.upperBound(), 0.0);
             }
 
 #pragma omp for schedule(guided) nowait
@@ -126,7 +126,7 @@ count LouvainMapEquation::localMoving(std::vector<node> &nodes, count iteration)
         // code duplication for the use-case of clustering lots of small graphs
         SparseVector<double> &neighborClusterWeights = ets_neighborClusterWeights[0];
         if (iteration == 0) {
-            neighborClusterWeights.resize(G->upperNodeIdBound(), 0.0);
+            neighborClusterWeights.resize(result.upperBound(), 0.0);
         }
         for (node u : nodes) {
             if (tryLocalMove(u, neighborClusterWeights, dummyMoves, false)) {
