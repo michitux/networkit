@@ -36,10 +36,17 @@ void LouvainMapEquation::run() {
     Aux::SignalHandler handler;
 
     result = Partition(G->upperNodeIdBound());
-    result.allToSingletons();
+    result.setUpperBound(G->numberOfNodes());
+    {
+        index i = 0;
+        G->forNodes([&](node u) { result[u] = i++; });
+    }
     if (parallelizationType == ParallelizationType::Synchronous) {
         nextPartition = Partition(G->upperNodeIdBound());
-        nextPartition.allToSingletons();
+        {
+            index i = 0;
+            G->forNodes([&](node u) { nextPartition[u] = i++; });
+        }
     }
     if (parallelizationType == ParallelizationType::RelaxMap) {
         locks = Aux::SpinlockArray(G->upperNodeIdBound());
