@@ -571,7 +571,7 @@ cdef class LPPotts(CommunityDetector):
 	"""
 	Community Detection algorithm based on label propagation and the Absolute Potts Model.
 	"""
-	def __cinit__(self, Graph G not None, double alpha = 0.3, theta = none, maxIterations = none,
+	def __cinit__(self, Graph G not None, double alpha = 0.3, theta = none, maxIterations = 20,
 	    para = False, Partition baseClustering=None):
 		self._G = G
 		if baseClustering:
