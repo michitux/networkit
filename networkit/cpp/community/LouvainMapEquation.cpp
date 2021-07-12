@@ -360,7 +360,9 @@ double LouvainMapEquation::fitnessChange(node, double degree, double loopWeight,
         targetCutPlusVolumeCurrent = cutTarget + cutDifferenceCurrent + volTarget - degree;
     }
 
+#ifndef _MSC_VER // MSVC doesn't support OpenMP simd, at least with the flags we use
 #pragma omp simd
+#endif
     for (size_t i = 0; i < 5; ++i) {
         values[i] /= totalVolume;
         if (values[i] > 0) {
