@@ -86,7 +86,17 @@ private:
     Partition nextPartition;
     std::vector<SparseVector<double>> ets_neighborClusterWeights;
 
-    count localMoving(std::vector<node> &nodes, count iteration);
+    // for active nodes
+    static constexpr double minimumMoveFraction = 0.005;
+    static constexpr count earliestActiveNodesIteration = 10;
+    static constexpr count maximumActiveNodesBufferSize = 1 << 12;
+    bool useActiveNodes = false;
+    std::vector<node> activeNodes;
+    using AtomicRound = std::atomic<uint16_t>;
+
+    count sequentialLocalMoving(std::vector<node> &nodes, count iteration);
+    count parallelLocalMoving(std::vector<node> &nodes, count iteration,
+                              std::vector<AtomicRound> &lastActiveRound);
 
     count synchronousLocalMoving(std::vector<node> &nodes, count iteration);
 

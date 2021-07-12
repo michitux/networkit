@@ -13,6 +13,7 @@
 
 #include <omp.h>
 
+#include <mutex>
 #include <networkit/auxiliary/Parallelism.hpp>
 #include <networkit/auxiliary/SignalHandling.hpp>
 #include <networkit/coarsening/ParallelPartitionCoarsening.hpp>
@@ -72,23 +73,29 @@ void LouvainMapEquation::run() {
     updatePLogPSums();
 #endif
 
+    std::vector<AtomicRound> lastActiveRound; // not a member to retain copy constructor
+
     bool clusteringChanged = false;
     std::vector<node> nodes{G->nodeRange().begin(), G->nodeRange().end()};
     count numberOfNodesMoved = 1;
     for (count iteration = 0; iteration < maxIterations && numberOfNodesMoved > 0; ++iteration) {
         handler.assureRunning();
-        DEBUG("Iteration ", iteration);
-#ifndef NDEBUG
-        DEBUG("Map equation is ", mapEquation());
-#endif
         std::shuffle(nodes.begin(), nodes.end(), Aux::Random::getURNG());
         if (parallelizationType == ParallelizationType::Synchronous) {
             numberOfNodesMoved = synchronousLocalMoving(nodes, iteration);
+        } else if (parallelizationType == ParallelizationType::RelaxMap) {
+            numberOfNodesMoved = parallelLocalMoving(nodes, iteration, lastActiveRound);
         } else {
-            numberOfNodesMoved = localMoving(nodes, iteration);
+            numberOfNodesMoved = sequentialLocalMoving(nodes, iteration);
         }
         clusteringChanged |= numberOfNodesMoved > 0;
+
+        DEBUG("iteration ", iteration, " num moves ", numberOfNodesMoved);
+#ifndef NDEBUG
+        DEBUG("Map equation is ", mapEquation());
+#endif
     }
+    useActiveNodes = false;
 
     handler.assureRunning();
     if (hierarchical && clusteringChanged) {
@@ -97,43 +104,108 @@ void LouvainMapEquation::run() {
     hasRun = true;
 }
 
-count LouvainMapEquation::localMoving(std::vector<node> &nodes, count iteration) {
+count LouvainMapEquation::sequentialLocalMoving(std::vector<node> &nodes, count iteration) {
+    std::vector<Move> dummyMoves;
+    count nodesMoved = 0;
+    SparseVector<double> &neighborClusterWeights = ets_neighborClusterWeights[0];
+    if (iteration == 0) {
+        neighborClusterWeights.resize(result.upperBound(), 0.0);
+    }
+    for (node u : nodes) {
+        if (tryLocalMove(u, neighborClusterWeights, dummyMoves, false)) {
+            nodesMoved += 1;
+        }
+    }
+    return nodesMoved;
+}
+
+count LouvainMapEquation::parallelLocalMoving(std::vector<node> &nodes, count iteration,
+                                              std::vector<AtomicRound> &lastActiveRound) {
     // dummies, since SLM implementation needs more datastructures
     std::vector<Move> dummyMoves;
-
     count nodesMoved = 0;
-    if (parallel) {
+
+    std::mutex activeNodesLock;
+    activeNodes.clear();
+    auto activateNode = [&](const node u) -> bool {
+        auto l = lastActiveRound[u].load(std::memory_order_relaxed);
+        if (l != iteration)
+            return false;
+        return lastActiveRound[u].compare_exchange_strong(l, iteration, std::memory_order_acq_rel);
+    };
+
 #pragma omp parallel
-        {
-            count nm = 0;
-            int tid = omp_get_thread_num();
-            SparseVector<double> &neighborClusterWeights = ets_neighborClusterWeights[tid];
-            if (iteration == 0) {
-                neighborClusterWeights.resize(result.upperBound(), 0.0);
-            }
-
-#pragma omp for schedule(guided) nowait
-            for (omp_index i = 0; i < static_cast<omp_index>(nodes.size()); ++i) {
-                if (tryLocalMove(nodes[i], neighborClusterWeights, dummyMoves, false)) {
-                    nm += 1;
-                }
-            }
-
-#pragma omp atomic
-            nodesMoved += nm;
-        }
-    } else {
-        // code duplication for the use-case of clustering lots of small graphs
-        SparseVector<double> &neighborClusterWeights = ets_neighborClusterWeights[0];
+    {
+        count nm = 0;
+        int tid = omp_get_thread_num();
+        SparseVector<double> &neighborClusterWeights = ets_neighborClusterWeights[tid];
         if (iteration == 0) {
             neighborClusterWeights.resize(result.upperBound(), 0.0);
         }
-        for (node u : nodes) {
+
+        std::vector<node> activeNodesBuffer;
+
+#pragma omp for schedule(guided) nowait
+        for (omp_index i = 0; i < static_cast<omp_index>(nodes.size()); ++i) {
+            const node u = nodes[i];
             if (tryLocalMove(u, neighborClusterWeights, dummyMoves, false)) {
-                nodesMoved += 1;
+                nm += 1;
+                if (useActiveNodes) {
+                    G->forNeighborsOf(u, [&](node v) {
+                        if (activateNode(v)) {
+                            activeNodesBuffer.push_back(v);
+                        }
+                    });
+                    if (activateNode(u)) {
+                        activeNodesBuffer.push_back(u);
+                    }
+                    // flush local buffer but don't insist on it
+                    if (activeNodesBuffer.size() > maximumActiveNodesBufferSize
+                        && activeNodesLock.try_lock()) {
+                        activeNodes.insert(activeNodes.end(), activeNodesBuffer.begin(),
+                                           activeNodesBuffer.end());
+                        activeNodesLock.unlock();
+                        activeNodesBuffer.clear();
+                    }
+                }
             }
         }
+
+        // clear out local buffer but insist on the lock.
+        if (!activeNodesBuffer.empty()) {
+            activeNodesLock.lock();
+            activeNodes.insert(activeNodes.end(), activeNodesBuffer.begin(),
+                               activeNodesBuffer.end());
+            activeNodesLock.unlock();
+            activeNodesBuffer.clear();
+        }
+
+#pragma omp atomic
+        nodesMoved += nm;
     }
+
+    if (useActiveNodes) {
+        std::swap(nodes, activeNodes);
+    }
+
+    if (nodesMoved > 0 && !useActiveNodes && parallelizationType == ParallelizationType::RelaxMap
+        && iteration >= earliestActiveNodesIteration
+        && nodesMoved < minimumMoveFraction * G->numberOfNodes()) {
+        DEBUG("start using active nodes for the level. threshold = ",
+              minimumMoveFraction * G->numberOfNodes(), " num moves = ", nodesMoved);
+        useActiveNodes = true;
+        if (lastActiveRound.empty()) {
+            // assign because std::atomic has no copy constructor
+            lastActiveRound = std::vector<AtomicRound>(G->upperNodeIdBound());
+        }
+    }
+
+    if (useActiveNodes && nodesMoved == 0) {
+        // do one full round at the end
+        useActiveNodes = false;
+        nodes = std::vector<node>(G->nodeRange().begin(), G->nodeRange().end());
+    }
+
     return nodesMoved;
 }
 
@@ -451,8 +523,8 @@ void LouvainMapEquation::runHierarchical() {
 
     assert(metaGraph.numberOfNodes() < G->numberOfNodes());
 
-    INFO("Run hierarchical with ", metaGraph.numberOfNodes(), " clusters (from ",
-         G->numberOfNodes(), " nodes)");
+    DEBUG("Run hierarchical with ", metaGraph.numberOfNodes(), " clusters (from ",
+          G->numberOfNodes(), " nodes)");
 
     ParallelizationType para =
         metaGraph.numberOfNodes() > 10000 ? parallelizationType : ParallelizationType::None;
