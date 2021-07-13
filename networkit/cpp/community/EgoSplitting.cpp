@@ -21,6 +21,7 @@
 #include <networkit/community/PLM.hpp>
 #include <networkit/community/LouvainMapEquation.hpp>
 #include <networkit/community/cleanup/SignificanceCommunityCleanUp.hpp>
+#include <networkit/components/ConnectedComponents.hpp>
 #include <networkit/components/ParallelConnectedComponents.hpp>
 #include <networkit/coarsening/ParallelPartitionCoarsening.hpp>
 #include <networkit/graph/RandomMaximumSpanningForest.hpp>
@@ -383,6 +384,9 @@ void EgoSplitting::connectPersonas() {
         return personaOffsets[u] + i;
     };
 
+    Aux::Timer timer;
+    timer.start();
+
     for (node u = 0; u < G->upperNodeIdBound(); ++u) {
         if (!G->hasNode(u) || G->degree(u) < 2)
             continue;
@@ -417,6 +421,10 @@ void EgoSplitting::connectPersonas() {
             ++egoNetPartitionsOffset[u];
         }
     }
+
+    timer.stop();
+    INFO("adding persona graph edges took ", timer.elapsedMilliseconds(), " ms");
+    timer.start();
 
 #ifndef NDEBUG
     count internalPersonaEdges = 0;
@@ -462,6 +470,11 @@ void EgoSplitting::connectPersonas() {
     ParallelConnectedComponents compsAlgo(personaGraph);
     compsAlgo.run();
     const Partition& comps = compsAlgo.getPartition();
+
+    timer.stop();
+    INFO("connected components took ", timer.elapsedMilliseconds(), " ms");
+    timer.start();
+
     std::vector<count> componentSizes(compsAlgo.numberOfComponents());
     personaGraph.parallelForNodes([&](node u) {
         if (componentSizes[comps[u]] < minCommunitySize) {
@@ -470,12 +483,20 @@ void EgoSplitting::connectPersonas() {
         }
 
     });
+
+    timer.stop();
+    INFO("component sizes took ", timer.elapsedMilliseconds(), " ms");
+    timer.start();
+
     personaGraph.forNodes([&](node u) {
         const index c = compsAlgo.componentOfNode(u);
         if (componentSizes[c] < minCommunitySize) {
             personaGraph.removeNode(u);
         }
     });
+
+    timer.stop();
+    INFO("removing small components took ", timer.elapsedMilliseconds(), " ms");
 
     egoNetPartitions.clear();
     egoNetPartitions.shrink_to_fit();
