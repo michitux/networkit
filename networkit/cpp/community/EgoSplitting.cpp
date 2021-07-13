@@ -388,7 +388,7 @@ void EgoSplitting::connectPersonas() {
 
     count addedEdges = 0;
 
-#pragma omp parallel for reduction(+:addedEdges)
+#pragma omp parallel for schedule(guided) reduction(+:addedEdges)
     for (omp_index u = 0; u < G->upperNodeIdBound(); ++u) {
         addedEdges += 0;
         if (!G->hasNode(u) || G->degree(u) < 2)
