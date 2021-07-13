@@ -494,7 +494,7 @@ void EgoSplitting::connectPersonas() {
     std::vector<count> componentSizes(compsAlgo.numberOfComponents());
     personaGraph.parallelForNodes([&](node u) {
         if (componentSizes[comps[u]] < minCommunitySize) {
-#pragma omp atomic update
+#pragma omp atomic
             componentSizes[comps[u]] += 1;
         }
 
