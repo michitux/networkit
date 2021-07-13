@@ -94,7 +94,7 @@ TEST_F(CleanupGTest, testCleanUp) {
     Graph G = graphReader.read("input/10_clusters.graph");
     node isolatedNode = G.addNode();
     std::map<std::string, std::string> parameters;
-    parameters["Extend EgoNet Strategy"] = "None";
+    parameters["Extend EgoNet"] = "No";
     EgoSplitting algo(G);
     algo.setParameters(parameters);
     algo.run();
