@@ -491,10 +491,12 @@ void EgoSplitting::connectPersonas() {
 
     count removedEdges = 0;
     personaGraph.forNodes([&](node u) {
-        // the other direction gets deleted as well, since we remove connected components
-        removedEdges += personaGraph.degree(u);
-        personaGraph.removePartialOutEdges(unsafe, u);
-        personaGraph.removeNode(u);
+        if (componentSizes[comps[u]] < minCommunitySize) {
+            // the other direction gets deleted as well, since we remove connected components
+            removedEdges += personaGraph.degree(u);
+            personaGraph.removePartialOutEdges(unsafe, u);
+            personaGraph.removeNode(u);
+        }
     });
     personaGraph.setEdgeCount(unsafe, personaGraph.numberOfEdges() - removedEdges / 2);
 
