@@ -22,7 +22,6 @@
 #include <networkit/community/LouvainMapEquation.hpp>
 #include <networkit/community/cleanup/SignificanceCommunityCleanUp.hpp>
 #include <networkit/components/ConnectedComponents.hpp>
-#include <networkit/components/ParallelConnectedComponents.hpp>
 #include <networkit/coarsening/ParallelPartitionCoarsening.hpp>
 #include <networkit/graph/RandomMaximumSpanningForest.hpp>
 #include <networkit/structures/Partition.hpp>
@@ -426,33 +425,34 @@ void EgoSplitting::connectPersonas() {
     INFO("adding persona graph edges took ", timer.elapsedMilliseconds(), " ms");
 
 #ifndef NDEBUG
-    count internalPersonaEdges = 0;
-    for (const auto &edges : personaEdges)
-        internalPersonaEdges += edges.size();
-    count removedEdges = 0;
-    G->forNodes([&](node v) {
-        if (G->degree(v) == 1) {
-            node neighbor = none;
-            G->forNeighborsOf(v, [&](node x) { neighbor = x; });
-            assert(neighbor != none);
-            if (G->degree(neighbor) > 1 || v < neighbor) {
-                ++removedEdges;
-            }
-        }
-    });
-    assert(personaGraph.numberOfEdges() + removedEdges == G->numberOfEdges() + internalPersonaEdges);
-
-    personaGraph.forNodes([&](node u) {
-        assert(personaGraph.degree(u) >= 1);
-        if (personaGraph.degree(u) == 1) {
-            node neighbor = none;
-            personaGraph.forNeighborsOf(u, [&](node x) { neighbor = x; });
-            assert(neighbor != u);
-        }
-    });
     {
+        count internalPersonaEdges = 0;
+        for (const auto &edges : personaEdges)
+            internalPersonaEdges += edges.size();
+        count removedEdges = 0;
+        G->forNodes([&](node v) {
+            if (G->degree(v) == 1) {
+                node neighbor = none;
+                G->forNeighborsOf(v, [&](node x) { neighbor = x; });
+                assert(neighbor != none);
+                if (G->degree(neighbor) > 1 || v < neighbor) {
+                    ++removedEdges;
+                }
+            }
+        });
+        assert(personaGraph.numberOfEdges() + removedEdges == G->numberOfEdges() + internalPersonaEdges);
+
+        personaGraph.forNodes([&](node u) {
+            assert(personaGraph.degree(u) >= 1);
+            if (personaGraph.degree(u) == 1) {
+                node neighbor = none;
+                personaGraph.forNeighborsOf(u, [&](node x) { neighbor = x; });
+                assert(neighbor != u);
+            }
+        });
+
         // check that no isolated nodes were added
-        ParallelConnectedComponents compsAlgo(personaGraph);
+        ConnectedComponents compsAlgo(personaGraph);
         compsAlgo.run();
         auto componentSizeMap = compsAlgo.getPartition().subsetSizeMap();
         count isolatedNodes = 0;
@@ -468,7 +468,7 @@ void EgoSplitting::connectPersonas() {
     timer.start();
 
     // Remove small components in the persona graph, as the resulting communities would always be discarded
-    ParallelConnectedComponents compsAlgo(personaGraph);
+    ConnectedComponents compsAlgo(personaGraph);
     compsAlgo.run();
     const Partition& comps = compsAlgo.getPartition();
 
@@ -480,7 +480,7 @@ void EgoSplitting::connectPersonas() {
     personaGraph.parallelForNodes([&](node u) {
         if (componentSizes[comps[u]] < minCommunitySize) {
 #pragma omp atomic update
-            componentSizes[compsAlgo.componentOfNode(u)] += 1;
+            componentSizes[comps[u]] += 1;
         }
 
     });
@@ -489,13 +489,14 @@ void EgoSplitting::connectPersonas() {
     INFO("component sizes took ", timer.elapsedMilliseconds(), " ms");
     timer.start();
 
-    personaGraph.parallelForNodes([&](node u) {
-        if (comps[u] < minCommunitySize) {
-            // edges in the other direction are eliminated as well, since we remove connected components
-            personaGraph.removePartialOutEdges(unsafe, u);
-            personaGraph.removeNode(u);
-        }
+    count removedEdges = 0;
+    personaGraph.forNodes([&](node u) {
+        // the other direction gets deleted as well, since we remove connected components
+        removedEdges += personaGraph.degree(u);
+        personaGraph.removePartialOutEdges(unsafe, u);
+        personaGraph.removeNode(u);
     });
+    personaGraph.setEdgeCount(unsafe, personaGraph.numberOfEdges() - removedEdges / 2);
 
     timer.stop();
     INFO("removing small components took ", timer.elapsedMilliseconds(), " ms");
