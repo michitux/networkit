@@ -488,9 +488,10 @@ void EgoSplitting::connectPersonas() {
     INFO("component sizes took ", timer.elapsedMilliseconds(), " ms");
     timer.start();
 
-    personaGraph.forNodes([&](node u) {
-        const index c = compsAlgo.componentOfNode(u);
-        if (componentSizes[c] < minCommunitySize) {
+    personaGraph.parallelForNodes([&](node u) {
+        if (comps[u] < minCommunitySize) {
+            // edges in the other direction are eliminated as well, since we remove connected components
+            personaGraph.removePartialOutEdges(unsafe, u);
             personaGraph.removeNode(u);
         }
     });
