@@ -209,8 +209,8 @@ void EgoSplitting::createEgoNets() {
                 // Get scores of extension candidates
                 candidatesAndScores.clear();
                 weightToOriginalEgoNet.forElements([&](node candidate, double neighborCount) {
-                    if (neighborCount >= minNeighbors) {
-                        double score = neighborCount * neighborCount / G->degree(candidate);
+                    if (neighborCount >= minNeighbors) { // FIXME: this absolute limit doesn't work for weighted
+                        double score = neighborCount * neighborCount / G->degree(candidate); // FIXME: replace degree by (stored) weighted degree for weighted
                         candidatesAndScores.emplace_back(candidate, score);
                     }
                 });
