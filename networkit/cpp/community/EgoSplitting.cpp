@@ -648,7 +648,7 @@ std::vector<std::unordered_map<node, index>> EgoSplitting::getEgoNetPartitions()
 void
 EgoSplitting::setParameters(std::map<std::string, std::string> const &new_parameters) {
     for (auto &x : new_parameters) {
-        this->parameters[x.first] = x.second;
+        parameters.at(x.first) = x.second;
     }
 }
 
