@@ -424,7 +424,6 @@ void EgoSplitting::connectPersonas() {
 
     timer.stop();
     INFO("adding persona graph edges took ", timer.elapsedMilliseconds(), " ms");
-    timer.start();
 
 #ifndef NDEBUG
     count internalPersonaEdges = 0;
@@ -465,6 +464,8 @@ void EgoSplitting::connectPersonas() {
         assert(isolatedNodes == 0);
     }
 #endif
+
+    timer.start();
 
     // Remove small components in the persona graph, as the resulting communities would always be discarded
     ParallelConnectedComponents compsAlgo(personaGraph);
