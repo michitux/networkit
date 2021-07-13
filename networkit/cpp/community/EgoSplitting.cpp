@@ -386,7 +386,11 @@ void EgoSplitting::connectPersonas() {
     Aux::Timer timer;
     timer.start();
 
-    for (node u = 0; u < G->upperNodeIdBound(); ++u) {
+    count addedEdges = 0;
+
+#pragma omp parallel for reduction(+:addedEdges)
+    for (omp_index u = 0; u < G->upperNodeIdBound(); ++u) {
+        addedEdges += 0;
         if (!G->hasNode(u) || G->degree(u) < 2)
             continue;
         // Connect personas of each node
@@ -394,32 +398,43 @@ void EgoSplitting::connectPersonas() {
             node pu = getPersona(u, edge.u);
             node pv = getPersona(u, edge.v);
             assert(pu != pv);
-            personaGraph.addEdge(pu, pv, edge.weight);
+            personaGraph.addPartialOutEdge(unsafe, pu, pv, edge.weight);
+            personaGraph.addPartialOutEdge(unsafe, pv, pu, edge.weight);
+            addedEdges += 2;
         }
 
         // Connect personas of different nodes
+        const auto b = egoNetPartitions.cbegin();
         const index egoBeginU = egoNetPartitionsOffset[u];
         const index nextEgoBegin = egoNetPartitionsOffset[u + 1];
         const index personaOffsetU = getPersona(u, 0);
         for (index i = egoBeginU; i < nextEgoBegin; ++i) {
             const std::pair<node, index> &neighborPersona = egoNetPartitions[i];
-            node neighbor = neighborPersona.first;
+            const node v = neighborPersona.first;
+            if (v == none) break;
 
-            // Are we already at the end of the current ego node
-            if (neighbor <= u || neighbor == none) break;
+            const std::pair<node, index> toFind { u, 0 };
 
-            index neighborPos = egoNetPartitionsOffset[neighbor];
-            assert(neighborPos < egoNetPartitions.size());
-            assert(egoNetPartitions[neighborPos].first == u);
-            const node pu = personaOffsetU + neighborPersona.second;
-            const node pv = getPersona(neighbor, egoNetPartitions[neighborPos].second);
+            /*
+            const auto it = std::find_if(b + egoNetPartitionsOffset[v],
+                                         b + egoNetPartitionsOffset[v + 1],
+                                         [&](const std::pair<node, index>& i) { return i.first == u; });
+            */
+            const auto it = std::lower_bound(b + egoNetPartitionsOffset[v],
+                                             b + egoNetPartitionsOffset[v + 1],
+                                             toFind);
+            assert(it != b + egoNetPartitionsOffset[v + 1]);
+            assert(it->first == u);
+            assert(it->second < G->degree(v));
+            const node pu = getPersona(v, it->second); // persona of u in v's neighbor list
+            const node pv = personaOffsetU + neighborPersona.second;// persona of v in u's neighbors
             assert(pu != none && pv != none);
-            personaGraph.addEdge(pu, pv);
-
-            ++egoNetPartitionsOffset[neighbor];
-            ++egoNetPartitionsOffset[u];
+            personaGraph.addPartialOutEdge(unsafe, pv, pu);     // FIXME misses edge weight! (and did so before!)
+            addedEdges += 1;
         }
     }
+
+    personaGraph.setEdgeCount(unsafe, addedEdges / 2);
 
     timer.stop();
     INFO("adding persona graph edges took ", timer.elapsedMilliseconds(), " ms");
