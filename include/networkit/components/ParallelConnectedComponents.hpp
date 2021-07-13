@@ -57,7 +57,7 @@ public:
     /**
      * Return a Partition that represents the components
      */
-    Partition getPartition() const;
+    const Partition &getPartition() const;
 
     /**
      * @return Vector of components, each stored as (unordered) set of nodes.

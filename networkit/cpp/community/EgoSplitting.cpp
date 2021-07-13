@@ -21,7 +21,7 @@
 #include <networkit/community/PLM.hpp>
 #include <networkit/community/LouvainMapEquation.hpp>
 #include <networkit/community/cleanup/SignificanceCommunityCleanUp.hpp>
-#include <networkit/components/ConnectedComponents.hpp>
+#include <networkit/components/ParallelConnectedComponents.hpp>
 #include <networkit/coarsening/ParallelPartitionCoarsening.hpp>
 #include <networkit/graph/RandomMaximumSpanningForest.hpp>
 #include <networkit/structures/Partition.hpp>
@@ -445,9 +445,9 @@ void EgoSplitting::connectPersonas() {
     });
     {
         // check that no isolated nodes were added
-        ConnectedComponents compsAlgo(personaGraph);
+        ParallelConnectedComponents compsAlgo(personaGraph);
         compsAlgo.run();
-        auto componentSizeMap = compsAlgo.getComponentSizes();
+        auto componentSizeMap = compsAlgo.getPartition().subsetSizeMap();
         count isolatedNodes = 0;
         for (const auto &component  : componentSizeMap) {
             count numNodes = component.second;
@@ -458,13 +458,17 @@ void EgoSplitting::connectPersonas() {
     }
 #endif
 
-
     // Remove small components in the persona graph, as the resulting communities would always be discarded
-    ConnectedComponents compsAlgo(personaGraph);
+    ParallelConnectedComponents compsAlgo(personaGraph);
     compsAlgo.run();
+    const Partition& comps = compsAlgo.getPartition();
     std::vector<count> componentSizes(compsAlgo.numberOfComponents());
-    personaGraph.forNodes([&](node u) {
-        ++componentSizes[compsAlgo.componentOfNode(u)];
+    personaGraph.parallelForNodes([&](node u) {
+        if (componentSizes[comps[u]] < minCommunitySize) {
+#pragma omp atomic update
+            componentSizes[compsAlgo.componentOfNode(u)] += 1;
+        }
+
     });
     personaGraph.forNodes([&](node u) {
         const index c = compsAlgo.componentOfNode(u);

@@ -171,7 +171,7 @@ void ParallelConnectedComponents::runSequential() {
 }
 
 
-Partition ParallelConnectedComponents::getPartition() const {
+const Partition &ParallelConnectedComponents::getPartition() const {
     assureFinished();
     return this->component;
 }
